@@ -47,6 +47,13 @@ interface MarketItem {
   onChain: OnChainState | null;
 }
 
+// 同一 Gate 命题被 owner 重复广播了两次。保留更早创建的
+// 0xc90Ab8EeF942a9aecA29A9280526AB3476eC4949 作为前端唯一正式入口；
+// 链上 Factory 没有删除 Vault 的接口，因此这里只能停止展示较晚的副本。
+const HIDDEN_DUPLICATE_VAULTS = new Set([
+  "0x818064be8a2656b7ffd19b6abf6084b75552f12d",
+]);
+
 const MOCK_EXPLORE_ITEMS: MarketItem[] = [];
 
 interface ExploreViewProps {
@@ -205,7 +212,10 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
     try {
       const provider = new JsonRpcProvider(config.rpcUrl);
       const factory = new Contract(config.factoryAddress, FACTORY_ABI, provider);
-      const vaults = (await factory.getVaults()) as string[];
+      const factoryVaults = (await factory.getVaults()) as string[];
+      const vaults = factoryVaults.filter(
+        (vaultAddr) => !HIDDEN_DUPLICATE_VAULTS.has(String(vaultAddr).toLowerCase()),
+      );
       if (!Array.isArray(vaults) || vaults.length === 0) {
         return [];
       }
