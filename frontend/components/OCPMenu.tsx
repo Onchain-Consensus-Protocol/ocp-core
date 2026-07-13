@@ -90,7 +90,7 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
             X / @ocp_protocol
           </a>
           <a
-            href="https://github.com/Onchain-Consensus-Protocol/ocp"
+            href="https://github.com/Onchain-Consensus-Protocol/ocp-core"
             target="_blank"
             rel="noopener noreferrer"
             role="menuitem"
