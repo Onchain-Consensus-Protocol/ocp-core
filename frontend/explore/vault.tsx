@@ -9,7 +9,7 @@ import { OCPMenu } from "../components/OCPMenu";
 import { Contract, JsonRpcProvider, formatUnits, parseUnits, type JsonRpcSigner } from "ethers";
 import {
   ShieldAlert, Zap, ArrowLeftRight, LayoutDashboard, AlertTriangle,
-  ArrowRight, Share2, TrendingUp, BarChart3,
+  ArrowRight, Share2,
   X,
 } from "lucide-react";
 import { Button } from "../components/Button";
@@ -21,148 +21,6 @@ import { useWallet } from "../useWallet";
 
 type TabMode = "PROTOCOL" | "MARKET";
 type TradeMode = "BUY" | "SELL";
-
-/** 一个时间点上的累计质押快照（从 Staked 事件链重放得到） */
-interface StakePoint {
-  /** 相对位置 0..1（创建→结算时间线） */
-  t: number;
-  yes: number;
-  no: number;
-  invalid: number;
-}
-
-type TrendStatus = "loading" | "ready" | "empty" | "error";
-
-/**
- * 纯 SVG 堆叠面积图：展示 YES / NO / INVALID 三侧累计仓位占比随时间走势。
- * 不依赖任何第三方 chart 库，颜色复用全局 success / danger / yellow-500 主题。
- */
-function StakeTrendChart({
-  points,
-  status,
-  lang,
-}: {
-  points: StakePoint[];
-  status: TrendStatus;
-  lang: "zh" | "en";
-}) {
-  const t = CONTENT[lang].ui;
-
-  const W = 600;
-  const H = 220;
-  const PAD_L = 36;
-  const PAD_R = 12;
-  const PAD_T = 12;
-  const PAD_B = 24;
-  const plotW = W - PAD_L - PAD_R;
-  const plotH = H - PAD_T - PAD_B;
-
-  const COL_YES = "#15803d";
-  const COL_NO = "#b91c1c";
-  const COL_INVALID = "#ca8a04";
-
-  if (status === "loading") {
-    return (
-      <div className="rounded-xl border border-border p-4 text-center text-xs font-mono text-text-muted animate-fade-in">
-        {t.trend_chart_loading}
-      </div>
-    );
-  }
-  if (status === "empty" || points.length === 0) {
-    return (
-      <div className="rounded-xl border border-border p-4 text-center text-xs font-mono text-text-muted animate-fade-in">
-        {t.trend_chart_no_data}
-      </div>
-    );
-  }
-
-  // 确保时间线首尾闭合：起点 (0,0,0,0) 与终点快照
-  const seq: StakePoint[] = [];
-  if (points[0].t > 0) seq.push({ t: 0, yes: 0, no: 0, invalid: 0 });
-  seq.push(...points);
-  if (seq[seq.length - 1].t < 1) seq.push({ ...seq[seq.length - 1], t: 1 });
-
-  const xOf = (tt: number) => PAD_L + tt * plotW;
-  // y 满量程为 100（百分比堆叠），自底向上叠放
-  const yOf = (pctFromBottom: number) => PAD_T + plotH - (pctFromBottom / 100) * plotH;
-
-  // 每个点计算三层（百分比）的累计下沿
-  const layers = seq.map((p) => {
-    const total = p.yes + p.no + p.invalid;
-    const yesPct = total > 0 ? (p.yes / total) * 100 : 0;
-    const noPct = total > 0 ? (p.no / total) * 100 : 0;
-    const invalidPct = total > 0 ? (p.invalid / total) * 100 : 0;
-    return {
-      x: xOf(p.t),
-      yesPct,
-      noPct,
-      invalidPct,
-      // 自底（YES）→ NO → INVALID（顶）
-      yesTop: yesPct,
-      noTop: yesPct + noPct,
-      invTop: yesPct + noPct + invalidPct,
-    };
-  });
-
-  const buildArea = (topKey: "yesTop" | "noTop" | "invTop", bottomKey: "yesTop" | "noTop" | "invTop" | "zero") => {
-    const top = layers.map((l) => `${l.x.toFixed(1)},${yOf(l[topKey]).toFixed(1)}`).join(" ");
-    const bottom = layers
-      .slice()
-      .reverse()
-      .map((l) => `${l.x.toFixed(1)},${yOf(bottomKey === "zero" ? 0 : l[bottomKey]).toFixed(1)}`)
-      .join(" ");
-    return `${top} ${bottom}`;
-  };
-
-  const yesArea = buildArea("yesTop", "zero");
-  const noArea = buildArea("noTop", "yesTop");
-  const invalidArea = buildArea("invTop", "noTop");
-
-  // 网格 + Y 轴刻度
-  const gridLines = [0, 25, 50, 75, 100];
-
-  // X 轴标签：首尾 + 中点
-  const xLabels = [
-    { t: 0, label: lang === "zh" ? "创建" : "Open" },
-    { t: 1, label: lang === "zh" ? "结算" : "Final" },
-  ];
-
-  return (
-    <div className="rounded-xl border border-border p-4 animate-fade-in">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-accent" />
-          <span className="text-xs font-bold font-display tracking-wide text-text">{t.trend_chart_title}</span>
-        </div>
-        <div className="flex items-center gap-3 text-[10px] font-mono">
-          <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: COL_YES }} /><span className="text-success font-bold">{t.trend_chart_legend_yes}</span></span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: COL_NO }} /><span className="text-danger font-bold">{t.trend_chart_legend_no}</span></span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: COL_INVALID }} /><span className="text-yellow-500 font-bold">{t.trend_chart_legend_invalid}</span></span>
-        </div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={t.trend_chart_title}>
-        {/* 网格 */}
-        {gridLines.map((g) => (
-          <line key={g} x1={PAD_L} x2={W - PAD_R} y1={yOf(g)} y2={yOf(g)} stroke="currentColor" strokeWidth={0.5} className="text-border" />
-        ))}
-        {/* Y 轴刻度 */}
-        {gridLines.map((g) => (
-          <text key={`y${g}`} x={PAD_L - 6} y={yOf(g) + 3} textAnchor="end" fontSize={9} className="fill-text-muted font-mono">{g}</text>
-        ))}
-        {/* 堆叠区域 */}
-        <polygon points={yesArea} fill={COL_YES} fillOpacity={0.55} stroke={COL_YES} strokeWidth={1} />
-        <polygon points={noArea} fill={COL_NO} fillOpacity={0.55} stroke={COL_NO} strokeWidth={1} />
-        <polygon points={invalidArea} fill={COL_INVALID} fillOpacity={0.55} stroke={COL_INVALID} strokeWidth={1} />
-        {/* 边框 */}
-        <rect x={PAD_L} y={PAD_T} width={plotW} height={plotH} fill="none" stroke="currentColor" strokeWidth={0.75} className="text-border" />
-        {/* X 轴标签 */}
-        {xLabels.map((xl) => (
-          <text key={`x${xl.t}`} x={xOf(xl.t)} y={H - 6} textAnchor={xl.t === 0 ? "start" : "end"} fontSize={9} className="fill-text-muted font-mono">{xl.label}</text>
-        ))}
-      </svg>
-    </div>
-  );
-}
 
 interface DetailState {
   snapshotBlock: number;
@@ -295,9 +153,6 @@ function VaultPage({
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [trendPoints, setTrendPoints] = useState<StakePoint[]>([]);
-  const [trendStatus, setTrendStatus] = useState<TrendStatus>("loading");
-  const [showTrend, setShowTrend] = useState<boolean>(true);
 
   useEffect(() => {
     const t = setInterval(() => setLiveNow(Math.floor(Date.now() / 1000)), 1000);
@@ -495,72 +350,6 @@ function VaultPage({
       setDetailLoading(false);
     }
   }, [vaultAddr, marketAddr, signer, walletAddress, lang]);
-
-  /**
-   * 查询该 Vault 的全部 Staked 事件，重放出 YES/NO/INVALID 累计仓位随时间的走势。
-   * 事件中的 totalAmount 即该侧质押后的累计金额，无需额外累加。
-   * 按 blockNumber 升序排列；点过多时按时间线性降采样到 ~12 个点。
-   */
-  const fetchTrend = useCallback(async () => {
-    setTrendStatus("loading");
-    try {
-      const provider = config.rpcUrl ? new JsonRpcProvider(config.rpcUrl) : null;
-      if (!provider) { setTrendStatus("error"); return; }
-      const vault = new Contract(vaultAddr, VAULT_ABI, provider);
-      const stakedEvent = vault.getEvent("Staked");
-      const filter = stakedEvent.filter;
-      const logs = await vault.queryFilter(filter, 0, "latest");
-
-      if (!logs || logs.length === 0) { setTrendStatus("empty"); setTrendPoints([]); return; }
-
-      // 取每个事件的 blockNumber / side / totalAmount，并获取对应时间戳
-      const enriched = await Promise.all(logs.map(async (log) => {
-        const block = await provider.getBlock(log.blockNumber);
-        return {
-          ts: block?.timestamp ?? 0,
-          side: Number(log.args.side),
-          total: BigInt(log.args.totalAmount),
-        };
-      }));
-
-      // 按时间升序
-      enriched.sort((a, b) => a.ts - b.ts);
-
-      // 用事件序列重放出每个时间点上三侧的累计金额
-      let yes = 0, no = 0, invalid = 0;
-      const raw: StakePoint[] = [];
-      const tStart = enriched[0].ts;
-      const tEnd = detailState?.resolutionTime && detailState.resolutionTime > tStart
-        ? detailState.resolutionTime
-        : enriched[enriched.length - 1].ts;
-      const span = Math.max(1, tEnd - tStart);
-      for (const e of enriched) {
-        if (e.side === 0) yes = Number(e.total);
-        else if (e.side === 1) no = Number(e.total);
-        else if (e.side === 2) invalid = Number(e.total);
-        raw.push({ t: Math.min(1, Math.max(0, (e.ts - tStart) / span)), yes, no, invalid });
-      }
-      // 保证末尾落在结算点（resolutionTime）
-      raw.push({ t: 1, yes, no, invalid });
-
-      // 降采样：如果点数 > 14，等步长抽取，保留首尾
-      const MAX_POINTS = 14;
-      let sampled = raw;
-      if (raw.length > MAX_POINTS) {
-        sampled = raw.filter((_, i) => i === 0 || i === raw.length - 1 || i % Math.ceil(raw.length / MAX_POINTS) === 0);
-      }
-
-      setTrendPoints(sampled);
-      setTrendStatus("ready");
-    } catch {
-      setTrendStatus("error");
-    }
-  }, [vaultAddr, detailState?.resolutionTime]);
-
-  useEffect(() => {
-    if (!detailState) return;
-    fetchTrend();
-  }, [fetchTrend, detailState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1206,26 +995,6 @@ function VaultPage({
             <span className="w-2 h-2 bg-success rounded-full" /> {t.sys_online}
           </div>
         </div>
-        {/* 走势图：YES / NO / INVALID 累计仓位占比随时间变化 */}
-        {tabMode === "PROTOCOL" && detailState && (
-          <div className="mb-6">
-            <button
-              onClick={() => setShowTrend((v) => !v)}
-              className="w-full flex items-center justify-between mb-2 px-1 group"
-              aria-expanded={showTrend}
-            >
-              <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-text-muted font-display group-hover:text-text transition-colors">
-                <BarChart3 className="w-3.5 h-3.5 text-accent" />
-                {t.trend_chart_title}
-                <span className="text-[9px] text-text-muted normal-case font-mono ml-1">{showTrend ? (lang === "zh" ? "[收起]" : "[hide]") : (lang === "zh" ? "[展开]" : "[show]")}</span>
-              </span>
-            </button>
-            {showTrend && (
-              <StakeTrendChart points={trendPoints} status={trendStatus} lang={lang} />
-            )}
-          </div>
-        )}
-
         <div className="space-y-3 sm:space-y-4 mb-5 sm:mb-8 animate-fade-in">
           <div className="text-center text-xs font-bold uppercase tracking-widest mb-2 text-text-muted font-display">
             {tabMode === "MARKET" ? t.showing_market : protocolPoolLabel}

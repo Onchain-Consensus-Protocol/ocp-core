@@ -189,15 +189,6 @@ export const CONTENT = {
       bridge_demo_title: "Bridge + Fact Verification Layer (OCP)",
       bridge_demo_subtitle: "OCP provides the fact layer only; the bridge (liquidity, release) can be built by partners. This demo shows how the two layers interact.",
 
-      // Stake Trend Chart
-      trend_chart_title: "Stake History",
-      trend_chart_no_data: "No staking activity yet",
-      trend_chart_loading: "Loading stake history...",
-      trend_chart_legend_yes: "YES",
-      trend_chart_legend_no: "NO",
-      trend_chart_legend_invalid: "INVALID",
-      trend_toggle_chart: "Trend",
-      trend_toggle_bars: "Bars",
     }
   },
   zh: {
@@ -393,15 +384,6 @@ export const CONTENT = {
       ai_stake_yes_safe: "质押 YES (安全)",
       ai_stake_no_unsafe: "质押 NO (不安全)",
 
-      // Stake Trend Chart
-      trend_chart_title: "质押走势",
-      trend_chart_no_data: "暂无质押记录",
-      trend_chart_loading: "加载质押历史...",
-      trend_chart_legend_yes: "YES",
-      trend_chart_legend_no: "NO",
-      trend_chart_legend_invalid: "INVALID",
-      trend_toggle_chart: "走势",
-      trend_toggle_bars: "柱状",
     }
   }
 };
