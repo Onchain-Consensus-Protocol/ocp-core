@@ -11,3 +11,5 @@ keeper-keys/
 settlements/
 keeper-state.json
 .DS_Store
+.vercel
+.env*
