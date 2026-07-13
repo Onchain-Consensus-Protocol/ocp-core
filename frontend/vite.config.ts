@@ -10,7 +10,7 @@ export default defineConfig(() => {
     },
     build: {
       rollupOptions: {
-        input: ['index.html', 'explore.html', 'explore/vault.html'],
+        input: ['index.html', 'explore.html', 'explore/vault.html', 'admin.html'],
       },
     },
     plugins: [react()],
