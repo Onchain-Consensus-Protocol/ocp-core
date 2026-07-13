@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Explore Stake War | OCP</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: transparent;
+      --surface: transparent;
+      --surface-2: transparent;
+      --border: rgba(0, 0, 0, 0.12);
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #ea580c;
+      --accent-2: #5b21b6;
+      --accent-glow: rgba(234, 88, 12, 0.35);
+      --success: #15803d;
+      --danger: #b91c1c;
+    }
+
+    body {
+      font-family: 'Space Mono', monospace;
+      background: #f8fafc;
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .font-display {
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .font-mono {
+      font-family: 'Space Mono', monospace;
+    }
+
+    .text-glow {
+      text-shadow: 0 0 12px var(--accent-glow), 0 0 24px var(--accent-glow);
+    }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</head>
+
+<body class="selection:bg-accent/25 selection:text-white">
+  <div id="root"></div>
+  <script type="module" src="/explore.tsx"></script>
+</body>
+
+</html>

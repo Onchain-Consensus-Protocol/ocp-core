@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: transparent;
+  --surface: transparent;
+  --surface-2: transparent;
+  --border: rgba(0, 0, 0, 0.12);
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --accent: #ea580c;
+  --accent-2: #5b21b6;
+  --accent-glow: rgba(234, 88, 12, 0.35);
+  --success: #15803d;
+  --danger: #b91c1c;
+}
+
+body {
+  font-family: 'Space Mono', monospace;
+  background: #f8fafc;
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.text-glow {
+  text-shadow: 0 0 12px var(--accent-glow), 0 0 24px var(--accent-glow);
+}
+
+.title-highlight {
+  background-color: rgba(234, 88, 12, 0.28);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
