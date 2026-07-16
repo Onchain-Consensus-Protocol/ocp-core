@@ -8,6 +8,7 @@ import "./index.css";
 import { Shield, AlertTriangle } from "lucide-react";
 import { ExploreView } from "./components/ExploreView";
 import { OCPMenu } from "./components/OCPMenu";
+import { LanguageToggle } from "./components/LanguageToggle";
 import { WalletButton } from "./components/WalletButton";
 import { useWallet } from "./useWallet";
 
@@ -54,12 +55,7 @@ function ExploreStandalone() {
                 onConnect={wallet.connectWallet}
                 onDisconnect={wallet.disconnectWallet}
               />
-              <button
-                onClick={() => setLang((l) => (l === "zh" ? "en" : "zh"))}
-                className="flex items-center justify-center w-9 h-9 text-xs font-bold text-text-muted hover:text-accent hover:bg-white/10 border border-border hover:border-accent rounded-lg font-mono"
-              >
-                {lang === "zh" ? "EN" : "中"}
-              </button>
+              <LanguageToggle lang={lang} setLang={setLang} />
             </div>
           </div>
         </div>

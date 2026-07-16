@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "../components/Button";
 import { WalletButton } from "../components/WalletButton";
+import { LanguageToggle } from "../components/LanguageToggle";
 import { config, VAULT_ABI, MARKET_ABI, ERC20_ABI } from "../config";
 import { CONTENT } from "../constants";
 import ReactMarkdown from "react-markdown";
@@ -1157,9 +1158,7 @@ function VaultStandalone() {
                 onConnect={wallet.connectWallet}
                 onDisconnect={wallet.disconnectWallet}
               />
-              <button onClick={() => setLang((l) => (l === "zh" ? "en" : "zh"))} className="flex items-center justify-center w-9 h-9 text-xs font-bold text-text-muted hover:text-accent border border-border hover:border-accent rounded-lg font-mono">
-                {lang === "zh" ? "EN" : "中"}
-              </button>
+              <LanguageToggle lang={lang} setLang={setLang} />
             </div>
           </div>
         </div>

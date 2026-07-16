@@ -7,6 +7,7 @@ import { BridgeDemo } from './components/BridgeDemo';
 import { Layers, GitCommit, Database, TrendingUp, Scale, Vote, Terminal, Sparkles, Landmark } from 'lucide-react';
 import { Button } from './components/Button';
 import { OCPMenu } from './components/OCPMenu';
+import { LanguageToggle } from './components/LanguageToggle';
 import { Language } from './types';
 import { CONTENT } from './constants';
 import ReactMarkdown from 'react-markdown';
@@ -30,10 +31,6 @@ function App() {
   const [balance, setBalance] = useState(10000);
 
   const t = CONTENT[lang].ui;
-
-  const toggleLang = () => {
-    setLang(prev => prev === 'zh' ? 'en' : 'zh');
-  };
 
   // Simulation-only "wallet" connect: just toggles local demo state
   const connectWallet = useCallback(() => {
@@ -59,12 +56,7 @@ function App() {
                 <span className="hidden sm:inline">{t.nav_vaults}</span>
               </a>
 
-              <button
-                onClick={toggleLang}
-                className="flex items-center justify-center w-9 h-9 text-xs font-bold text-text-muted hover:text-accent border border-transparent hover:border-border rounded-md transition-colors font-mono"
-              >
-                {lang === 'zh' ? 'EN' : '中'}
-              </button>
+              <LanguageToggle lang={lang} setLang={setLang} />
             </div>
           </div>
 

@@ -13,12 +13,15 @@ import {
 
 import type { Language } from "../types";
 
-const INTERNAL_LINKS = [
+const PRIMARY_LINKS = [
   { view: "simulation", zh: "开始体验", en: "Start Playing", icon: Home },
+  { view: "mechanism", zh: "机制", en: "Mechanism", icon: BookOpen },
+] as const;
+
+const FUTURE_VISION_LINKS = [
   { view: "ai-demo", zh: "AI 对齐演示", en: "AI Alignment", icon: Sparkles },
   { view: "infra", zh: "同步 / 预最终性", en: "Sync / Pre-finality", icon: Activity },
   { view: "bridge", zh: "桥 + 事实验证层", en: "Bridge + Truth Layer", icon: Waypoints },
-  { view: "mechanism", zh: "机制", en: "Mechanism", icon: BookOpen },
   { view: "moat", zh: "历史账本", en: "History Ledger", icon: GitCommit },
 ] as const;
 
@@ -64,7 +67,7 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
           role="menu"
           className="absolute left-0 top-[calc(100%+12px)] z-[70] w-72 rounded-lg border border-border bg-white shadow-xl p-2"
         >
-          {INTERNAL_LINKS.map((link) => {
+          {PRIMARY_LINKS.map((link) => {
             const Icon = link.icon;
             return (
               <a
@@ -78,6 +81,32 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
               </a>
             );
           })}
+          <details className="group/future">
+            <summary
+              role="menuitem"
+              className="flex cursor-pointer list-none items-center gap-3 rounded-md px-3 py-2.5 text-sm font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
+            >
+              <Sparkles className="w-4 h-4 shrink-0" />
+              <span className="flex-1">{lang === "zh" ? "未来愿景" : "Future Vision"}</span>
+              <ChevronDown className="w-4 h-4 shrink-0 transition-transform group-open/future:rotate-180" />
+            </summary>
+            <div role="menu" className="ml-4 border-l border-border pl-2">
+              {FUTURE_VISION_LINKS.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <a
+                    key={link.view}
+                    href={`/?view=${link.view}`}
+                    role="menuitem"
+                    className="flex items-center gap-3 rounded-md px-3 py-2 text-xs font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {lang === "zh" ? link.zh : link.en}
+                  </a>
+                );
+              })}
+            </div>
+          </details>
           <div className="my-2 border-t border-border" />
           <a
             href="https://x.com/ocp_protocol"
