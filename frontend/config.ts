@@ -37,6 +37,8 @@ export const VAULT_ABI = [
   "function minStake() external view returns (uint256)",
   "function totalPrincipal() external view returns (uint256)",
   "function totalDonations() external view returns (uint256)",
+  "function settlementPool() external view returns (uint256)",
+  "function remainingEligibleClaims() external view returns (uint256)",
   "function totalStakeYes() external view returns (uint256)",
   "function totalStakeNo() external view returns (uint256)",
   "function totalStakeInvalid() external view returns (uint256)",
