@@ -30,6 +30,9 @@ interface DetailState {
   totalPrincipalRaw: string;
   totalFees: string;
   totalDonationsRaw: string;
+  settlementPoolRaw: string;
+  remainingEligibleClaimsRaw: string;
+  vaultBalanceRaw: string;
   totalStakeYes: string;
   totalStakeNo: string;
   totalStakeInvalid: string;
@@ -53,6 +56,8 @@ interface DetailState {
   userStakeYesRaw: string;
   userStakeNoRaw: string;
   userStakeInvalidRaw: string;
+  /** null 表示未连接钱包或 RPC 无法可靠判断；true 表示 withdraw 已经执行过 */
+  userVaultClaimed: boolean | null;
   userYesShares: string;
   userNoShares: string;
   userYesSharesRaw: string;
@@ -196,6 +201,8 @@ function VaultPage({
         stakeTokenAddr,
         resolutionTime,
         totalPrincipal,
+        settlementPool,
+        remainingEligibleClaims,
         totalStakeYes,
         totalStakeNo,
         totalStakeInvalid,
@@ -210,6 +217,8 @@ function VaultPage({
         vault.stakeToken(),
         vault.resolutionTime(),
         vault.totalPrincipal(),
+        vault.settlementPool(),
+        vault.remainingEligibleClaims(),
         vault.totalStakeYes(),
         vault.totalStakeNo(),
         vault.totalStakeInvalid(),
@@ -230,9 +239,10 @@ function VaultPage({
       }
 
       const token = new Contract(stakeTokenAddr, ERC20_ABI, provider);
-      const [decimals, symbol] = await Promise.all([
+      const [decimals, symbol, vaultBalance] = await Promise.all([
         token.decimals(),
         token.symbol(),
+        token.balanceOf(vaultAddr),
       ]);
       const defaultPriceTuple: [bigint, bigint] = [500000000000000000n, 500000000000000000n];
       const [priceTuple, totalYesShares, totalNoShares, marketBalance] = hasMarket && market
@@ -257,6 +267,7 @@ function VaultPage({
       let userStakeYes = "0", userStakeNo = "0", userStakeInvalid = "0";
       let userYesShares = "0", userNoShares = "0", userBalance = "0";
       let userPendingFeesWei = "0";
+      let userVaultClaimed: boolean | null = null;
       if (userAddr) {
         const [stakeTuple, yesR, noR, balanceR] = await Promise.all([
           vault.stakeOf(userAddr) as Promise<[bigint, bigint, bigint]>,
@@ -271,6 +282,31 @@ function VaultPage({
         userNoShares = noR.toString();
         userBalance = balanceR.toString();
         userPendingFeesWei = "0";
+
+        const userPrincipal = stakeTuple[0] + stakeTuple[1] + stakeTuple[2];
+        if (resolved && userPrincipal > 0n) {
+          try {
+            // V4 Vault 的 _claimed mapping 没有 public getter。这里用 eth_call 只读预执行
+            // withdraw：不会发送交易或改链上状态，但能复用合约自己的 Already claimed
+            // 检查，避免把历史应得金额继续显示成当前可领取金额。
+            await vault.withdraw.staticCall({ from: userAddr });
+            userVaultClaimed = false;
+          } catch (claimError) {
+            const value = claimError as {
+              message?: string;
+              shortMessage?: string;
+              reason?: string;
+              info?: { error?: { message?: string } };
+            };
+            const claimErrorText = [
+              value.shortMessage,
+              value.reason,
+              value.info?.error?.message,
+              value.message,
+            ].filter(Boolean).join(" | ").toLowerCase();
+            if (claimErrorText.includes("already claimed")) userVaultClaimed = true;
+          }
+        }
       }
 
       const dec = Number(decimals);
@@ -287,6 +323,9 @@ function VaultPage({
         totalPrincipalRaw: totalPrincipal.toString(),
         totalFees: format(totalFees.toString()),
         totalDonationsRaw: totalFees.toString(),
+        settlementPoolRaw: settlementPool.toString(),
+        remainingEligibleClaimsRaw: remainingEligibleClaims.toString(),
+        vaultBalanceRaw: vaultBalance.toString(),
         totalStakeYes: format(totalStakeYes.toString()),
         totalStakeNo: format(totalStakeNo.toString()),
         totalStakeInvalid: format(totalStakeInvalid.toString()),
@@ -310,6 +349,7 @@ function VaultPage({
         userStakeYesRaw: userStakeYes,
         userStakeNoRaw: userStakeNo,
         userStakeInvalidRaw: userStakeInvalid,
+        userVaultClaimed,
         userYesShares: format(userYesShares),
         userNoShares: format(userNoShares),
         userYesSharesRaw: userYesShares,
@@ -422,20 +462,36 @@ function VaultPage({
     return formatMoney(formatUnits(rawBig, detailState.tokenDecimals ?? 18));
   };
 
-  const estimatedVaultPayoutWei = (() => {
+  const withdrawableVaultPayoutWei = (() => {
     if (!detailState || !detailState.resolved || detailState.outcome === null) return null;
     const userYes = BigInt(detailState.userStakeYesRaw || "0");
     const userNo = BigInt(detailState.userStakeNoRaw || "0");
     const userInvalid = BigInt(detailState.userStakeInvalidRaw || "0");
     const userPrincipal = userYes + userNo + userInvalid;
+    if (userPrincipal === 0n) return 0n;
+    if (detailState.userVaultClaimed === true) return 0n;
+    // 状态无法可靠确认时 fail closed：不再把历史理论赔付冒充为当前可领取额。
+    if (detailState.userVaultClaimed !== false) return null;
     const totalPrincipal = BigInt(detailState.totalPrincipalRaw || "0");
-    const donations = BigInt(detailState.totalDonationsRaw || "0");
-    const pool = totalPrincipal + donations;
+    const pool = BigInt(detailState.settlementPoolRaw || "0");
+    const eligiblePrincipal = detailState.outcome === 3
+      ? userPrincipal
+      : detailState.outcome === 1
+        ? userYes
+        : userNo;
+    if (eligiblePrincipal === 0n) return 0n;
+    // 合约让最后一名合格领取者提走实时余额，以吸收前序 mulDiv 的舍入尘埃。
+    if (BigInt(detailState.remainingEligibleClaimsRaw || "0") === 1n) {
+      return BigInt(detailState.vaultBalanceRaw || "0");
+    }
     if (detailState.outcome === 3) return totalPrincipal > 0n ? (pool * userPrincipal) / totalPrincipal : 0n;
     if (detailState.outcome === 1) return BigInt(detailState.totalStakeYesRaw) > 0n ? (pool * userYes) / BigInt(detailState.totalStakeYesRaw) : 0n;
     if (detailState.outcome === 2) return BigInt(detailState.totalStakeNoRaw) > 0n ? (pool * userNo) / BigInt(detailState.totalStakeNoRaw) : 0n;
     return 0n;
   })();
+  const canWithdrawVaultPayout = withdrawableVaultPayoutWei !== null
+    && withdrawableVaultPayoutWei > 0n
+    && detailState?.userVaultClaimed !== true;
 
   const estimatedMarketPayoutWei = (() => {
     if (!marketEnabled) return null;
@@ -479,6 +535,7 @@ function VaultPage({
     shareUrl.searchParams.set("vault", vaultAddr);
     shareUrl.searchParams.set("market", marketAddr);
     shareUrl.searchParams.set("block", String(detailState.snapshotBlock));
+    if (detailState.resolved) shareUrl.searchParams.set("finalized", "1");
 
     const intentUrl = new URL("https://x.com/intent/post");
     intentUrl.searchParams.set("text", title.trim() || (lang === "zh" ? "OCP 金库命题" : "OCP Vault proposition"));
@@ -932,8 +989,14 @@ function VaultPage({
                       {lang === "zh" ? "可提取金额" : "Withdrawable"}
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-text-muted">{t.btn_claim_proto}</span>
-                      <span className="text-text font-bold">{estimatedVaultPayoutWei === null ? "—" : formatToken(estimatedVaultPayoutWei)}</span>
+                      <span className="text-text-muted">
+                        {detailState.userVaultClaimed === true
+                          ? t.btn_claimed
+                          : detailState.userVaultClaimed === null
+                            ? (lang === "zh" ? "领取状态不可用" : "Claim status unavailable")
+                            : t.btn_claim_proto}
+                      </span>
+                      <span className="text-text font-bold">{withdrawableVaultPayoutWei === null ? "—" : formatToken(withdrawableVaultPayoutWei)}</span>
                     </div>
                     {marketEnabled && (
                       <div className="flex justify-between mt-1">
@@ -942,8 +1005,8 @@ function VaultPage({
                       </div>
                     )}
                   </div>
-                  <Button onClick={handleWithdraw} disabled={txLoading || !signer} variant="primary" className="w-full justify-center">
-                    {t.btn_claim_proto}
+                  <Button onClick={handleWithdraw} disabled={txLoading || !signer || !canWithdrawVaultPayout} variant="primary" className="w-full justify-center">
+                    {detailState.userVaultClaimed ? t.btn_claimed : t.btn_claim_proto}
                   </Button>
                   {marketEnabled && (
                     <Button onClick={handleRedeem} disabled={txLoading || !signer} variant="secondary" className="w-full justify-center">{t.btn_claim_market}</Button>
