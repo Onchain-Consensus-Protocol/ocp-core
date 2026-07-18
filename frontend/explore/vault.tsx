@@ -9,7 +9,7 @@ import { OCPMenu } from "../components/OCPMenu";
 import { Contract, JsonRpcProvider, formatUnits, parseUnits, type JsonRpcSigner } from "ethers";
 import {
   ShieldAlert, Zap, ArrowLeftRight, LayoutDashboard, AlertTriangle,
-  ArrowRight, Share2,
+  ArrowRight, Share2, CheckCircle2, ExternalLink, Trophy,
   X,
 } from "lucide-react";
 import { Button } from "../components/Button";
@@ -22,6 +22,30 @@ import { useWallet } from "../useWallet";
 
 type TabMode = "PROTOCOL" | "MARKET";
 type TradeMode = "BUY" | "SELL";
+type StakeSide = "YES" | "NO" | "INVALID";
+
+type SuccessAction =
+  | {
+    kind: "stake";
+    side: StakeSide;
+    amountRaw: bigint;
+    tokenSymbol: string;
+    tokenDecimals: number;
+    txHash: string;
+    blockNumber: number;
+  }
+  | {
+    kind: "withdraw";
+    side: StakeSide;
+    finalOutcome: StakeSide;
+    shareable: boolean;
+    principalRaw: bigint;
+    withdrawnRaw: bigint;
+    tokenSymbol: string;
+    tokenDecimals: number;
+    txHash: string;
+    blockNumber: number;
+  };
 
 interface DetailState {
   snapshotBlock: number;
@@ -154,6 +178,7 @@ function VaultPage({
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
+  const [successAction, setSuccessAction] = useState<SuccessAction | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setLiveNow(Math.floor(Date.now() / 1000)), 1000);
@@ -472,21 +497,92 @@ function VaultPage({
 
   const leaderSide = yesStake === noStake ? null : (yesStake > noStake ? "YES" : "NO");
 
-  const handleShareOnX = () => {
-    if (!detailState?.snapshotBlock || typeof window === "undefined") return;
+  const buildShareUrl = (blockNumber: number) => {
+    if (typeof window === "undefined") return null;
 
     const shareUrl = new URL("/api/vault-share", window.location.origin);
     shareUrl.searchParams.set("vault", vaultAddr);
     shareUrl.searchParams.set("market", marketAddr);
-    shareUrl.searchParams.set("block", String(detailState.snapshotBlock));
+    shareUrl.searchParams.set("block", String(blockNumber));
+    return shareUrl;
+  };
+
+  const openXIntent = (text: string, blockNumber: number) => {
+    const shareUrl = buildShareUrl(blockNumber);
+    if (!shareUrl) return;
 
     const intentUrl = new URL("https://x.com/intent/post");
-    intentUrl.searchParams.set("text", title.trim() || (lang === "zh" ? "OCP 金库命题" : "OCP Vault proposition"));
+    intentUrl.searchParams.set("text", text);
     intentUrl.searchParams.set("url", shareUrl.toString());
     window.open(intentUrl.toString(), "_blank", "noopener,noreferrer");
   };
 
-  const handleStake = async (side: "YES" | "NO" | "INVALID") => {
+  const handleShareOnX = () => {
+    if (!detailState?.snapshotBlock) return;
+    openXIntent(title.trim() || (lang === "zh" ? "OCP 金库命题" : "OCP Vault proposition"), detailState.snapshotBlock);
+  };
+
+  const displayTokenAmount = (raw: bigint, decimals: number) => {
+    const value = formatUnits(raw, decimals);
+    const [whole, fraction = ""] = value.split(".");
+    const trimmedFraction = fraction.slice(0, 4).replace(/0+$/, "");
+    return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
+  };
+
+  const winningReturnLabel = (principal: bigint, withdrawn: bigint) => {
+    if (principal === 0n) return "0.00%";
+    const profit = withdrawn - principal;
+    const negative = profit < 0n;
+    const absoluteProfit = negative ? -profit : profit;
+    const hundredths = (absoluteProfit * 10_000n) / principal;
+    const label = `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, "0")}%`;
+    return negative ? `-${label}` : `+${label}`;
+  };
+
+  const handleSuccessShareOnX = () => {
+    if (!successAction || !detailState) return;
+    const rawClaim = title.trim() || "OCP Vault proposition";
+    // X 会把附带链接计入字符限制；完整题面仍由分享卡展示。
+    const claim = rawClaim.length > 32 ? `${rawClaim.slice(0, 29).trimEnd()}…` : rawClaim;
+
+    if (successAction.kind === "stake") {
+      const amountLabel = displayTokenAmount(successAction.amountRaw, successAction.tokenDecimals);
+      const text = [
+        `I backed ${successAction.side} with ${amountLabel} ${successAction.tokenSymbol} in an OCP Vault.`,
+        "",
+        "Claim:",
+        claim,
+        "",
+        `YES: ${yesPct.toFixed(1)}% · ${displayTokenAmount(BigInt(detailState.totalStakeYesRaw), successAction.tokenDecimals)} ${successAction.tokenSymbol}`,
+        `NO: ${noPct.toFixed(1)}% · ${displayTokenAmount(BigInt(detailState.totalStakeNoRaw), successAction.tokenDecimals)} ${successAction.tokenSymbol}`,
+        `INVALID: ${invalidPct.toFixed(1)}% · ${displayTokenAmount(BigInt(detailState.totalStakeInvalidRaw), successAction.tokenDecimals)} ${successAction.tokenSymbol}`,
+        "",
+        "Stake your claim 👇",
+      ].join("\n");
+      openXIntent(text, successAction.blockNumber);
+      return;
+    }
+
+    if (!successAction.shareable) return;
+    const withdrawnLabel = displayTokenAmount(successAction.withdrawnRaw, successAction.tokenDecimals);
+    const principalLabel = displayTokenAmount(successAction.principalRaw, successAction.tokenDecimals);
+    const profitRaw = successAction.withdrawnRaw - successAction.principalRaw;
+    const profitLabel = displayTokenAmount(profitRaw >= 0n ? profitRaw : -profitRaw, successAction.tokenDecimals);
+    const text = [
+      `I backed ${successAction.side} with ${principalLabel} ${successAction.tokenSymbol} and withdrew ${withdrawnLabel} ${successAction.tokenSymbol} after this OCP Vault settled.`,
+      "",
+      `Winning return: ${winningReturnLabel(successAction.principalRaw, successAction.withdrawnRaw)}`,
+      `Profit: ${profitRaw >= 0n ? "+" : "-"}${profitLabel} ${successAction.tokenSymbol}`,
+      "",
+      `Final verdict: ${successAction.finalOutcome}`,
+      `Claim: ${claim}`,
+      "",
+      "Result and payout recorded onchain 👇",
+    ].join("\n");
+    openXIntent(text, successAction.blockNumber);
+  };
+
+  const handleStake = async (side: StakeSide) => {
     if (!signer || !amount.trim() || !detailState) return;
     setTxLoading(true);
     setError(null);
@@ -498,9 +594,19 @@ function VaultPage({
       const token = new Contract(tokenAddr, ERC20_ABI, signer);
       const sideId = (side === "YES" ? 0 : side === "NO" ? 1 : 2) as 0 | 1 | 2;
       await (await token.approve(vaultAddr, amountWei)).wait();
-      await (await vault.stake(sideId, amountWei)).wait();
+      const stakeReceipt = await (await vault.stake(sideId, amountWei)).wait();
+      if (!stakeReceipt) throw new Error("Stake transaction was not confirmed");
       setAmount("");
       await fetchDetailState();
+      setSuccessAction({
+        kind: "stake",
+        side,
+        amountRaw: amountWei,
+        tokenSymbol: detailState.tokenSymbol,
+        tokenDecimals: detailState.tokenDecimals,
+        txHash: stakeReceipt.hash,
+        blockNumber: stakeReceipt.blockNumber,
+      });
     } catch (e) {
       setError(friendlyActionError(e, lang));
     } finally {
@@ -540,13 +646,40 @@ function VaultPage({
   };
 
   const handleWithdraw = async () => {
-    if (!signer) return;
+    if (!signer || !detailState || detailState.outcome === null) return;
     setTxLoading(true);
     setError(null);
     try {
       const vault = new Contract(vaultAddr, VAULT_ABI, signer);
-      await (await vault.withdraw()).wait();
+      const userAddress = await signer.getAddress();
+      const token = new Contract(detailState.stakeTokenAddress, ERC20_ABI, signer);
+      const balanceBefore = await token.balanceOf(userAddress) as bigint;
+      const userYes = BigInt(detailState.userStakeYesRaw || "0");
+      const userNo = BigInt(detailState.userStakeNoRaw || "0");
+      const userInvalid = BigInt(detailState.userStakeInvalidRaw || "0");
+      const principal = userYes + userNo + userInvalid;
+      const userSide: StakeSide = userYes > 0n ? "YES" : userNo > 0n ? "NO" : "INVALID";
+      const winningSide = detailState.outcome === 1 ? "YES" : detailState.outcome === 2 ? "NO" : null;
+      const userWon = winningSide === "YES" ? userYes > 0n : winningSide === "NO" ? userNo > 0n : false;
+      const finalOutcome: StakeSide = winningSide ?? "INVALID";
+
+      const withdrawReceipt = await (await vault.withdraw()).wait();
+      if (!withdrawReceipt) throw new Error("Withdrawal transaction was not confirmed");
+      const balanceAfter = await token.balanceOf(userAddress) as bigint;
+      const withdrawn = balanceAfter - balanceBefore;
       await fetchDetailState();
+      setSuccessAction({
+        kind: "withdraw",
+        side: userSide,
+        finalOutcome,
+        shareable: userWon && withdrawn > 0n,
+        principalRaw: principal,
+        withdrawnRaw: withdrawn,
+        tokenSymbol: detailState.tokenSymbol,
+        tokenDecimals: detailState.tokenDecimals,
+        txHash: withdrawReceipt.hash,
+        blockNumber: withdrawReceipt.blockNumber,
+      });
     } catch (e) {
       setError(friendlyActionError(e, lang));
     } finally {
@@ -610,6 +743,74 @@ function VaultPage({
     : null;
 
   return (
+    <>
+    {successAction && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="success-title">
+        <div className="relative w-full max-w-md rounded-2xl border border-border bg-white p-6 shadow-2xl">
+          <button
+            type="button"
+            onClick={() => setSuccessAction(null)}
+            className="absolute right-4 top-4 rounded-md p-1 text-text-muted hover:bg-black/5 hover:text-text"
+            aria-label={lang === "zh" ? "关闭" : "Close"}
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-3 pr-8">
+            <div className={`rounded-full p-2 ${successAction.kind === "withdraw" && successAction.shareable ? "bg-yellow-500/10 text-yellow-600" : "bg-success/10 text-success"}`}>
+              {successAction.kind === "withdraw" && successAction.shareable ? <Trophy className="h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
+            </div>
+            <div>
+              <h3 id="success-title" className="font-display text-lg font-bold text-text">
+                {successAction.kind === "stake"
+                  ? (lang === "zh" ? "质押已确认" : "Stake confirmed")
+                  : successAction.shareable
+                    ? (lang === "zh" ? "获胜收益已领取" : "Winning payout received")
+                    : (lang === "zh" ? "提款已确认" : "Withdrawal confirmed")}
+              </h3>
+              <p className="mt-1 text-xs text-text-muted font-mono">
+                {successAction.kind === "stake"
+                  ? `${successAction.side} · ${displayTokenAmount(successAction.amountRaw, successAction.tokenDecimals)} ${successAction.tokenSymbol}`
+                  : `${displayTokenAmount(successAction.withdrawnRaw, successAction.tokenDecimals)} ${successAction.tokenSymbol} · ${winningReturnLabel(successAction.principalRaw, successAction.withdrawnRaw)}`}
+              </p>
+            </div>
+          </div>
+
+          {successAction.kind === "withdraw" && successAction.shareable && (
+            <div className="mt-5 grid grid-cols-2 gap-3 rounded-xl border border-border bg-slate-50 p-4 text-sm font-mono">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-text-muted">{lang === "zh" ? "获胜收益率" : "Winning return"}</div>
+                <div className="mt-1 font-bold text-success">{winningReturnLabel(successAction.principalRaw, successAction.withdrawnRaw)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-text-muted">{lang === "zh" ? "利润" : "Profit"}</div>
+                <div className="mt-1 font-bold text-text">
+                  {successAction.withdrawnRaw >= successAction.principalRaw ? "+" : "-"}
+                  {displayTokenAmount(successAction.withdrawnRaw >= successAction.principalRaw
+                    ? successAction.withdrawnRaw - successAction.principalRaw
+                    : successAction.principalRaw - successAction.withdrawnRaw, successAction.tokenDecimals)} {successAction.tokenSymbol}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className={`mt-6 grid gap-3 ${successAction.kind === "stake" || successAction.shareable ? "sm:grid-cols-2" : ""}`}>
+            {(successAction.kind === "stake" || successAction.shareable) && (
+              <Button onClick={handleSuccessShareOnX} variant="primary" className="w-full">
+                <Share2 className="h-4 w-4" /> {lang === "zh" ? "分享到 X" : "Share on X"}
+              </Button>
+            )}
+            <a
+              href={`${config.explorer.replace(/\/$/, "")}/tx/${successAction.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-4 text-sm font-mono text-text hover:border-accent hover:text-accent"
+            >
+              <ExternalLink className="h-4 w-4" /> {lang === "zh" ? "查看交易" : "View transaction"}
+            </a>
+          </div>
+        </div>
+      </div>
+    )}
     <div className="vault-shell bg-white/80 border-y sm:border border-border sm:rounded-2xl shadow-sm sm:shadow-2xl flex flex-col md:flex-row max-w-6xl mx-auto md:min-h-[600px] overflow-hidden backdrop-blur-xl relative">
       <div className="absolute top-10 right-10 w-72 sm:w-96 h-72 sm:h-96 bg-accent/5 rounded-full blur-[100px] pointer-events-none" />
 
@@ -1118,6 +1319,7 @@ function VaultPage({
         </details>
       </div>
     </div>
+    </>
   );
 }
 
