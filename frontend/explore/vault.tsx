@@ -15,13 +15,28 @@ import {
 import { Button } from "../components/Button";
 import { WalletButton } from "../components/WalletButton";
 import { LanguageToggle } from "../components/LanguageToggle";
-import { config, VAULT_ABI, MARKET_ABI, ERC20_ABI } from "../config";
+import {
+  config,
+  VAULT_ABI,
+  MARKET_ABI,
+  MARKET_FACTORY_ABI,
+  ERC20_ABI,
+} from "../config";
 import { CONTENT } from "../constants";
 import ReactMarkdown from "react-markdown";
 import { useWallet } from "../useWallet";
 
 type TabMode = "PROTOCOL" | "MARKET";
 type TradeMode = "BUY" | "SELL";
+
+interface MarketQuotePreview {
+  fee: bigint;
+  grossCashFlow: bigint;
+  quotedCashFlow: bigint;
+  protectedCashFlow: bigint;
+  averagePrice: number;
+  priceImpactPct: number;
+}
 
 interface DetailState {
   snapshotBlock: number;
@@ -31,6 +46,7 @@ interface DetailState {
   totalFees: string;
   totalDonationsRaw: string;
   settlementPoolRaw: string;
+  remainingSettlementPoolRaw: string;
   remainingEligibleClaimsRaw: string;
   vaultBalanceRaw: string;
   totalStakeYes: string;
@@ -40,7 +56,7 @@ interface DetailState {
   totalStakeNoRaw: string;
   totalStakeInvalidRaw: string;
   minStake: string;
-  protocolVersion: 4;
+  protocolVersion: number;
   resolutionTime: number;
   canResolve: boolean;
   nowTs: number;
@@ -68,11 +84,13 @@ interface DetailState {
   tokenSymbol: string;
   tokenDecimals: number;
   userBalance: string;
-  /** 用户待领的预测市场手续费（金库 donate 累计中属于该用户的部分） */
+  /** Vault 终局后，用户按照手续费发生时质押占比可领取的 PM 手续费 */
   userPendingFees: string;
   userPendingFeesRaw: string;
   /** 预测市场交易手续费（bps） */
   marketFeeBps: number;
+  /** PM 生命周期累计归属于本 Vault 的 1.0% 手续费 */
+  vaultFeeRevenueRaw: string;
 }
 
 function getParams(): { vault: string; market: string } | null {
@@ -155,6 +173,8 @@ function VaultPage({
   const [tabMode, setTabMode] = useState<TabMode>("PROTOCOL");
   const [tradeMode, setTradeMode] = useState<TradeMode>("BUY");
   const [amount, setAmount] = useState("");
+  const [marketQuotes, setMarketQuotes] = useState<Partial<Record<"YES" | "NO", MarketQuotePreview>>>({});
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [txLoading, setTxLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState<string>("");
@@ -168,6 +188,78 @@ function VaultPage({
   useEffect(() => {
     if (!marketEnabled && tabMode === "MARKET") setTabMode("PROTOCOL");
   }, [marketEnabled, tabMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      if (!marketEnabled || !detailState || detailState.resolved || !amount.trim()) {
+        setMarketQuotes({});
+        setQuoteLoading(false);
+        return;
+      }
+
+      try {
+        const sharesWei = parseUnits(amount.trim(), detailState.tokenDecimals);
+        if (sharesWei <= 0n) {
+          setMarketQuotes({});
+          setQuoteLoading(false);
+          return;
+        }
+
+        setQuoteLoading(true);
+        const provider = new JsonRpcProvider(config.rpcUrl);
+        const market = new Contract(marketAddr, MARKET_ABI, provider);
+        const sides = [
+          { side: "YES" as const, isYes: true, marginalPrice: detailState.yesPrice },
+          { side: "NO" as const, isYes: false, marginalPrice: detailState.noPrice },
+        ];
+        const results = await Promise.allSettled(sides.map(async ({ side, isYes, marginalPrice }) => {
+          const [quotedCashFlow, fee] = tradeMode === "BUY"
+            ? await market.quoteBuy(isYes, sharesWei) as [bigint, bigint]
+            : await market.quoteSell(isYes, sharesWei) as [bigint, bigint];
+          // BUY quote 含 fee，SELL quote 已扣 fee；先还原曲线本身的 gross cash flow，
+          // 才能把 LMSR 价格影响与 1.2% 手续费分开展示。
+          const grossCashFlow = tradeMode === "BUY"
+            ? quotedCashFlow - fee
+            : quotedCashFlow + fee;
+          const averagePrice = Number(grossCashFlow) / Number(sharesWei);
+          const rawImpact = tradeMode === "BUY"
+            ? ((averagePrice / marginalPrice) - 1) * 100
+            : (1 - (averagePrice / marginalPrice)) * 100;
+          const protectedCashFlow = tradeMode === "BUY"
+            ? (quotedCashFlow * 101n + 99n) / 100n
+            : (quotedCashFlow * 99n) / 100n;
+          return {
+            side,
+            quote: {
+              fee,
+              grossCashFlow,
+              quotedCashFlow,
+              protectedCashFlow,
+              averagePrice,
+              priceImpactPct: Math.max(0, rawImpact),
+            } satisfies MarketQuotePreview,
+          };
+        }));
+
+        if (cancelled) return;
+        const nextQuotes: Partial<Record<"YES" | "NO", MarketQuotePreview>> = {};
+        for (const result of results) {
+          if (result.status === "fulfilled") nextQuotes[result.value.side] = result.value.quote;
+        }
+        setMarketQuotes(nextQuotes);
+      } catch {
+        if (!cancelled) setMarketQuotes({});
+      } finally {
+        if (!cancelled) setQuoteLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [amount, detailState, marketAddr, marketEnabled, tradeMode]);
 
   const fetchDetailState = useCallback(async () => {
     setDetailError(null);
@@ -185,6 +277,28 @@ function VaultPage({
       const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
       const hasMarket = marketEnabled && marketAddr?.toLowerCase() !== ZERO_ADDR.toLowerCase();
       const market = hasMarket ? new Contract(marketAddr, MARKET_ABI, provider) : null;
+      if (hasMarket && market) {
+        if (config.marketFactoryAddress.toLowerCase() === ZERO_ADDR.toLowerCase()) {
+          throw new Error("The official prediction market factory is not configured.");
+        }
+        const registry = new Contract(
+          config.marketFactoryAddress,
+          MARKET_FACTORY_ABI,
+          provider,
+        );
+        const [registered, canonicalMarket, boundVault] = await Promise.all([
+          registry.isMarket(marketAddr) as Promise<boolean>,
+          registry.marketByVault(vaultAddr) as Promise<string>,
+          market.vault() as Promise<string>,
+        ]);
+        if (
+          !registered
+          || canonicalMarket.toLowerCase() !== marketAddr.toLowerCase()
+          || boundVault.toLowerCase() !== vaultAddr.toLowerCase()
+        ) {
+          throw new Error("This prediction market is not registered to this Vault by the official factory.");
+        }
+      }
       let userAddr: string | null = walletAddress?.trim() || null;
       if (!userAddr && signer) {
         try {
@@ -202,6 +316,7 @@ function VaultPage({
         resolutionTime,
         totalPrincipal,
         settlementPool,
+        remainingSettlementPool,
         remainingEligibleClaims,
         totalStakeYes,
         totalStakeNo,
@@ -211,13 +326,14 @@ function VaultPage({
         outcome,
         canResolve,
         protocolVersion,
-        yesReserve,
-        noReserve,
+        totalMarketYes,
+        totalMarketNo,
       ] = await Promise.all([
         vault.stakeToken(),
         vault.resolutionTime(),
         vault.totalPrincipal(),
         vault.settlementPool(),
+        vault.remainingSettlementPool(),
         vault.remainingEligibleClaims(),
         vault.totalStakeYes(),
         vault.totalStakeNo(),
@@ -227,9 +343,23 @@ function VaultPage({
         vault.outcome(),
         vault.canResolve(),
         vault.protocolVersion(),
-        hasMarket && market ? market.yesReserve() : Promise.resolve(0n),
-        hasMarket && market ? market.noReserve() : Promise.resolve(0n),
+        hasMarket && market ? market.totalYesShares() : Promise.resolve(0n),
+        hasMarket && market ? market.totalNoShares() : Promise.resolve(0n),
       ]);
+      if (hasMarket && market) {
+        const [marketCollateral, marketDeadline, activated] = await Promise.all([
+          market.collateral() as Promise<string>,
+          market.resolutionTime() as Promise<bigint>,
+          market.activated() as Promise<boolean>,
+        ]);
+        if (
+          !activated
+          || marketCollateral.toLowerCase() !== String(stakeTokenAddr).toLowerCase()
+          || marketDeadline !== resolutionTime
+        ) {
+          throw new Error("The registered prediction market configuration does not match this Vault.");
+        }
+      }
 
       let totalFees = 0n;
       try {
@@ -245,14 +375,23 @@ function VaultPage({
         token.balanceOf(vaultAddr),
       ]);
       const defaultPriceTuple: [bigint, bigint] = [500000000000000000n, 500000000000000000n];
-      const [priceTuple, totalYesShares, totalNoShares, marketBalance] = hasMarket && market
+      const [
+        priceTuple,
+        totalYesShares,
+        totalNoShares,
+        marketBalance,
+        pendingVaultFees,
+        totalVaultFeesPaid,
+      ] = hasMarket && market
         ? await Promise.all([
           market.getYesNoPrice() as Promise<[bigint, bigint]>,
           market.totalYesShares() as Promise<bigint>,
           market.totalNoShares() as Promise<bigint>,
           token.balanceOf(marketAddr) as Promise<bigint>,
+          market.pendingVaultFees() as Promise<bigint>,
+          market.totalVaultFeesPaid() as Promise<bigint>,
         ])
-        : [defaultPriceTuple, 0n, 0n, 0n];
+        : [defaultPriceTuple, 0n, 0n, 0n, 0n, 0n];
       const yesPrice = { yes: Number(priceTuple[0]) / 1e18, no: Number(priceTuple[1]) / 1e18 };
 
       let feeBps = 0;
@@ -281,12 +420,19 @@ function VaultPage({
         userYesShares = yesR.toString();
         userNoShares = noR.toString();
         userBalance = balanceR.toString();
-        userPendingFeesWei = "0";
+        if (resolved) {
+          try {
+            userPendingFeesWei =
+              (await vault.claimableMarketFees(userAddr) as bigint).toString();
+          } catch {
+            userPendingFeesWei = "0";
+          }
+        }
 
         const userPrincipal = stakeTuple[0] + stakeTuple[1] + stakeTuple[2];
         if (resolved && userPrincipal > 0n) {
           try {
-            // V4 Vault 的 _claimed mapping 没有 public getter。这里用 eth_call 只读预执行
+            // Vault 的 _claimed mapping 没有 public getter。这里用 eth_call 只读预执行
             // withdraw：不会发送交易或改链上状态，但能复用合约自己的 Already claimed
             // 检查，避免把历史应得金额继续显示成当前可领取金额。
             await vault.withdraw.staticCall({ from: userAddr });
@@ -324,6 +470,7 @@ function VaultPage({
         totalFees: format(totalFees.toString()),
         totalDonationsRaw: totalFees.toString(),
         settlementPoolRaw: settlementPool.toString(),
+        remainingSettlementPoolRaw: remainingSettlementPool.toString(),
         remainingEligibleClaimsRaw: remainingEligibleClaims.toString(),
         vaultBalanceRaw: vaultBalance.toString(),
         totalStakeYes: format(totalStakeYes.toString()),
@@ -333,12 +480,12 @@ function VaultPage({
         totalStakeNoRaw: totalStakeNo.toString(),
         totalStakeInvalidRaw: totalStakeInvalid.toString(),
         minStake: format(minStake.toString()),
-        protocolVersion: Number(protocolVersion) as 4,
+        protocolVersion: Number(protocolVersion),
         resolutionTime: Number(resolutionTime),
         canResolve,
         nowTs,
-        yesReserve: format(yesReserve.toString()),
-        noReserve: format(noReserve.toString()),
+        yesReserve: format(totalMarketYes.toString()),
+        noReserve: format(totalMarketNo.toString()),
         yesPrice: yesPrice.yes,
         noPrice: yesPrice.no,
         resolved,
@@ -363,6 +510,7 @@ function VaultPage({
         userPendingFees: format(userPendingFeesWei),
         userPendingFeesRaw: userPendingFeesWei,
         marketFeeBps: feeBps,
+        vaultFeeRevenueRaw: (pendingVaultFees + totalVaultFeesPaid).toString(),
       });
 
       try {
@@ -426,36 +574,49 @@ function VaultPage({
   const phaseBadgeClass = vaultPhase === "staking"
     ? "border-accent/50 text-accent bg-accent/10"
     : "border-success/50 text-success bg-success/10";
-  const primaryActionTitle = vaultPhase === "staking"
-    ? (lang === "zh" ? "选择方向并质押" : "Choose a side and stake")
-    : vaultPhase === "ready"
-          ? (lang === "zh" ? "任何人都可以链上结算" : "Anyone can finalize on-chain")
-          : vaultPhase === "finalized"
-            ? (lang === "zh" ? "领取结算资金" : "Claim settlement")
-            : (lang === "zh" ? "金库操作" : "Vault actions");
-  const primaryActionDescription = vaultPhase === "staking"
-    ? (lang === "zh" ? "选择 YES、NO 或 INVALID。选定后只能同侧追加，不能换边。" : "Choose YES, NO, or INVALID. Once selected, you may add only to that side and cannot switch.")
-    : vaultPhase === "ready"
-          ? (lang === "zh" ? "质押截止后即可结算。" : "The Vault can be finalized after staking closes.")
-          : vaultPhase === "finalized"
-            ? (lang === "zh" ? "连接钱包查看并领取可提取金额。" : "Connect a wallet to view and claim the withdrawable amount.")
-            : (lang === "zh" ? "链上数据加载后显示可用操作。" : "Available actions appear after OnChain data loads.");
-  // 市场价：合约返回 yesPrice=yesReserve/total，买 YES 后 yesReserve 降→合约 YES 价降。为符合「买哪边哪边涨」，展示为：YES 显示 noReserve/total（买 YES 后涨），NO 显示 yesReserve/total
+  const isMarketTab = marketEnabled && tabMode === "MARKET";
+  const primaryActionTitle = isMarketTab
+    ? vaultPhase === "staking"
+      ? (lang === "zh" ? "交易预测份额" : "Trade prediction shares")
+      : vaultPhase === "ready"
+        ? (lang === "zh" ? "结算预测市场" : "Settle prediction market")
+        : vaultPhase === "finalized"
+          ? (lang === "zh" ? "兑换市场份额" : "Redeem market shares")
+          : (lang === "zh" ? "预测市场操作" : "Prediction market actions")
+    : vaultPhase === "staking"
+      ? (lang === "zh" ? "选择方向并质押" : "Choose a side and stake")
+      : vaultPhase === "ready"
+        ? (lang === "zh" ? "任何人都可以链上结算" : "Anyone can finalize on-chain")
+        : vaultPhase === "finalized"
+          ? (lang === "zh" ? "领取结算资金" : "Claim settlement")
+          : (lang === "zh" ? "金库操作" : "Vault actions");
+  const primaryActionDescription = isMarketTab
+    ? vaultPhase === "staking"
+      ? (lang === "zh" ? "买入或卖出 YES / NO 份额。输入数量后查看实时成交报价与价格影响。" : "Buy or sell YES / NO shares. Enter an amount to preview execution and price impact.")
+      : vaultPhase === "ready"
+        ? (lang === "zh" ? "交易已经截止；Vault 终局后即可按最终结果兑换份额。" : "Trading is closed. Shares become redeemable after the Vault finalizes.")
+        : vaultPhase === "finalized"
+          ? (lang === "zh" ? "根据 Vault 的最终结果兑换尚未领取的 YES / NO 份额。" : "Redeem unclaimed YES / NO shares using the Vault's finalized outcome.")
+          : (lang === "zh" ? "链上数据加载后显示可用的市场操作。" : "Available market actions appear after OnChain data loads.")
+    : vaultPhase === "staking"
+      ? (lang === "zh" ? "选择 YES、NO 或 INVALID。选定后只能同侧追加，不能换边。" : "Choose YES, NO, or INVALID. Once selected, you may add only to that side and cannot switch.")
+      : vaultPhase === "ready"
+        ? (lang === "zh" ? "质押截止后即可结算。" : "The Vault can be finalized after staking closes.")
+        : vaultPhase === "finalized"
+          ? (lang === "zh" ? "连接钱包查看并领取可提取金额。" : "Connect a wallet to view and claim the withdrawable amount.")
+          : (lang === "zh" ? "链上数据加载后显示可用操作。" : "Available actions appear after OnChain data loads.");
+  // LMSR 合约直接返回成本函数的边际概率；买入某侧后该侧概率单调上升。
   const prices = detailState
-    ? { yes: detailState.noPrice, no: detailState.yesPrice }
+    ? { yes: detailState.yesPrice, no: detailState.noPrice }
     : { yes: 0.5, no: 0.5 };
   const marketYesPct = (prices.yes * 100);
   const marketNoPct = (prices.no * 100);
   const formatMoney = (amountStr: string) =>
     `${(parseFloat(amountStr) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${detailState?.tokenSymbol ?? ""}`;
-  const feeRate = (detailState?.marketFeeBps ?? 30) / 10000;
   const feePct = ((detailState?.marketFeeBps ?? 30) / 100).toFixed(2);
   const feeLabel = detailState
     ? `${lang === "zh" ? "手续费" : "Fee"} ${feePct}%`
     : t.amm_fee;
-  const estimatedFee = amount.trim() ? parseFloat(amount) * feeRate : 0;
-  const estimatedNet = amount.trim() ? parseFloat(amount) - estimatedFee : 0;
-
   const formatToken = (raw: bigint | string) => {
     if (!detailState) return "0";
     const rawBig = typeof raw === "bigint" ? raw : BigInt(raw || "0");
@@ -479,15 +640,20 @@ function VaultPage({
       : detailState.outcome === 1
         ? userYes
         : userNo;
-    if (eligiblePrincipal === 0n) return 0n;
-    // 合约让最后一名合格领取者提走实时余额，以吸收前序 mulDiv 的舍入尘埃。
-    if (BigInt(detailState.remainingEligibleClaimsRaw || "0") === 1n) {
-      return BigInt(detailState.vaultBalanceRaw || "0");
+    let principalPayout = 0n;
+    if (eligiblePrincipal === 0n) {
+      principalPayout = 0n;
+    // 最后一名合格本金领取者只领取冻结的本金结算余量，不会碰手续费奖励桶。
+    } else if (BigInt(detailState.remainingEligibleClaimsRaw || "0") === 1n) {
+      principalPayout = BigInt(detailState.remainingSettlementPoolRaw || "0");
+    } else if (detailState.outcome === 3) {
+      principalPayout = totalPrincipal > 0n ? (pool * userPrincipal) / totalPrincipal : 0n;
+    } else if (detailState.outcome === 1) {
+      principalPayout = BigInt(detailState.totalStakeYesRaw) > 0n ? (pool * userYes) / BigInt(detailState.totalStakeYesRaw) : 0n;
+    } else if (detailState.outcome === 2) {
+      principalPayout = BigInt(detailState.totalStakeNoRaw) > 0n ? (pool * userNo) / BigInt(detailState.totalStakeNoRaw) : 0n;
     }
-    if (detailState.outcome === 3) return totalPrincipal > 0n ? (pool * userPrincipal) / totalPrincipal : 0n;
-    if (detailState.outcome === 1) return BigInt(detailState.totalStakeYesRaw) > 0n ? (pool * userYes) / BigInt(detailState.totalStakeYesRaw) : 0n;
-    if (detailState.outcome === 2) return BigInt(detailState.totalStakeNoRaw) > 0n ? (pool * userNo) / BigInt(detailState.totalStakeNoRaw) : 0n;
-    return 0n;
+    return principalPayout + BigInt(detailState.userPendingFeesRaw || "0");
   })();
   const canWithdrawVaultPayout = withdrawableVaultPayoutWei !== null
     && withdrawableVaultPayoutWei > 0n
@@ -498,16 +664,11 @@ function VaultPage({
     if (!detailState || !detailState.resolved || detailState.outcome === null) return null;
     const userYes = BigInt(detailState.userYesSharesRaw || "0");
     const userNo = BigInt(detailState.userNoSharesRaw || "0");
-    const totalYes = BigInt(detailState.totalYesSharesRaw || "0");
-    const totalNo = BigInt(detailState.totalNoSharesRaw || "0");
-    const totalShares = totalYes + totalNo;
 
     if (detailState.outcome === 1) return userYes;
     if (detailState.outcome === 2) return userNo;
     if (detailState.outcome === 3) {
-      if (totalShares === 0n) return 0n;
-      const marketBal = BigInt(detailState.marketCollateralRaw || "0");
-      return (marketBal * (userYes + userNo)) / totalShares;
+      return (userYes + userNo) / 2n;
     }
     return 0n;
   })();
@@ -522,6 +683,12 @@ function VaultPage({
   const yesPct = totalStake > 0 ? (yesStake / totalStake) * 100 : 0;
   const noPct = totalStake > 0 ? (noStake / totalStake) * 100 : 0;
   const invalidPct = totalStake > 0 ? (invalidStake / totalStake) * 100 : 0;
+  const vaultFeeRoiPct = detailState && BigInt(detailState.totalPrincipalRaw) > 0n
+    ? Number(
+      (BigInt(detailState.vaultFeeRevenueRaw) * 1_000_000n)
+      / BigInt(detailState.totalPrincipalRaw),
+    ) / 10_000
+    : 0;
   const protocolPoolLabel = vaultPhase === "staking"
     ? (lang === "zh" ? "当前公开质押" : "Current public stake")
     : (lang === "zh" ? "最终公开资金分布" : "Final public capital distribution");
@@ -577,15 +744,38 @@ function VaultPage({
       const amountWei = parseUnits(amount.trim(), detailState.tokenDecimals ?? 18);
       if (amountWei <= 0n) throw new Error("Amount must be greater than zero");
       const market = new Contract(marketAddr, MARKET_ABI, signer);
+      const registry = new Contract(
+        config.marketFactoryAddress,
+        MARKET_FACTORY_ABI,
+        signer,
+      );
+      const [registered, canonicalMarket, boundVault] = await Promise.all([
+        registry.isMarket(marketAddr) as Promise<boolean>,
+        registry.marketByVault(vaultAddr) as Promise<string>,
+        market.vault() as Promise<string>,
+      ]);
+      if (
+        !registered
+        || canonicalMarket.toLowerCase() !== marketAddr.toLowerCase()
+        || boundVault.toLowerCase() !== vaultAddr.toLowerCase()
+      ) {
+        throw new Error("This prediction market is not registered to this Vault by the official factory.");
+      }
+      const txDeadline = BigInt(Math.floor(Date.now() / 1000) + 10 * 60);
+      const isYes = side === "YES";
       if (tradeMode === "BUY") {
         const tokenAddr = await market.collateral();
         const token = new Contract(tokenAddr, ERC20_ABI, signer);
-        await (await token.approve(marketAddr, amountWei)).wait();
-        if (side === "YES") await (await market.buyYes(amountWei, 0n)).wait();
-        else await (await market.buyNo(amountWei, 0n)).wait();
+        const [quotedCost] = await market.quoteBuy(isYes, amountWei) as [bigint, bigint];
+        const maxCost = (quotedCost * 101n + 99n) / 100n;
+        await (await token.approve(marketAddr, maxCost)).wait();
+        if (isYes) await (await market.buyYes(amountWei, maxCost, txDeadline)).wait();
+        else await (await market.buyNo(amountWei, maxCost, txDeadline)).wait();
       } else {
-        if (side === "YES") await (await market.sellYes(amountWei, 0n)).wait();
-        else await (await market.sellNo(amountWei, 0n)).wait();
+        const [quotedPayout] = await market.quoteSell(isYes, amountWei) as [bigint, bigint];
+        const minPayout = (quotedPayout * 99n) / 100n;
+        if (isYes) await (await market.sellYes(amountWei, minPayout, txDeadline)).wait();
+        else await (await market.sellNo(amountWei, minPayout, txDeadline)).wait();
       }
       setAmount("");
       await fetchDetailState();
@@ -636,6 +826,23 @@ function VaultPage({
     setError(null);
     try {
       const market = new Contract(marketAddr, MARKET_ABI, signer);
+      const registry = new Contract(
+        config.marketFactoryAddress,
+        MARKET_FACTORY_ABI,
+        signer,
+      );
+      const [registered, canonicalMarket, boundVault] = await Promise.all([
+        registry.isMarket(marketAddr) as Promise<boolean>,
+        registry.marketByVault(vaultAddr) as Promise<string>,
+        market.vault() as Promise<string>,
+      ]);
+      if (
+        !registered
+        || canonicalMarket.toLowerCase() !== marketAddr.toLowerCase()
+        || boundVault.toLowerCase() !== vaultAddr.toLowerCase()
+      ) {
+        throw new Error("This prediction market is not registered to this Vault by the official factory.");
+      }
       const resolved = await market.resolved();
       if (!resolved) {
         await (await market.resolve()).wait();
@@ -646,7 +853,7 @@ function VaultPage({
         market.noShares(userAddr) as Promise<bigint>,
       ]);
       if (yesR === 0n && noR === 0n) return;
-      await (await market.redeem(yesR, noR)).wait();
+      await (await market.redeem()).wait();
       await fetchDetailState();
     } catch (e) {
       setError(friendlyActionError(e, lang));
@@ -729,6 +936,22 @@ function VaultPage({
               {leaderSide ?? (lang === "zh" ? "平局" : "Tied")}
             </div>
           </div>
+          <div className="rounded-xl border border-border bg-white/60 px-3 py-2.5">
+            <div className="text-[10px] text-text-muted font-display uppercase tracking-wider">
+              {lang === "zh" ? "Vault 累计手续费" : "Vault cumulative fees"}
+            </div>
+            <div className="text-sm text-text font-bold font-mono mt-1">
+              {detailState ? formatToken(detailState.vaultFeeRevenueRaw) : "—"}
+            </div>
+          </div>
+          <div className="rounded-xl border border-accent/30 bg-accent/5 px-3 py-2.5">
+            <div className="text-[10px] text-text-muted font-display uppercase tracking-wider">
+              {lang === "zh" ? "手续费 ROI（非年化）" : "Fee ROI (non-annualized)"}
+            </div>
+            <div className="text-sm text-accent font-bold font-mono mt-1">
+              {detailState ? `${vaultFeeRoiPct.toFixed(2)}%` : "—"}
+            </div>
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-2 mt-3">
           <div className="rounded-xl bg-success/10 px-2.5 py-2 text-center"><div className="text-[10px] font-bold text-success">YES</div><div className="mt-0.5 text-sm font-bold text-text tabular-nums">{yesPct.toFixed(1)}%</div></div>
@@ -764,7 +987,10 @@ function VaultPage({
         )}
         <div>
           <h3 className="text-lg font-display font-bold text-text mb-1 flex items-center gap-2 tracking-wide text-glow">
-            <LayoutDashboard className="text-accent w-5 h-5" /> {primaryActionTitle}
+            {isMarketTab
+              ? <ArrowLeftRight className="text-accent-2 w-5 h-5" />
+              : <LayoutDashboard className="text-accent w-5 h-5" />}
+            {primaryActionTitle}
           </h3>
           <p className="text-text-muted text-xs font-mono">{primaryActionDescription}</p>
         </div>
@@ -817,20 +1043,69 @@ function VaultPage({
                 <button onClick={() => setTradeMode("SELL")} className={`flex-1 py-1.5 text-xs font-bold rounded-md font-display tracking-wider ${tradeMode === "SELL" ? "bg-danger/20 text-danger border border-danger/50" : "text-text-muted hover:text-text"}`}>{t.amm_mode_sell}</button>
               </div>
               <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2 flex justify-between font-display">
-                <span>{tradeMode === "BUY" ? t.sim_label_stake_amount : t.amm_shares}</span>
+                <span>{t.amm_shares}</span>
                 <span className="text-[10px] text-accent font-mono">{feeLabel}</span>
               </label>
               <div className="relative mb-2">
                 <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-transparent border border-border rounded-lg px-3 py-3 text-text text-lg font-mono" />
-                <div className="absolute right-3 top-4 text-text-muted text-xs font-mono">{tradeMode === "BUY" ? (detailState?.tokenSymbol ?? "") : t.amm_shares_suffix}</div>
+                <div className="absolute right-3 top-4 text-text-muted text-xs font-mono">{t.amm_shares_suffix}</div>
               </div>
-              {tradeMode === "BUY" && amount.trim() && parseFloat(amount) > 0 && (
-                <div className="flex justify-between text-[10px] text-text-muted mb-2 px-1 font-mono border-t border-border/50 pt-2 border-dashed">
-                  <span>{t.amm_gross}: {amount}</span>
-                  <span className="text-danger">- {t.amm_fee_deduction}: {estimatedFee.toFixed(2)}</span>
-                  <span className="text-success font-bold">= {t.amm_net}: {estimatedNet.toFixed(2)}</span>
+              <div className="text-[10px] text-text-muted mb-2 px-1 font-mono">
+                {lang === "zh"
+                  ? "选择方向时读取链上精确报价；交易 10 分钟后自动失效。"
+                  : "An exact OnChain quote is checked on side selection; the transaction expires after 10 minutes."}
+              </div>
+              {(quoteLoading || marketQuotes.YES || marketQuotes.NO) && (
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  {(["YES", "NO"] as const).map((side) => {
+                    const quote = marketQuotes[side];
+                    const sideColor = side === "YES" ? "text-success" : "text-danger";
+                    return (
+                      <div key={side} className="rounded-lg border border-border bg-white/60 px-2.5 py-2 text-[10px] font-mono">
+                        <div className={`mb-1.5 font-bold ${sideColor}`}>{side}</div>
+                        {quote ? (
+                          <div className="space-y-1 text-text-muted">
+                            <div className="flex justify-between gap-2">
+                              <span>{lang === "zh" ? "平均成交价" : "Avg. price"}</span>
+                              <span className="font-bold text-text">{quote.averagePrice.toFixed(4)}</span>
+                            </div>
+                            <div className="flex justify-between gap-2">
+                              <span>{lang === "zh" ? "价格影响" : "Price impact"}</span>
+                              <span className={`font-bold ${quote.priceImpactPct >= 5 ? "text-danger" : quote.priceImpactPct >= 2 ? "text-amber-600" : "text-success"}`}>
+                                {quote.priceImpactPct.toFixed(2)}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between gap-2">
+                              <span>{lang === "zh" ? "手续费" : "Fee"}</span>
+                              <span className="font-bold text-text">{formatToken(quote.fee)}</span>
+                            </div>
+                            <div className="flex justify-between gap-2 border-t border-border pt-1">
+                              <span>{tradeMode === "BUY"
+                                ? (lang === "zh" ? "预计支付" : "Est. payment")
+                                : (lang === "zh" ? "预计到账" : "Est. receipt")}</span>
+                              <span className="font-bold text-text">{formatToken(quote.quotedCashFlow)}</span>
+                            </div>
+                            <div className="flex justify-between gap-2">
+                              <span>{tradeMode === "BUY"
+                                ? (lang === "zh" ? "最大支付（滑点上限 1%）" : "Max payment (1% slippage limit)")
+                                : (lang === "zh" ? "最低到账（滑点上限 1%）" : "Min receipt (1% slippage limit)")}</span>
+                              <span className="font-bold text-text">{formatToken(quote.protectedCashFlow)}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-text-muted">{quoteLoading ? (lang === "zh" ? "报价中…" : "Quoting…") : "—"}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
+              <div role="note" className="mb-3 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2.5 text-text">
+                <div className="text-xs font-bold text-accent">{t.amm_fee_title}</div>
+                <p className="mt-1 text-[10px] leading-relaxed text-text-muted font-mono">
+                  {t.amm_fee_note}
+                </p>
+              </div>
               <div className="flex justify-end text-[10px] text-text-muted mb-3 font-mono">
                 {tradeMode === "BUY" ? (
                   <span>{t.amm_avail_balance}: <span className="text-text font-bold">{detailState ? formatMoney(detailState.userBalance) : "—"}</span></span>
@@ -912,12 +1187,6 @@ function VaultPage({
                   ) : (
                     <div className="text-text-muted">{connectHint}</div>
                   )}
-                  {marketEnabled && (
-                  <div className="border-t border-border/60 mt-2 pt-2 flex justify-between">
-                    <span className="text-text-muted">{t.user_pending_fees}</span>
-                    <span className="text-accent font-bold">{hasWallet ? formatMoney(detailState.userPendingFees) : connectHint}</span>
-                  </div>
-                  )}
                 </div>
               </>
             )}
@@ -997,6 +1266,16 @@ function VaultPage({
                             : t.btn_claim_proto}
                       </span>
                       <span className="text-text font-bold">{withdrawableVaultPayoutWei === null ? "—" : formatToken(withdrawableVaultPayoutWei)}</span>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-text-muted">
+                        {lang === "zh" ? "其中：按在场质押累计的 PM 手续费" : "Includes time-weighted PM fees"}
+                      </span>
+                      <span className="text-text font-bold">
+                        {detailState.userVaultClaimed === true
+                          ? formatToken(0n)
+                          : formatToken(detailState.userPendingFeesRaw)}
+                      </span>
                     </div>
                     {marketEnabled && (
                       <div className="flex justify-between mt-1">
@@ -1080,7 +1359,7 @@ function VaultPage({
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5 text-text-muted font-display">
-                  {lang === "zh" ? "流动性池" : "Liquidity pool"}
+                  {lang === "zh" ? "LMSR 未结算份额" : "Outstanding LMSR shares"}
                 </div>
                 <div className="text-xs font-mono text-text-muted space-y-1">
                   <div>YES: <span className="text-text font-bold">{detailState ? `${detailState.yesReserve} ${detailState.tokenSymbol}` : "—"}</span></div>
@@ -1147,38 +1426,24 @@ function VaultPage({
                 : leaderSide ?? (lang === "zh" ? "平局" : "Tied")}
             </div>
           </div>
-        </div>
-
-        <details className="border border-border rounded-xl p-3.5 sm:p-4 mt-auto text-xs font-mono text-text-muted group bg-white/60 md:bg-transparent">
-          <summary className="cursor-pointer select-none font-bold text-text font-display tracking-wide">
-            {lang === "zh" ? "链上资金明细" : "OnChain fund details"}
-          </summary>
-          <div className="mt-4 pt-4 border-t border-border space-y-4">
-            <div className="text-text-muted font-bold font-display tracking-wide">
-              {detailState?.resolved
-                ? (lang === "zh" ? "最终资金分布" : "Final fund distribution")
-                : (lang === "zh" ? "当前公开链上金额" : "Current public OnChain amounts")}
+          <div className="border border-border rounded-xl p-4">
+            <div className="text-[10px] text-text-muted uppercase mb-2 font-bold font-display tracking-wider">
+              {lang === "zh" ? "Vault 累计手续费" : "Vault cumulative fees"}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="border border-success/20 rounded-lg p-3">
-                <div className="text-success font-bold">YES</div>
-                <div className="text-text mt-1">{detailState ? formatMoney(detailState.totalStakeYes) : "—"}</div>
-              </div>
-              <div className="border border-danger/20 rounded-lg p-3">
-                <div className="text-danger font-bold">NO</div>
-                <div className="text-text mt-1">{detailState ? formatMoney(detailState.totalStakeNo) : "—"}</div>
-              </div>
-              <div className="border border-yellow-500/30 rounded-lg p-3">
-                <div className="text-yellow-500 font-bold">INVALID</div>
-                <div className="text-text mt-1">{detailState ? formatMoney(detailState.totalStakeInvalid) : "—"}</div>
-              </div>
-              <div className="border border-accent/20 rounded-lg p-3">
-                <div className="text-accent font-bold">{t.total_fees}</div>
-                <div className="text-text mt-1">{detailState ? formatMoney(detailState.totalFees) : "—"}</div>
-              </div>
+            <div className="text-sm text-text font-bold font-mono">
+              {detailState ? formatToken(detailState.vaultFeeRevenueRaw) : "—"}
             </div>
           </div>
-        </details>
+          <div className="border border-accent/30 bg-accent/5 rounded-xl p-4">
+            <div className="text-[10px] text-text-muted uppercase mb-2 font-bold font-display tracking-wider">
+              {lang === "zh" ? "手续费 ROI（非年化）" : "Fee ROI (non-annualized)"}
+            </div>
+            <div className="text-sm text-accent font-bold font-mono">
+              {detailState ? `${vaultFeeRoiPct.toFixed(2)}%` : "—"}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

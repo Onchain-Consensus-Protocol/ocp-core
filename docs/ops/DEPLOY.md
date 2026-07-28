@@ -25,12 +25,14 @@ forge test --match-contract OCPVaultBaseForkTest -vvv
 
 - `PRIVATE_KEY`：部署钱包私钥；
 - `STAKE_TOKEN`：Factory 唯一允许的质押代币；Base 主网必须为原生 USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`；
+- `OFFICIAL_LIQUIDITY_POOL`：接收 0.2% 手续费、专用于后续市场初始补贴的官方多签或资金池；
 - `BASE_SEPOLIA_RPC_URL`：Base Sepolia RPC；
 - 区块浏览器验证所需 API Key（按 Foundry 配置命名）。
 
 ## 只部署 Factory
 
-部署脚本只部署 Factory，不会创建测试代币、市场或 Vault：
+部署脚本部署 Factory；Factory 构造函数会同时创建一个 `OCPVaultDeployer` 和一个
+`PredictionMarketDeployer`，但不会创建测试代币、市场或 Vault：
 
 ```bash
 forge script script/DeployVaultFactory.s.sol:DeployVaultFactoryScript \
@@ -44,8 +46,10 @@ forge script script/DeployVaultFactory.s.sol:DeployVaultFactoryScript \
 1. 部署交易成功且地址存在字节码；
 2. `owner()` 等于预期部署地址；
 3. `officialStakeToken()` 等于目标网络的官方 USDC；
-4. `getVaults()` 初始为空；
-5. 区块浏览器显示源码验证成功。
+4. `officialLiquidityPool()` 等于预期官方资金池；
+5. `vaultDeployer()` 与 `marketDeployer()` 均存在字节码；
+6. `getVaults()` 与 `getMarkets()` 初始均为空；
+7. 区块浏览器显示 Factory 和两个部署器源码均验证成功。
 
 Factory 部署和源码验证是两个结果，报告时必须分开记录。验证失败时应重试验证，不要重新部署同一合约。
 
@@ -57,10 +61,14 @@ Factory 的 `createMarket` 参数为：
 stakeToken（必须等于 Factory 的 `officialStakeToken`）
 resolutionTime
 minStake
-initialLiquidity（保留字段，当前忽略）
+initialLiquidity（LMSR 流动性参数 b，6 位 USDC 单位）
 title
 description
 ```
+
+Factory owner 必须提前授权 Factory 使用 `ceil(b × ln(2))` 加安全缓冲的
+官方 USDC。创建交易会原子部署 Vault 和 Prediction Market、注入补贴并激活；
+任一步失败全部回滚。
 
 创建后核对：
 
@@ -68,6 +76,9 @@ description
 - `resolutionTime` 是固定质押截止；
 - `getVaultMeta(vault)` 的题面与含义完整；
 - Vault 的质押代币和最低金额正确。
+- `marketByVault(vault)` 与事件中的 market 一致；
+- Market 已激活，`subsidyProvider` 与实际补贴方一致；
+- 空 Vault 到期能够终局为 `INVALID`。
 
 ## 前端
 

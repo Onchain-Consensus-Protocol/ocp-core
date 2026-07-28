@@ -50,10 +50,13 @@ contract OCPVaultTest is Test {
     address dave = address(0xDA7E);
     uint256 constant USDC = 1_000_000;
     uint256 constant MIN = USDC;
+    uint256 constant B = 100 * USDC;
 
     function setUp() public {
         token = new TestToken();
-        factory = new OCPVaultFactory(address(token));
+        factory = new OCPVaultFactory(address(token), address(this));
+        token.mint(address(this), 100_000 * USDC);
+        token.approve(address(factory), type(uint256).max);
         for (uint256 i; i < 4; i++) {
             token.mint([alice, bob, carol, dave][i], 10_000 * USDC);
         }
@@ -61,8 +64,8 @@ contract OCPVaultTest is Test {
 
     function createVault(uint256 end) internal returns (OCPVault vault) {
         (address addr, address market) =
-            factory.createMarket(address(token), end, MIN, 0, "Test", "YES / NO / INVALID");
-        assertEq(market, address(0));
+            factory.createMarket(address(token), end, MIN, B, "Test", "YES / NO / INVALID");
+        assertTrue(market != address(0));
         vault = OCPVault(addr);
     }
 
@@ -76,7 +79,7 @@ contract OCPVaultTest is Test {
     function test_factoryCreatesSinglePeriodVault() public {
         OCPVault vault = createVault(block.timestamp + 1 days);
         assertEq(token.decimals(), 6);
-        assertEq(vault.protocolVersion(), 4);
+        assertEq(vault.protocolVersion(), 5);
         assertEq(address(vault.stakeToken()), address(token));
         assertEq(factory.officialStakeToken(), address(token));
         assertEq(factory.getVaults().length, 1);
@@ -86,20 +89,20 @@ contract OCPVaultTest is Test {
         TestToken other = new TestToken();
         vm.expectRevert("Unsupported stake token");
         factory.createMarket(
-            address(other), block.timestamp + 1 days, MIN, 0, "Test", "Description"
+            address(other), block.timestamp + 1 days, MIN, B, "Test", "Description"
         );
     }
 
     function test_factoryConstructorRejectsEOAAsToken() public {
         vm.expectRevert("Token has no code");
-        new OCPVaultFactory(alice);
+        new OCPVaultFactory(alice, address(this));
     }
 
     function test_onlyFactoryOwnerCanCreateVault() public {
         vm.prank(alice);
         vm.expectRevert("Only owner");
         factory.createMarket(
-            address(token), block.timestamp + 1 days, MIN, 0, "Test", "Description"
+            address(token), block.timestamp + 1 days, MIN, B, "Test", "Description"
         );
     }
 
@@ -158,13 +161,17 @@ contract OCPVaultTest is Test {
         vm.stopPrank();
     }
 
-    function test_emptyVaultIsNotResolvable() public {
+    function test_emptyVaultResolvesInvalid() public {
         uint256 end = block.timestamp + 1 days;
         OCPVault vault = createVault(end);
         vm.warp(end);
-        assertFalse(vault.canResolve());
-        vm.expectRevert("Empty vault");
+        assertTrue(vault.canResolve());
         vault.finalize();
+        assertTrue(vault.resolved());
+        assertTrue(vault.settlementReady());
+        assertEq(uint256(vault.outcome()), uint256(IOCPVault.Outcome.INVALID));
+        assertEq(vault.totalPrincipal(), 0);
+        assertEq(vault.remainingEligibleClaims(), 0);
     }
 
     function test_yesMustExceedHalfOfAllCapital() public {
@@ -302,7 +309,7 @@ contract OCPVaultTest is Test {
         assertEq(uint256(vault.outcome()), uint256(IOCPVault.Outcome.YES));
     }
 
-    function test_directTransferAfterFinalizeGoesToLastEligibleClaimant() public {
+    function test_directTransferAfterFinalizeCannotBeTakenByLastEligibleClaimant() public {
         uint256 end = block.timestamp + 1 days;
         OCPVault vault = createVault(end);
         stake(alice, vault, IOCPVault.Side.YES, 2 * USDC);
@@ -322,8 +329,12 @@ contract OCPVaultTest is Test {
         uint256 bobBefore = token.balanceOf(bob);
         vm.prank(bob);
         vault.withdraw();
-        assertEq(token.balanceOf(bob) - bobBefore, 9_500_000);
-        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(token.balanceOf(bob) - bobBefore, 2_500_000);
+        assertEq(token.balanceOf(address(vault)), 7 * USDC);
+
+        uint256 officialBefore = token.balanceOf(address(this));
+        assertEq(vault.claimSurplus(), 7 * USDC);
+        assertEq(token.balanceOf(address(this)) - officialBefore, 7 * USDC);
     }
 
     function test_invalidNonDivisiblePoolClearsRoundingDust() public {
@@ -403,9 +414,12 @@ contract OCPVaultTest is Test {
     function test_blacklistedWinnerCanRetryAfterUnblock() public {
         ControlledUSDC controlled = new ControlledUSDC();
         controlled.mint(alice, 10 * USDC);
-        OCPVaultFactory controlledFactory = new OCPVaultFactory(address(controlled));
+        controlled.mint(address(this), 1_000 * USDC);
+        OCPVaultFactory controlledFactory =
+            new OCPVaultFactory(address(controlled), address(this));
+        controlled.approve(address(controlledFactory), type(uint256).max);
         (address vaultAddress,) = controlledFactory.createMarket(
-            address(controlled), block.timestamp + 1 days, MIN, 0, "Test", "Description"
+            address(controlled), block.timestamp + 1 days, MIN, B, "Test", "Description"
         );
         OCPVault vault = OCPVault(vaultAddress);
         vm.startPrank(alice);
@@ -471,11 +485,13 @@ contract OCPVaultTest is Test {
 
         vm.expectRevert("Only owner");
         factory.createMarket(
-            address(token), block.timestamp + 1 days, MIN, 0, "Test", "Description"
+            address(token), block.timestamp + 1 days, MIN, B, "Test", "Description"
         );
         vm.prank(alice);
+        token.approve(address(factory), type(uint256).max);
+        vm.prank(alice);
         factory.createMarket(
-            address(token), block.timestamp + 1 days, MIN, 0, "Test", "Description"
+            address(token), block.timestamp + 1 days, MIN, B, "Test", "Description"
         );
     }
 }

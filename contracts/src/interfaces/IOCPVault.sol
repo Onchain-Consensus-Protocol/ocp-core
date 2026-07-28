@@ -25,7 +25,18 @@ interface IOCPVault {
     function totalStakeYes() external view returns (uint256);
     function totalStakeNo() external view returns (uint256);
     function totalStakeInvalid() external view returns (uint256);
+    function market() external view returns (address);
+    function settlementReady() external view returns (bool);
+    function marketFeesInSettlementPool() external view returns (uint256);
+    function totalMarketFeesAccrued() external view returns (uint256);
+    function marketFeeUserPoolRemaining() external view returns (uint256);
+    function officialMarketFeesClaimable() external view returns (uint256);
     function stakeOf(address user) external view returns (uint256 yes, uint256 no, uint256 invalid);
+    function conditionalMarketFees(address user)
+        external
+        view
+        returns (uint256 yesFees, uint256 noFees, uint256 invalidFees);
+    function claimableMarketFees(address user) external view returns (uint256 amount);
     function sideOf(address user) external view returns (Side side, bool hasPosition);
     function resolved() external view returns (bool);
     function outcome() external view returns (Outcome);
@@ -33,6 +44,12 @@ interface IOCPVault {
 
     function stake(Side side, uint256 amount) external;
     function donate(uint256 amount) external;
+    function bindMarket(address market_) external;
+    function depositMarketFee(uint256 amount) external;
     function finalize() external;
     function withdraw() external;
+    function claimMarketFeesFor(address user) external returns (uint256 amount);
+    function claimEmptySettlement() external returns (uint256 amount);
+    function claimOfficialMarketFees() external returns (uint256 amount);
+    function claimSurplus() external returns (uint256 amount);
 }

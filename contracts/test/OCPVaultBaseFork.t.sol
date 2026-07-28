@@ -22,6 +22,7 @@ interface IBaseUSDC is IERC20 {
 contract OCPVaultBaseForkTest is Test {
     address private constant BASE_USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     uint256 private constant USDC = 1_000_000;
+    uint256 private constant B = 100 * USDC;
 
     IBaseUSDC private constant usdc = IBaseUSDC(BASE_USDC);
     address private alice = address(0xA11CE);
@@ -103,9 +104,11 @@ contract OCPVaultBaseForkTest is Test {
     }
 
     function _createVault(uint256 end) private returns (OCPVault vault) {
-        OCPVaultFactory factory = new OCPVaultFactory(BASE_USDC);
+        OCPVaultFactory factory = new OCPVaultFactory(BASE_USDC, address(this));
+        deal(BASE_USDC, address(this), 1_000 * USDC, true);
+        usdc.approve(address(factory), type(uint256).max);
         (address vaultAddress,) =
-            factory.createMarket(BASE_USDC, end, USDC, 0, "Base USDC fork", "YES / NO / INVALID");
+            factory.createMarket(BASE_USDC, end, USDC, B, "Base USDC fork", "YES / NO / INVALID");
         vault = OCPVault(vaultAddress);
     }
 

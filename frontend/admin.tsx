@@ -32,7 +32,11 @@ import { useWallet } from "./useWallet";
 const ADMIN_CHAIN_ID = 8453;
 const ADMIN_FACTORY = "0xe343be8F1d8572937da49234882e6a1eF4FFEb26";
 const ADMIN_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const ADMIN_LMSR_B = 1_000_000_000n; // 1,000 USDC，最坏补贴约 693.15 USDC
 const EXPECTED_FACTORY_CODE_HASH = "0xc8988995765b2b285e6bae6b1947fc517dd5161e9422859a04e44ec1b418da2d";
+const ADMIN_DEPLOYMENT_ENABLED =
+  (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+    ?.VITE_ADMIN_DEPLOYMENT_ENABLED === "true";
 const REQUIRED_CONFIRMATIONS = 2;
 const PENDING_KEY = `ocp:vault-create:${ADMIN_CHAIN_ID}:${ADMIN_FACTORY.toLowerCase()}`;
 const utf8 = new TextEncoder();
@@ -72,6 +76,7 @@ type PendingIntent = Review & {
 type DeploymentResult = {
   txHash: string;
   vault: string;
+  market: string;
   blockNumber: number;
   sourceVerified: boolean | null;
 };
@@ -224,6 +229,9 @@ function AdminPage() {
   const runConfigPreflight = useCallback(async () => {
     setPreflightOk(false);
     try {
+      if (!ADMIN_DEPLOYMENT_ENABLED) {
+        throw new Error("V5 Factory 尚未部署并启用，管理员创建功能已安全关闭");
+      }
       if (config.chainId !== ADMIN_CHAIN_ID) throw new Error(`构建 chainId 不是 ${ADMIN_CHAIN_ID}`);
       if (!sameAddress(config.factoryAddress, ADMIN_FACTORY)) throw new Error("构建 Factory 不是正式 Base Factory");
       if (!sameAddress(config.depositTokenAddress, ADMIN_USDC)) throw new Error("构建代币不是 Base 原生 USDC");
@@ -256,6 +264,9 @@ function AdminPage() {
   }, [runConfigPreflight]);
 
   const validateSigner = useCallback(async (signer: JsonRpcSigner) => {
+    if (!ADMIN_DEPLOYMENT_ENABLED) {
+      throw new Error("V5 Factory 尚未部署并启用，不能发送创建交易");
+    }
     const signerProvider = signer.provider;
     const [network, sender, factoryCode] = await Promise.all([
       signerProvider.getNetwork(),
@@ -307,7 +318,7 @@ function AdminPage() {
       const latest = await wallet.signer.provider.getBlock("latest");
       if (!latest) throw new Error("无法读取最新 Base 区块");
       const resolutionTime = latest.timestamp + params.durationSeconds;
-      const args = [ADMIN_USDC, resolutionTime, params.minStake, 0n, params.title, params.description] as const;
+      const args = [ADMIN_USDC, resolutionTime, params.minStake, ADMIN_LMSR_B, params.title, params.description] as const;
       await factory.createMarket.staticCall(...args);
       const gasEstimate = await factory.createMarket.estimateGas(...args);
       const calldata = factory.interface.encodeFunctionData("createMarket", args);
@@ -349,10 +360,10 @@ function AdminPage() {
     });
     if (matchingEvents.length !== 1) throw new Error(`MarketCreated 事件数量异常：${matchingEvents.length}`);
     const event = matchingEvents[0];
-    const market = String(event.args.market);
+    const market = getAddress(String(event.args.market));
     const vault = getAddress(String(event.args.vault));
     const creator = String(event.args.creator);
-    if (!sameAddress(market, ZeroAddress) || vault === ZeroAddress) throw new Error("Market/Vault 事件参数异常");
+    if (market === ZeroAddress || vault === ZeroAddress) throw new Error("Market/Vault 事件参数异常");
     if (!sameAddress(creator, intent.from)) throw new Error("事件 creator 与 owner 不一致");
     if (String(event.args.title) !== intent.title || String(event.args.description) !== intent.description) {
       throw new Error("事件题面与确认参数不一致");
@@ -361,6 +372,14 @@ function AdminPage() {
     const blockTag = receipt.blockNumber;
     const factory = new Contract(ADMIN_FACTORY, FACTORY_ABI, provider);
     const deployedVault = new Contract(vault, VAULT_ABI, provider);
+    const [marketCode, marketRegistered, pairedMarket] = await Promise.all([
+      provider.getCode(market, blockTag),
+      factory.isMarket(market, { blockTag }),
+      factory.marketByVault(vault, { blockTag }),
+    ]);
+    if (marketCode === "0x" || !marketRegistered || !sameAddress(pairedMarket, market)) {
+      throw new Error("LMSR Market 未与 Vault 原子注册");
+    }
     const [
       code, registered, creatorOnChain, meta, vaults, version, vaultFactory, stakeToken,
       resolutionTime, minStake, totalPrincipal, totalDonations, yes, no, invalid, resolved, outcome,
@@ -387,11 +406,12 @@ function AdminPage() {
     if (code === "0x" || !registered || !(vaults as string[]).some((item) => sameAddress(item, vault))) throw new Error("Vault 未完整注册到 Factory");
     if (!sameAddress(creatorOnChain, intent.from) || !sameAddress(vaultFactory, ADMIN_FACTORY) || !sameAddress(stakeToken, ADMIN_USDC)) throw new Error("Vault owner/factory/token 回读不一致");
     if (String(meta[0]) !== intent.title || String(meta[1]) !== intent.description) throw new Error("Factory metadata 回读不一致");
-    if (BigInt(version) !== 4n || BigInt(resolutionTime) !== BigInt(intent.resolutionTime) || BigInt(minStake) !== BigInt(intent.minStake)) throw new Error("Vault version/deadline/minStake 回读不一致");
+    if (BigInt(version) !== 5n || BigInt(resolutionTime) !== BigInt(intent.resolutionTime) || BigInt(minStake) !== BigInt(intent.minStake)) throw new Error("Vault version/deadline/minStake 回读不一致");
     if (!zeroInitialState || Boolean(resolved) || Number(outcome) !== 0) throw new Error("Vault 初始账本状态不是全零 PENDING");
     return {
       txHash: receipt.hash,
       vault,
+      market,
       blockNumber: receipt.blockNumber,
       sourceVerified: await readSourceVerification(vault),
     };
@@ -511,7 +531,7 @@ function AdminPage() {
         throw new Error("确认页已超过 5 分钟，请重新预检，确保完整质押期限从接近创建时开始计算");
       }
       if (review.resolutionTime !== review.preparedBlockTimestamp + review.durationSeconds) throw new Error("deadline 与预检期限不一致");
-      const args = [ADMIN_USDC, review.resolutionTime, BigInt(review.minStake), 0n, review.title, review.description] as const;
+      const args = [ADMIN_USDC, review.resolutionTime, BigInt(review.minStake), ADMIN_LMSR_B, review.title, review.description] as const;
       const calldata = factory.interface.encodeFunctionData("createMarket", args);
       if (keccak256(calldata) !== review.calldataHash) throw new Error("calldata 与预检结果不一致");
       await factory.createMarket.staticCall(...args);
@@ -658,7 +678,7 @@ function AdminPage() {
                   <h2 className="font-display font-bold text-xl">Vault 创建并回读核验成功</h2>
                   <p className="text-sm text-text-muted mt-2">两个区块确认；Factory 注册、题面、v4、USDC、deadline、minStake 与初始零账本均一致。</p>
                   <div className="mt-4 space-y-2 text-sm font-mono break-all">
-                    <div>VAULT · {result.vault}</div><div>TX · {result.txHash}</div><div>BLOCK · {result.blockNumber}</div>
+                    <div>VAULT · {result.vault}</div><div>MARKET · {result.market}</div><div>TX · {result.txHash}</div><div>BLOCK · {result.blockNumber}</div>
                   </div>
                   <div className={`mt-4 text-sm font-bold ${result.sourceVerified ? "text-success" : "text-danger"}`}>{sourceStatus}</div>
                   <button
@@ -671,7 +691,7 @@ function AdminPage() {
                     <p className="text-xs text-text-muted mt-2">在 contracts 目录执行：<code>make verify-vault ADDR={result.vault} RPC_URL=&lt;Base主网RPC&gt; CHAIN_ID=8453</code></p>
                   )}
                   <div className="flex flex-wrap gap-3 mt-5">
-                    <a className="text-sm text-accent inline-flex items-center gap-1" href={`/explore/vault.html?vault=${result.vault}&market=${ZeroAddress}`}>打开 Vault <ExternalLink className="w-3 h-3" /></a>
+                    <a className="text-sm text-accent inline-flex items-center gap-1" href={`/explore/vault.html?vault=${result.vault}&market=${result.market}`}>打开 Vault 与市场 <ExternalLink className="w-3 h-3" /></a>
                     <a className="text-sm text-accent inline-flex items-center gap-1" href={`${config.explorer}/address/${result.vault}#code`} target="_blank" rel="noreferrer">区块浏览器 <ExternalLink className="w-3 h-3" /></a>
                   </div>
                   <Button className="mt-6" variant="outline" onClick={() => { setResult(null); setForm(initialForm); setReview(null); setConfirmPhrase(""); }}>创建另一个 Vault</Button>
@@ -701,7 +721,7 @@ function AdminPage() {
                   </label>
                 </div>
                 <div className="rounded-lg bg-slate-50 border border-border p-4 text-xs text-text-muted leading-5">
-                  固定参数：Base 主网 · 官方 USDC · initialLiquidity = 0 · 不创建预测市场。若截止前无人质押，Vault 会永久空置且不能 finalize。
+                  固定参数：Base 主网 · 官方 USDC · LMSR b = 1,000 USDC。Vault 与预测市场在同一笔交易中创建；需要 Factory owner 预先授权约 693.15 USDC 做市补贴。空 Vault 到期自动结算为 INVALID。
                 </div>
                 <div className="rounded-lg bg-accent/5 border border-accent/30 p-4 text-xs text-text-muted leading-5">
                   v4 规则：题面与三侧定义只用于展示，合约不会读取文字判案。单一公开期内，同地址首次选边后不可换边或撤回。
