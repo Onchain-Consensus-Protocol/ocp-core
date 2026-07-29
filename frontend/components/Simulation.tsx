@@ -725,7 +725,7 @@ export const Simulation: React.FC<Props> = ({
                 {phaseLabel}
               </span>
             </div>
-            <div className="w-[15ch] shrink-0 whitespace-nowrap text-right text-3xl font-bold text-text tabular-nums font-display tracking-normal text-glow">
+            <div className="w-72 max-w-full shrink-0 whitespace-nowrap text-right text-3xl font-bold text-text tabular-nums font-display tracking-normal text-glow">
               {timeLeft > 0 ? `0h 0m ${timeLeft}s` : "—"}
             </div>
           </div>
