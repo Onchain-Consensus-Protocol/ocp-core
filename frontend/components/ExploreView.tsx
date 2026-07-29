@@ -7,9 +7,9 @@ import {
   Wallet,
   Copy,
   Coins,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "./Button";
-import { HowToPlay } from "./HowToPlay";
 import { config, VAULT_ABI, MARKET_ABI, ERC20_ABI, ERC20_MINT_ABI, FACTORY_ABI } from "../config";
 
 import type { JsonRpcSigner } from "ethers";
@@ -81,6 +81,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       loading: "加载中…",
       noApi: "请配置 VITE_API_BASE",
       refresh: "刷新",
+      howItWorks: "OCP 与市场如何运作",
       createdBy: "创建者",
       resolution: "结算时间",
       status: "状态",
@@ -145,6 +146,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       loading: "Loading…",
       noApi: "Set VITE_API_BASE in .env",
       refresh: "Refresh",
+      howItWorks: "How OCP & Market Works",
       createdBy: "Created by",
       resolution: "Resolution",
       status: "Status",
@@ -410,6 +412,13 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
 
         </div>
         <div className="flex items-center gap-3">
+          <a
+            href="/how.html"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 px-3 py-2 text-xs font-display font-bold text-accent transition-colors hover:bg-accent/10"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            {t.howItWorks}
+          </a>
           <button onClick={fetchMarkets} className="text-xs font-mono text-accent hover:underline">
             {t.refresh}
           </button>
@@ -566,9 +575,6 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
         )}
       </div>
 
-      <div className="mt-8">
-        <HowToPlay lang={lang} />
-      </div>
     </div>
   );
 };
