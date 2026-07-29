@@ -20,6 +20,7 @@ import {
   keccak256,
   parseUnits,
   type ContractRunner,
+  type ContractTransactionResponse,
   type JsonRpcSigner,
   type TransactionReceipt,
 } from "ethers";
@@ -84,6 +85,7 @@ export type PendingIntent = Review & {
   nonce: number;
   submittedAt: number;
   txHash?: string;
+  lastError?: string;
 };
 
 type DeploymentResult = {
@@ -96,6 +98,7 @@ type DeploymentResult = {
   subsidy?: string;
   vaultSourceVerified: boolean | null;
   marketSourceVerified: boolean | null;
+  recoveryNote?: string;
 };
 
 export type BlockscoutTransaction = {
@@ -189,6 +192,46 @@ function friendlyError(error: unknown) {
   return raw.length > 320 ? `${raw.slice(0, 320)}…` : raw;
 }
 
+export function walletErrorDiagnostic(error: unknown) {
+  const e = error as {
+    code?: string | number;
+    shortMessage?: string;
+    reason?: string;
+    message?: string;
+    info?: { error?: { code?: string | number; message?: string } };
+    error?: { code?: string | number; message?: string };
+  };
+  const parts = [
+    e?.code !== undefined ? `code=${String(e.code)}` : "",
+    e?.shortMessage ? `shortMessage=${e.shortMessage}` : "",
+    e?.reason ? `reason=${e.reason}` : "",
+    e?.message ? `message=${e.message}` : "",
+    e?.info?.error?.code !== undefined ? `rpc.code=${String(e.info.error.code)}` : "",
+    e?.info?.error?.message ? `rpc.message=${e.info.error.message}` : "",
+    e?.error?.code !== undefined ? `wallet.code=${String(e.error.code)}` : "",
+    e?.error?.message ? `wallet.message=${e.error.message}` : "",
+  ].filter(Boolean);
+  const diagnostic = parts.join("\n") || "钱包请求失败（钱包未提供可安全显示的错误字段）";
+  return diagnostic.length > 2_000 ? `${diagnostic.slice(0, 2_000)}…` : diagnostic;
+}
+
+export async function withWalletTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`钱包在 ${Math.max(1, Math.round(timeoutMs / 1_000))} 秒内没有返回交易哈希或错误`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function readSourceVerification(address: string): Promise<boolean | null> {
   try {
     const response = await fetch(`${BLOCKSCOUT_API}/smart-contracts/${address}`);
@@ -264,7 +307,8 @@ function loadPendingIntent(): PendingIntent | null {
       || !Number.isSafeInteger(value.submittedAt) || Number(value.submittedAt) <= 0
       || Number(value.submittedAt) > Date.now() + 300_000
       || typeof value.calldataHash !== "string" || !/^0x[0-9a-f]{64}$/i.test(value.calldataHash)
-      || (value.txHash !== undefined && !/^0x[0-9a-f]{64}$/i.test(value.txHash))) {
+      || (value.txHash !== undefined && !/^0x[0-9a-f]{64}$/i.test(value.txHash))
+      || (value.lastError !== undefined && (typeof value.lastError !== "string" || value.lastError.length > 2_000))) {
       localStorage.removeItem(PENDING_KEY);
       return null;
     }
@@ -305,6 +349,31 @@ function AdminPage() {
     else localStorage.removeItem(PENDING_KEY);
   }, []);
 
+  const trackLateWalletHash = useCallback((
+    request: Promise<ContractTransactionResponse>,
+    intent: PendingIntent,
+  ) => {
+    void request.then((tx) => {
+      const current = loadPendingIntent();
+      if (
+        !current
+        || current.txHash
+        || !sameAddress(current.from, intent.from)
+        || current.nonce !== intent.nonce
+        || current.calldataHash.toLowerCase() !== intent.calldataHash.toLowerCase()
+      ) return;
+      savePending({
+        ...current,
+        stage: "pending",
+        txHash: tx.hash,
+        nonce: tx.nonce,
+        lastError: undefined,
+      });
+    }, () => {
+      // Active request paths persist a sanitized error. A late rejection must never unlock the intent.
+    });
+  }, [savePending]);
+
   useEffect(() => {
     const syncPendingAcrossTabs = (event: StorageEvent) => {
       if (event.key === PENDING_KEY) setPending(loadPendingIntent());
@@ -312,6 +381,10 @@ function AdminPage() {
     window.addEventListener("storage", syncPendingAcrossTabs);
     return () => window.removeEventListener("storage", syncPendingAcrossTabs);
   }, []);
+
+  useEffect(() => {
+    if (pending?.lastError) setError(pending.lastError);
+  }, [pending?.lastError]);
 
   const runConfigPreflight = useCallback(async () => {
     setPreflightOk(false);
@@ -741,6 +814,23 @@ function AdminPage() {
               setRecoveryMessage(`nonce ${intent.nonce} 的替代交易尚未达到双 RPC nonce 与 ${REQUIRED_CONFIRMATIONS} 区块确认条件；继续锁定。`);
               return;
             }
+            const [primaryFinalized, recoveryFinalized] = await Promise.all([
+              provider.getBlock("finalized"),
+              recoveryProvider.getBlock("finalized"),
+            ]);
+            if (!primaryFinalized || !recoveryFinalized) {
+              throw new Error("双 RPC 无法读取 Base finalized 区块");
+            }
+            if (
+              primaryFinalized.number < replacementReceipt.blockNumber
+              || recoveryFinalized.number < replacementReceipt.blockNumber
+            ) {
+              setRecoveryMessage(
+                `nonce ${intent.nonce} 已由区块 ${replacementReceipt.blockNumber} 的交易占用，`
+                + `正在等待 Base finalized（双 RPC：${primaryFinalized.number}/${recoveryFinalized.number}）。`,
+              );
+              return;
+            }
             const [primaryBlock, recoveryBlock] = await Promise.all([
               provider.getBlock(replacementReceipt.blockNumber),
               recoveryProvider.getBlock(replacementReceipt.blockNumber),
@@ -751,6 +841,51 @@ function AdminPage() {
               || recoveryBlock.hash !== replacementReceipt.blockHash
             ) {
               throw new Error("替代交易所在区块不是当前规范链区块");
+            }
+            const createMarketFunction = factoryInterface.getFunction("createMarket");
+            const isSuccessfulFactoryCreate =
+              replacementReceipt.status === 1
+              && replacementTransaction.to !== null
+              && sameAddress(replacementTransaction.to, ADMIN_FACTORY)
+              && createMarketFunction !== null
+              && replacementTransaction.data.slice(0, 10).toLowerCase() === createMarketFunction.selector.toLowerCase();
+            if (isSuccessfulFactoryCreate) {
+              const decoded = factoryInterface.decodeFunctionData("createMarket", replacementTransaction.data);
+              const recoveredResolutionTime = BigInt(decoded[1]);
+              const recoveredMinStake = BigInt(decoded[2]);
+              const recoveredLiquidity = BigInt(decoded[3]);
+              if (
+                !sameAddress(String(decoded[0]), ADMIN_USDC)
+                || recoveredResolutionTime > BigInt(Number.MAX_SAFE_INTEGER)
+                || recoveredMinStake <= 0n
+                || recoveredLiquidity !== ADMIN_LMSR_B
+                || typeof decoded[4] !== "string"
+                || typeof decoded[5] !== "string"
+              ) {
+                throw new Error("同 nonce 的 Factory 创建交易参数不符合 V5 生产约束");
+              }
+              const recoveredIntent: PendingIntent = {
+                ...intent,
+                title: String(decoded[4]),
+                description: String(decoded[5]),
+                resolutionTime: Number(recoveredResolutionTime),
+                minStake: recoveredMinStake.toString(),
+                calldataHash: keccak256(replacementTransaction.data),
+                stage: "pending",
+                txHash: replacementTransaction.hash,
+              };
+              const verified = await verifyReceipt(replacementReceipt, recoveredIntent);
+              setResult({
+                ...verified,
+                recoveryNote:
+                  "原本地创建意图未上链；页面已从 finalized 规范链恢复同一 nonce 实际成功创建的 Vault 与 Market，以下均为实际链上参数。",
+              });
+              setError("");
+              setRecoveryMessage("");
+              setPendingCanClear(false);
+              setPendingCanRetry(false);
+              savePending(null);
+              return;
             }
             setPendingCanClear(true);
             setRecoveryMessage(
@@ -803,6 +938,23 @@ function AdminPage() {
         setRecoveryMessage(`交易已进入区块，等待 ${REQUIRED_CONFIRMATIONS} 个确认（当前 ${confirmations}）…`);
         return;
       }
+      const [primaryFinalized, recoveryFinalized] = await Promise.all([
+        provider.getBlock("finalized"),
+        recoveryProvider.getBlock("finalized"),
+      ]);
+      if (!primaryFinalized || !recoveryFinalized) {
+        throw new Error("双 RPC 无法读取 Base finalized 区块");
+      }
+      if (
+        primaryFinalized.number < receipt.blockNumber
+        || recoveryFinalized.number < receipt.blockNumber
+      ) {
+        setRecoveryMessage(
+          `交易已成功进入区块 ${receipt.blockNumber}，正在等待 Base finalized`
+          + `（双 RPC finalized：${primaryFinalized.number}/${recoveryFinalized.number}）。页面保持锁定但不会重发。`,
+        );
+        return;
+      }
       const [primaryBlock, recoveryBlock] = await Promise.all([
         provider.getBlock(receipt.blockNumber),
         recoveryProvider.getBlock(receipt.blockNumber),
@@ -832,7 +984,7 @@ function AdminPage() {
     } finally {
       recoveryLock.current = false;
     }
-  }, [provider, recoveryProvider, savePending, verifyReceipt]);
+  }, [factoryInterface, provider, recoveryProvider, savePending, verifyReceipt]);
 
   const retryPendingWithSameNonce = async () => {
     if (busy || !pending || !pendingCanRetry || pending.txHash || pending.stage !== "awaiting_signature") return;
@@ -888,18 +1040,32 @@ function AdminPage() {
       const baseMaxFee = feeData.maxFeePerGas ?? feeData.gasPrice;
       const basePriorityFee = feeData.maxPriorityFeePerGas ?? 1_000_000n;
       if (!baseMaxFee) throw new Error("无法读取 Base EIP-1559 Gas 报价");
-      const tx = await factory.createMarket(...args, {
+      savePending({ ...pending, lastError: undefined });
+      const walletRequest = factory.createMarket(...args, {
         nonce: pending.nonce,
         gasLimit: (gasEstimate * 120n) / 100n,
         maxFeePerGas: baseMaxFee * 2n,
         maxPriorityFeePerGas: basePriorityFee * 2n,
       });
+      trackLateWalletHash(walletRequest, pending);
+      const tx = await withWalletTimeout(walletRequest, 60_000);
       const withHash = { ...pending, stage: "pending" as const, txHash: tx.hash, nonce: tx.nonce };
       savePending(withHash);
       setPendingCanRetry(false);
       await recoverPending(withHash);
     } catch (e) {
-      setError(friendlyError(e));
+      const diagnostic = walletErrorDiagnostic(e);
+      const current = loadPendingIntent();
+      if (
+        current
+        && pending
+        && sameAddress(current.from, pending.from)
+        && current.nonce === pending.nonce
+        && current.calldataHash.toLowerCase() === pending.calldataHash.toLowerCase()
+      ) {
+        savePending({ ...current, lastError: diagnostic });
+      }
+      setError(diagnostic);
     } finally {
       setBusy(false);
     }
@@ -954,14 +1120,27 @@ function AdminPage() {
       };
       savePending(intent);
       try {
-        const tx = await factory.createMarket(...args, { gasLimit: (gasEstimate * 120n) / 100n });
+        const walletRequest = factory.createMarket(...args, {
+          nonce: intent.nonce,
+          gasLimit: (gasEstimate * 120n) / 100n,
+        });
+        trackLateWalletHash(walletRequest, intent);
+        const tx = await withWalletTimeout(walletRequest, 60_000);
         const withHash = { ...intent, stage: "pending" as const, txHash: tx.hash, nonce: tx.nonce };
         savePending(withHash);
         await recoverPending(withHash);
       } catch (e) {
         const code = (e as { code?: string | number })?.code;
-        if (code === "ACTION_REJECTED" || code === 4001) {
+        const current = loadPendingIntent();
+        const isCurrentIntent =
+          current
+          && sameAddress(current.from, intent.from)
+          && current.nonce === intent.nonce
+          && current.calldataHash.toLowerCase() === intent.calldataHash.toLowerCase();
+        if ((code === "ACTION_REJECTED" || code === 4001) && isCurrentIntent && !current.txHash) {
           savePending(null);
+        } else if (isCurrentIntent) {
+          savePending({ ...current, lastError: walletErrorDiagnostic(e) });
         }
         throw e;
       }
@@ -1077,6 +1256,12 @@ function AdminPage() {
                 <div>
                   <h2 className="font-bold">存在未完成的创建意图，禁止再次发送</h2>
                   <p className="text-sm text-text-muted mt-2">状态：{pending.stage} · nonce {pending.nonce}</p>
+                  <div className="mt-3 rounded-lg border border-yellow-500/30 bg-white/60 p-3 text-xs font-mono leading-5">
+                    <div>命题 · {pending.title}</div>
+                    <div>截止时间 · {new Date(pending.resolutionTime * 1000).toLocaleString()}</div>
+                    <div>最低质押 · {formatUnits(BigInt(pending.minStake), 6)} USDC</div>
+                    <div className="break-all">CALLDATA HASH · {pending.calldataHash}</div>
+                  </div>
                   {pending.txHash && <a className="text-sm text-accent mt-2 inline-flex items-center gap-1" href={`${config.explorer}/tx/${pending.txHash}`} target="_blank" rel="noreferrer">查看交易 <ExternalLink className="w-3 h-3" /></a>}
                   {recoveryMessage && <p className="text-sm text-yellow-900 mt-3 whitespace-pre-wrap">{recoveryMessage}</p>}
                   {error && <p className="text-sm text-danger mt-3 whitespace-pre-wrap">{error}</p>}
@@ -1112,8 +1297,13 @@ function AdminPage() {
                   <h2 className="font-display font-bold text-xl">
                     V5 Vault 与 LMSR Market 创建并回读核验成功
                   </h2>
+                  {result.recoveryNote && (
+                    <p className="mt-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm font-bold text-text">
+                      {result.recoveryNote}
+                    </p>
+                  )}
                   <p className="text-sm text-text-muted mt-2">
-                    两个区块确认且位于规范链；MarketCreated/MarketActivated、Factory 双向注册、V5 Vault、LMSR 参数、补贴、费率与条件编码均一致。
+                    交易已进入 finalized 规范链；MarketCreated/MarketActivated、Factory 双向注册、V5 Vault、LMSR 参数、补贴、费率与条件编码均一致。
                   </p>
                   <div className="mt-4 space-y-2 text-sm font-mono break-all">
                     <div>VAULT · {result.vault}</div>
