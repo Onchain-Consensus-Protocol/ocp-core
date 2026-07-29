@@ -32,13 +32,15 @@ import { useWallet } from "./useWallet";
 
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
 const ADMIN_CHAIN_ID = 8453;
-const LEGACY_V4_FACTORY = "0xe343be8F1d8572937da49234882e6a1eF4FFEb26";
-const ADMIN_FACTORY = env?.VITE_ADMIN_FACTORY_ADDRESS?.trim() || config.factoryAddress;
+export const ADMIN_FACTORY = env?.VITE_ADMIN_FACTORY_ADDRESS?.trim() || config.factoryAddress;
 const ADMIN_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const ADMIN_LMSR_B = 1_000_000_000n; // 1,000 USDC
 const ADMIN_REQUIRED_SUBSIDY = 693_147_183n; // ceil(1,000 USDC × ln(2)) + 2 个最小单位缓冲
-const EXPECTED_FACTORY_CODE_HASH = env?.VITE_ADMIN_FACTORY_CODE_HASH?.trim().toLowerCase() ?? "";
-const ADMIN_DEPLOYMENT_ENABLED = env?.VITE_ADMIN_DEPLOYMENT_ENABLED === "true";
+const EXPECTED_FACTORY_CODE_HASH = (
+  env?.VITE_ADMIN_FACTORY_CODE_HASH
+  ?? "0xd35a9a60cfa96671b443e0f89b4f065d926b3a191d7a6d4ab0678feaeeece319"
+).trim().toLowerCase();
+const ADMIN_DEPLOYMENT_ENABLED = env?.VITE_ADMIN_DEPLOYMENT_ENABLED !== "false";
 const RECOVERY_RPC_URL = env?.VITE_RECOVERY_RPC_URL?.trim() || "https://mainnet.base.org";
 const BLOCKSCOUT_API = "https://base.blockscout.com/api/v2";
 const EXPECTED_PROTOCOL_VERSION = 5n;
@@ -90,7 +92,6 @@ type DeploymentResult = {
   market: string;
   blockNumber: number;
   protocolVersion: number;
-  legacy: boolean;
   liquidityPool?: string;
   subsidy?: string;
   vaultSourceVerified: boolean | null;
@@ -318,9 +319,6 @@ function AdminPage() {
       const [decimals, symbol] = await Promise.all([token.decimals(), token.symbol()]);
       if (Number(decimals) !== 6 || String(symbol) !== "USDC") throw new Error("USDC 元数据不匹配");
 
-      if (sameAddress(ADMIN_FACTORY, LEGACY_V4_FACTORY)) {
-        throw new Error("当前地址是旧 V4 Factory：不会创建 LMSR Market。V5 Factory 部署并更新地址前，创建功能已安全关闭");
-      }
       if (!ADMIN_DEPLOYMENT_ENABLED) {
         throw new Error("V5 Factory 尚未完成生产启用，管理员创建功能已安全关闭");
       }
@@ -364,9 +362,6 @@ function AdminPage() {
   const validateSigner = useCallback(async (signer: JsonRpcSigner) => {
     if (!ADMIN_DEPLOYMENT_ENABLED) {
       throw new Error("V5 Factory 尚未部署并启用，不能发送创建交易");
-    }
-    if (sameAddress(ADMIN_FACTORY, LEGACY_V4_FACTORY)) {
-      throw new Error("旧 V4 Factory 已停用；禁止按 V5 参数发送创建交易");
     }
     if (!/^0x[0-9a-f]{64}$/i.test(EXPECTED_FACTORY_CODE_HASH)) {
       throw new Error("V5 Factory runtime code hash 未配置");
@@ -530,51 +525,14 @@ function AdminPage() {
     const event = matchingEvents[0];
     const market = getAddress(String(event.args.market));
     const vault = getAddress(String(event.args.vault));
-    if (vault === ZeroAddress || !sameAddress(String(event.args.creator), intent.from)) {
-      throw new Error("MarketCreated 的 vault/creator 参数异常");
+    if (
+      market === ZeroAddress || vault === ZeroAddress
+      || !sameAddress(String(event.args.creator), intent.from)
+    ) {
+      throw new Error("MarketCreated 的 market/vault/creator 参数异常");
     }
     if (String(event.args.title) !== intent.title || String(event.args.description) !== intent.description) {
       throw new Error("MarketCreated 题面与确认参数不一致");
-    }
-
-    // 仅为旧 V4 正式地址恢复历史本地锁。所有判断都使用规范 receipt + 当前不可变状态，
-    // 不把 Blockscout 索引本身当作成功证明。
-    if (market === ZeroAddress) {
-      if (!sameAddress(ADMIN_FACTORY, LEGACY_V4_FACTORY)) {
-        throw new Error("非历史 V4 Factory 返回了零地址 Market");
-      }
-      const legacyFactory = new Contract(ADMIN_FACTORY, FACTORY_ABI, recoveryProvider);
-      const legacyVault = new Contract(vault, VAULT_ABI, recoveryProvider);
-      const [
-        registered, creator, meta, version, vaultFactory, stakeToken, resolutionTime, minStake,
-      ] = await Promise.all([
-        legacyFactory.isVault(vault),
-        legacyFactory.getVaultCreator(vault),
-        legacyFactory.getVaultMeta(vault),
-        legacyVault.protocolVersion(),
-        legacyVault.factory(),
-        legacyVault.stakeToken(),
-        legacyVault.resolutionTime(),
-        legacyVault.minStake(),
-      ]);
-      if (
-        !registered || BigInt(version) !== 4n
-        || !sameAddress(creator, intent.from) || !sameAddress(vaultFactory, ADMIN_FACTORY)
-        || !sameAddress(stakeToken, ADMIN_USDC)
-        || BigInt(resolutionTime) !== BigInt(intent.resolutionTime)
-        || BigInt(minStake) !== BigInt(intent.minStake)
-        || String(meta[0]) !== intent.title || String(meta[1]) !== intent.description
-      ) throw new Error("历史 V4 Factory/Vault 的不可变状态与创建意图不一致");
-      return {
-        txHash: receipt.hash,
-        vault,
-        market,
-        blockNumber: receipt.blockNumber,
-        protocolVersion: 4,
-        legacy: true,
-        vaultSourceVerified: await readSourceVerification(vault),
-        marketSourceVerified: null,
-      };
     }
 
     const factory = new Contract(ADMIN_FACTORY, FACTORY_ABI, provider);
@@ -698,7 +656,6 @@ function AdminPage() {
       market,
       blockNumber: receipt.blockNumber,
       protocolVersion: 5,
-      legacy: false,
       liquidityPool: getAddress(String(officialLiquidityPool)),
       subsidy: BigInt(subsidy).toString(),
       vaultSourceVerified,
@@ -923,13 +880,9 @@ function AdminPage() {
     && BigInt(review.factoryAllowance ?? "0") >= ADMIN_REQUIRED_SUBSIDY
     && BigInt(review.gasEstimate) > 0n,
   );
-  const sourceStatus = result?.legacy
-    ? result.vaultSourceVerified === true
-      ? "历史 V4 Vault 源码已验证"
-      : "历史 V4 Vault 已创建；源码验证状态暂不可用"
-    : result?.vaultSourceVerified === true && result?.marketSourceVerified === true
-      ? "Vault 与 Market 的 Blockscout 源码均已验证"
-      : "部署成功；Vault 或 Market 的源码验证尚未完成/尚未索引";
+  const sourceStatus = result?.vaultSourceVerified === true && result?.marketSourceVerified === true
+    ? "Vault 与 Market 的 Blockscout 源码均已验证"
+    : "部署成功；Vault 或 Market 的源码验证尚未完成/尚未索引";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -1025,12 +978,10 @@ function AdminPage() {
               <div className="flex gap-3"><CheckCircle2 className="w-6 h-6 text-success shrink-0" />
                 <div className="min-w-0">
                   <h2 className="font-display font-bold text-xl">
-                    {result.legacy ? "历史 V4 创建交易已确认，旧锁已清除" : "V5 Vault 与 LMSR Market 创建并回读核验成功"}
+                    V5 Vault 与 LMSR Market 创建并回读核验成功
                   </h2>
                   <p className="text-sm text-text-muted mt-2">
-                    {result.legacy
-                      ? "该交易属于旧 Factory，仅用于恢复历史本地记录；V5 Factory 上线前不会允许继续创建。"
-                      : "两个区块确认且位于规范链；MarketCreated/MarketActivated、Factory 双向注册、V5 Vault、LMSR 参数、补贴、费率与条件编码均一致。"}
+                    两个区块确认且位于规范链；MarketCreated/MarketActivated、Factory 双向注册、V5 Vault、LMSR 参数、补贴、费率与条件编码均一致。
                   </p>
                   <div className="mt-4 space-y-2 text-sm font-mono break-all">
                     <div>VAULT · {result.vault}</div>
@@ -1040,22 +991,22 @@ function AdminPage() {
                     {result.liquidityPool && <div>OFFICIAL LP · {result.liquidityPool}</div>}
                     <div>TX · {result.txHash}</div><div>BLOCK · {result.blockNumber}</div>
                   </div>
-                  <div className={`mt-4 text-sm font-bold ${result.vaultSourceVerified && (result.legacy || result.marketSourceVerified) ? "text-success" : "text-danger"}`}>{sourceStatus}</div>
+                  <div className={`mt-4 text-sm font-bold ${result.vaultSourceVerified && result.marketSourceVerified ? "text-success" : "text-danger"}`}>{sourceStatus}</div>
                   <button
                     className="mt-2 text-xs text-accent inline-flex items-center gap-1"
                     onClick={async () => setResult({
                       ...result,
                       vaultSourceVerified: await readSourceVerification(result.vault),
-                      marketSourceVerified: result.legacy ? null : await readSourceVerification(result.market),
+                      marketSourceVerified: await readSourceVerification(result.market),
                     })}
                   >
                     <RefreshCw className="w-3 h-3" /> 重新检查 Blockscout
                   </button>
-                  {(!result.vaultSourceVerified || (!result.legacy && !result.marketSourceVerified)) && (
+                  {(!result.vaultSourceVerified || !result.marketSourceVerified) && (
                     <p className="text-xs text-text-muted mt-2">部署成功不等于源码验证成功；需要分别核对 Vault 与 Market。</p>
                   )}
                   <div className="flex flex-wrap gap-3 mt-5">
-                    {!result.legacy && <a className="text-sm text-accent inline-flex items-center gap-1" href={`/explore/vault.html?vault=${result.vault}&market=${result.market}`}>打开 Vault 与市场 <ExternalLink className="w-3 h-3" /></a>}
+                    <a className="text-sm text-accent inline-flex items-center gap-1" href={`/explore/vault.html?vault=${result.vault}&market=${result.market}`}>打开 Vault 与市场 <ExternalLink className="w-3 h-3" /></a>
                     <a className="text-sm text-accent inline-flex items-center gap-1" href={`${config.explorer}/address/${result.vault}#code`} target="_blank" rel="noreferrer">区块浏览器 <ExternalLink className="w-3 h-3" /></a>
                   </div>
                   <Button className="mt-6" variant="outline" onClick={() => { setResult(null); setForm(initialForm); setReview(null); setConfirmPhrase(""); }}>创建另一个 Vault</Button>

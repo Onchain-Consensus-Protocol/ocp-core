@@ -26,7 +26,7 @@ forge test --match-contract OCPVaultBaseForkTest -vvv
 - `PRIVATE_KEY`：部署钱包私钥；
 - `STAKE_TOKEN`：Factory 唯一允许的质押代币；Base 主网必须为原生 USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`；
 - `OFFICIAL_LIQUIDITY_POOL`：接收 0.2% 手续费、专用于后续市场初始补贴的官方多签或资金池；
-- `BASE_SEPOLIA_RPC_URL`：Base Sepolia RPC；
+- `BASE_RPC_URL`：Base 主网 RPC；
 - 区块浏览器验证所需 API Key（按 Foundry 配置命名）。
 
 ## 只部署 Factory
@@ -36,7 +36,7 @@ forge test --match-contract OCPVaultBaseForkTest -vvv
 
 ```bash
 forge script script/DeployVaultFactory.s.sol:DeployVaultFactoryScript \
-  --rpc-url "$BASE_SEPOLIA_RPC_URL" \
+  --rpc-url "$BASE_RPC_URL" \
   --broadcast \
   --verify
 ```
@@ -95,8 +95,8 @@ Factory owner 必须提前授权 Factory 使用 `ceil(b × ln(2))` 加安全缓�
   `eth_getLogs` 猜测旧交易，而是先按 sender + nonce 从 Blockscout 定位交易，再严格核对
   target、value、calldata、receipt 和 `MarketCreated`。
 
-管理页必须拒绝旧 V4 Factory：旧版本虽然有相同的六参数 `createMarket`，但会忽略
-`initialLiquidity`、返回零地址 Market 并部署 V4 Vault。V5 生产预检必须同时核对：
+前端只支持当前 V5 Factory。旧 Factory、旧 Vault、未知深链和非官方 Deployer
+创建的实例均不得读取为可交易市场。V5 生产预检必须同时核对：
 
 - Factory runtime hash；
 - `officialStakeToken`、`officialLiquidityPool`；
@@ -127,3 +127,15 @@ npm run build
 - 修改或部署 Factory 不等于创建 Vault；
 - 创建 Vault 必须单独获得明确授权；
 - 前端发布必须在 Factory 地址、ABI 和链上合约一致后进行。
+
+## Base 主网 V5 部署记录
+
+- 部署交易：`0xaf7be99192cb82d86e5504c527031c3bb9495fab1c079c443767f739c71c93b4`
+- Factory：`0x97B33092848a38Bb1abCAD3FEf0c72e2e3B8bBf0`
+- Factory runtime hash：`0xd35a9a60cfa96671b443e0f89b4f065d926b3a191d7a6d4ab0678feaeeece319`
+- VaultDeployer：`0xE4f1c071071ec001FCA10F9152d20FAa3F80239F`
+- PredictionMarketDeployer：`0xDB11A103b6C1b798fe41895F8707E5442Bf0C356`
+- Factory owner / officialLiquidityPool：`0x1556a9A5C01ecc4eF11e751CacC847DD36971be7`
+- officialStakeToken：Base 原生 USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+- 编译器：Solidity `0.8.20`，optimizer `200` runs，EVM `shanghai`
+- Factory、VaultDeployer、PredictionMarketDeployer 均已在 Basescan 验证源码。

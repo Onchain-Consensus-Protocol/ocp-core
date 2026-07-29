@@ -11,10 +11,23 @@ contract DeployVaultFactoryScript is Script {
     address private constant BASE_USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
     function run() external returns (OCPVaultFactory factory) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        string memory privateKeyString = vm.envString("PRIVATE_KEY");
+        uint256 deployerPrivateKey;
+        bytes memory privateKeyBytes = bytes(privateKeyString);
+        if (
+            privateKeyBytes.length >= 2 && privateKeyBytes[0] == "0"
+                && privateKeyBytes[1] == "x"
+        ) {
+            deployerPrivateKey = vm.parseUint(privateKeyString);
+        } else {
+            deployerPrivateKey =
+                vm.parseUint(string(abi.encodePacked("0x", privateKeyString)));
+        }
+        uint256 expectedChainId = vm.envUint("EXPECTED_CHAIN_ID");
         address stakeToken = vm.envAddress("STAKE_TOKEN");
         address officialLiquidityPool = vm.envAddress("OFFICIAL_LIQUIDITY_POOL");
         require(deployerPrivateKey != 0, "Invalid PRIVATE_KEY");
+        require(block.chainid == expectedChainId, "Unexpected chain");
         require(stakeToken != address(0), "Invalid STAKE_TOKEN");
         require(officialLiquidityPool != address(0), "Invalid OFFICIAL_LIQUIDITY_POOL");
         require(stakeToken.code.length > 0, "STAKE_TOKEN has no code");

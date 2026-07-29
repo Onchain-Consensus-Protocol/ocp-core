@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { keccak256 } from "ethers";
 import {
+  ADMIN_FACTORY,
   blockscoutTransactionMatchesIntent,
   findTransactionBySenderNonce,
   type BlockscoutTransaction,
@@ -8,7 +9,6 @@ import {
 } from "./admin";
 
 const OWNER = "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7";
-const FACTORY = "0xe343be8F1d8572937da49234882e6a1eF4FFEb26";
 const CALLDATA = "0x12345678";
 
 function intent(): PendingIntent {
@@ -38,7 +38,7 @@ function indexedTransaction(overrides: Partial<BlockscoutTransaction> = {}): Blo
     value: "0",
     block_number: 48_733_053,
     from: { hash: OWNER },
-    to: { hash: FACTORY },
+    to: { hash: ADMIN_FACTORY },
     ...overrides,
   };
 }

@@ -13,6 +13,7 @@ import { Button } from "./Button";
 import { config, VAULT_ABI, MARKET_ABI, ERC20_ABI, ERC20_MINT_ABI, FACTORY_ABI } from "../config";
 
 import type { JsonRpcSigner } from "ethers";
+const viteEnv = (import.meta as unknown as { env?: { DEV?: boolean } }).env;
 
 interface MarketMeta {
   title: string;
@@ -48,13 +49,6 @@ interface MarketItem {
   meta: MarketMeta | null;
   onChain: OnChainState | null;
 }
-
-// 同一 Gate 命题被 owner 重复广播了两次。保留更早创建的
-// 0xc90Ab8EeF942a9aecA29A9280526AB3476eC4949 作为前端唯一正式入口；
-// 链上 Factory 没有删除 Vault 的接口，因此这里只能停止展示较晚的副本。
-const HIDDEN_DUPLICATE_VAULTS = new Set([
-  "0x818064be8a2656b7ffd19b6abf6084b75552f12d",
-]);
 
 const MOCK_EXPLORE_ITEMS: MarketItem[] = [];
 
@@ -227,9 +221,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       const provider = new JsonRpcProvider(config.rpcUrl);
       const factory = new Contract(config.factoryAddress, FACTORY_ABI, provider);
       const factoryVaults = (await factory.getVaults()) as string[];
-      const vaults = factoryVaults.filter(
-        (vaultAddr) => !HIDDEN_DUPLICATE_VAULTS.has(String(vaultAddr).toLowerCase()),
-      );
+      const vaults = factoryVaults;
       if (!Array.isArray(vaults) || vaults.length === 0) {
         return [];
       }
@@ -319,7 +311,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
               tokenDecimals: Number(tokenDecimals),
             };
           } catch (e) {
-            if (import.meta.env.DEV) console.warn("[ExploreView] Vault OnChain read failed, showing fallback", addr, e);
+            if (viteEnv?.DEV) console.warn("[ExploreView] Vault OnChain read failed, showing fallback", addr, e);
           }
 
           let marketAddr = "0x0000000000000000000000000000000000000000";
@@ -328,19 +320,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
               marketAddr = String(await factory.marketByVault(addr));
               if (marketAddr !== "0x0000000000000000000000000000000000000000") {
                 const market = new Contract(marketAddr, MARKET_ABI, provider);
-                const marketVolumePromise = (async (): Promise<bigint> => {
-                  try {
-                    return await market.totalTradingVolume() as bigint;
-                  } catch {
-                    // 旧版 Market 没有累计 getter；从不可变的 FeeAccrued 日志还原
-                    // 每笔手续费前 gross USDC 现金流，保持旧市场的交易量展示准确。
-                    const events = await market.queryFilter(market.filters.FeeAccrued(), 0, "latest");
-                    return events.reduce((sum: bigint, event) => {
-                      const args = "args" in event ? event.args : undefined;
-                      return sum + BigInt(args?.grossCashFlow ?? 0);
-                    }, 0n);
-                  }
-                })();
+                const marketVolumePromise = market.totalTradingVolume() as Promise<bigint>;
                 const [
                   totalYesShares,
                   totalNoShares,
@@ -367,7 +347,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
                 };
               }
             } catch (e) {
-              if (import.meta.env.DEV) console.warn("[ExploreView] Market OnChain read failed", addr, e);
+              if (viteEnv?.DEV) console.warn("[ExploreView] Market OnChain read failed", addr, e);
             }
           }
 
