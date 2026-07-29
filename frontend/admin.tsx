@@ -43,6 +43,7 @@ const EXPECTED_FACTORY_CODE_HASH = (
   ?? "0xd35a9a60cfa96671b443e0f89b4f065d926b3a191d7a6d4ab0678feaeeece319"
 ).trim().toLowerCase();
 const ADMIN_DEPLOYMENT_ENABLED = env?.VITE_ADMIN_DEPLOYMENT_ENABLED !== "false";
+const ADMIN_RPC_URL = env?.VITE_ADMIN_RPC_URL?.trim() || "https://base.gateway.tenderly.co";
 const RECOVERY_RPC_URL = env?.VITE_RECOVERY_RPC_URL?.trim() || "https://base.drpc.org";
 const BLOCKSCOUT_API = "https://base.blockscout.com/api/v2";
 const EXPECTED_PROTOCOL_VERSION = 5n;
@@ -361,7 +362,7 @@ function loadPendingIntent(): PendingIntent | null {
 
 function AdminPage() {
   const wallet = useWallet();
-  const provider = useMemo(() => new JsonRpcProvider(config.rpcUrl), []);
+  const provider = useMemo(() => new JsonRpcProvider(ADMIN_RPC_URL), []);
   const recoveryProvider = useMemo(() => new JsonRpcProvider(RECOVERY_RPC_URL), []);
   const factoryInterface = useMemo(() => new Interface(FACTORY_ABI), []);
   const marketInterface = useMemo(() => new Interface(MARKET_ABI), []);
