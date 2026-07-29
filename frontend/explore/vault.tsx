@@ -1308,37 +1308,39 @@ function VaultPage({
 
       {/* Right: Visualizer - 与模拟页一致 */}
       <div className="px-4 py-5 sm:p-6 md:w-2/3 bg-slate-50/40 md:bg-transparent relative flex flex-col font-mono md:rounded-r-2xl">
-        <div className="hidden md:flex justify-between items-start mb-6 animate-fade-in border-b border-border pb-4">
-          <div className="min-w-0 pr-8">
-            <h2 className="text-2xl font-bold text-text mb-3 tracking-wide font-display text-glow break-words leading-tight">
-              {title || (lang === "zh" ? "金库" : "Vault")}
-            </h2>
-            {description && (
-              <div className="mb-3 px-3 py-2 rounded-lg bg-accent/5 border border-accent/20">
-                <p className="text-sm leading-6 text-text font-mono whitespace-pre-line break-words">
-                  {description}
-                </p>
-              </div>
-            )}
-            {phaseLabel && (
+        <div className="hidden md:block mb-6 animate-fade-in border-b border-border pb-4">
+          <h2 className="text-2xl font-bold text-text mb-3 tracking-wide font-display text-glow break-words leading-tight">
+            {title || (lang === "zh" ? "金库" : "Vault")}
+          </h2>
+          {description && (
+            <div className="mb-3 px-3 py-2 rounded-lg bg-accent/5 border border-accent/20">
+              <p className="text-sm leading-6 text-text font-mono whitespace-pre-line break-words">
+                {description}
+              </p>
+            </div>
+          )}
+          <div className="flex items-start justify-between gap-4">
+            <div className="pt-1.5">
+              {phaseLabel && (
               <span className={`px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded border font-mono ${phaseBadgeClass}`}>
                 {phaseLabel}
               </span>
-            )}
-          </div>
-          <div className="w-[16rem] shrink-0 text-right">
-            <div className="whitespace-nowrap text-4xl font-bold text-text tabular-nums font-display tracking-widest text-glow">
-              {timeLeft > 0 ? `${Math.floor(timeLeft / 3600)}h ${(Math.floor(timeLeft / 60) % 60)}m ${timeLeft % 60}s` : "—"}
+              )}
             </div>
-            <Button
-              onClick={handleShareOnX}
-              disabled={!detailState?.snapshotBlock}
-              variant="secondary"
-              className="mt-3 ml-auto"
-            >
-              <Share2 className="w-4 h-4 mr-2" />
-              {lang === "zh" ? "分享到 X" : "Share on X"}
-            </Button>
+            <div className="w-[15ch] shrink-0 text-right">
+              <div className="whitespace-nowrap text-3xl font-bold text-text tabular-nums font-display tracking-normal text-glow">
+              {timeLeft > 0 ? `${Math.floor(timeLeft / 3600)}h ${(Math.floor(timeLeft / 60) % 60)}m ${timeLeft % 60}s` : "—"}
+              </div>
+              <Button
+                onClick={handleShareOnX}
+                disabled={!detailState?.snapshotBlock}
+                variant="secondary"
+                className="mt-3 ml-auto"
+              >
+                <Share2 className="w-4 h-4 mr-2" />
+                {lang === "zh" ? "分享到 X" : "Share on X"}
+              </Button>
+            </div>
           </div>
         </div>
         <div className="hidden md:flex items-center gap-4 mb-6 text-xs text-text-muted font-mono uppercase">
