@@ -61,7 +61,7 @@ export default async function handler(request: Request) {
     const imageUrl = new URL(snapshot.resolved ? "/api/vault-result-card" : "/api/vault-card", origin);
     imageUrl.searchParams.set("vault", vault);
     imageUrl.searchParams.set("market", market);
-    imageUrl.searchParams.set("v", "4");
+    imageUrl.searchParams.set("v", "5");
     if (!snapshot.resolved) imageUrl.searchParams.set("block", String(snapshot.blockNumber));
 
     const outcomeLabel = snapshot.outcome === 1 ? "YES" : snapshot.outcome === 2 ? "NO" : "INVALID";
@@ -70,7 +70,7 @@ export default async function handler(request: Request) {
       ? snapshot.outcome === 3
         ? `FINALIZED: INVALID · No strict majority · ${snapshot.settlementPoolAmount} ${snapshot.tokenSymbol} settlement pool`
         : `FINALIZED: ${outcomeLabel} · ${outcomePct} consensus weight · ${snapshot.settlementPoolAmount} ${snapshot.tokenSymbol} settlement pool`
-      : `Vault: YES ${snapshot.yesPct} · NO ${snapshot.noPct} · INVALID ${snapshot.invalidPct} · Market: YES ${snapshot.marketYesPrice} · NO ${snapshot.marketNoPrice} · ${snapshot.marketVolumeAmount} ${snapshot.tokenSymbol} volume`;
+      : `Vault: YES ${snapshot.yesPct} · NO ${snapshot.noPct} · INVALID ${snapshot.invalidPct} · Market price: YES ${snapshot.marketYesPrice} · NO ${snapshot.marketNoPrice}`;
     const resultTitle = snapshot.outcome === 3 ? `No strict majority · ${snapshot.title}` : `${outcomeLabel} wins · ${snapshot.title}`;
     const title = escapeHtml(snapshot.resolved ? resultTitle : snapshot.title);
     const target = escapeHtml(vaultUrl.toString());

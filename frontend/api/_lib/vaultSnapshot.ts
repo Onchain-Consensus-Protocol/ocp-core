@@ -191,9 +191,9 @@ function formatPct(raw: bigint, total: bigint): string {
   return `${tenths / 10n}.${tenths % 10n}%`;
 }
 
-function formatWadPct(raw: bigint): string {
-  const tenths = (raw * 1000n + 500_000_000_000_000_000n) / 1_000_000_000_000_000_000n;
-  return `${tenths / 10n}.${tenths % 10n}%`;
+function formatWadDecimal(raw: bigint): string {
+  const hundredths = (raw * 100n + 500_000_000_000_000_000n) / 1_000_000_000_000_000_000n;
+  return `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, "0")}`;
 }
 
 export async function loadVaultSnapshot(
@@ -315,8 +315,8 @@ export async function loadVaultSnapshot(
     settlementPoolRaw,
     settlementPoolAmount: formatToken(settlementPoolRaw, tokenDecimals),
     market,
-    marketYesPrice: formatWadPct(marketYesPriceRaw),
-    marketNoPrice: formatWadPct(marketNoPriceRaw),
+    marketYesPrice: formatWadDecimal(marketYesPriceRaw),
+    marketNoPrice: formatWadDecimal(marketNoPriceRaw),
     marketVolumeAmount: formatToken(marketVolumeRaw, tokenDecimals),
     marketYesSharesAmount: formatToken(marketYesSharesRaw, tokenDecimals),
     marketNoSharesAmount: formatToken(marketNoSharesRaw, tokenDecimals),
