@@ -1327,7 +1327,7 @@ function VaultPage({
               </span>
               )}
             </div>
-            <div className="w-[15ch] shrink-0 text-right">
+            <div className="w-72 max-w-full shrink-0 text-right">
               <div className="whitespace-nowrap text-3xl font-bold text-text tabular-nums font-display tracking-normal text-glow">
               {timeLeft > 0 ? `${Math.floor(timeLeft / 3600)}h ${(Math.floor(timeLeft / 60) % 60)}m ${timeLeft % 60}s` : "—"}
               </div>
