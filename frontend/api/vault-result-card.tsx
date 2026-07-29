@@ -46,8 +46,8 @@ function ResultCard({ snapshot, logoUrl }: { snapshot: VaultSnapshot; logoUrl: s
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <img src={logoUrl} width={46} height={46} alt="OCP" style={{ borderRadius: 12 }} />
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontWeight: 900, fontSize: 21 }}>OCP</span>
-            <span style={{ color: "#94a3b8", fontSize: 12, letterSpacing: 2.4 }}>FINALIZED ONCHAIN RESULT</span>
+            <span style={{ fontWeight: 900, fontSize: 21 }}>OCP × MARKET</span>
+            <span style={{ color: "#94a3b8", fontSize: 12, letterSpacing: 2.4 }}>VAULT OUTCOME · MARKET SETTLEMENT</span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#94a3b8", fontSize: 14 }}>
@@ -86,8 +86,10 @@ function ResultCard({ snapshot, logoUrl }: { snapshot: VaultSnapshot; logoUrl: s
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 22, paddingTop: 17, borderTop: "1px solid #1e293b" }}>
-        <span style={{ display: "flex", color: "#64748b", fontSize: 13, letterSpacing: 2 }}>FINALIZED · ONCHAIN · IMMUTABLE</span>
-        <span style={{ display: "flex", color: outcome.color, fontSize: 14, fontWeight: 850 }}>PROOF OF COMMITMENT</span>
+        <span style={{ display: "flex", color: "#a78bfa", fontSize: 13, fontWeight: 850, letterSpacing: 1.6 }}>LMSR FINAL MARKET STATE</span>
+        <span style={{ display: "flex", color: "#cbd5e1", fontSize: 14, fontWeight: 800 }}>
+          YES {snapshot.marketYesPrice} · NO {snapshot.marketNoPrice} · VOLUME {snapshot.marketVolumeAmount} {snapshot.tokenSymbol}
+        </span>
       </div>
     </div>
   );
@@ -108,12 +110,13 @@ export default async function handler(request: Request) {
   }
   const url = new URL(request.url);
   const vault = url.searchParams.get("vault");
+  const market = url.searchParams.get("market");
   const blockParam = url.searchParams.get("block");
   const block = blockParam ? Number(blockParam) : undefined;
 
   try {
     if (!isAddress(vault)) throw new Error("Invalid Vault address");
-    const snapshot = await loadVaultSnapshot(vault, block);
+    const snapshot = await loadVaultSnapshot(vault, block, market ?? undefined);
     if (!snapshot.resolved || snapshot.outcome < 1 || snapshot.outcome > 3) {
       throw new Error("Vault is not finalized");
     }

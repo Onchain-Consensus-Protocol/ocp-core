@@ -56,10 +56,12 @@ export default async function handler(request: Request) {
   try {
     // 已结算状态的 totals/outcome/settlementPool 不再变化。新分享显式携带
     // finalized=1 后读取 latest 并再次验证 resolved，避免 OG 爬虫依赖归档 RPC。
-    const snapshot = await loadVaultSnapshot(vault, finalizedHint ? undefined : block);
+    const snapshot = await loadVaultSnapshot(vault, finalizedHint ? undefined : block, market);
     if (finalizedHint && !snapshot.resolved) throw new Error("Vault is not finalized");
     const imageUrl = new URL(snapshot.resolved ? "/api/vault-result-card" : "/api/vault-card", origin);
     imageUrl.searchParams.set("vault", vault);
+    imageUrl.searchParams.set("market", market);
+    imageUrl.searchParams.set("v", "2");
     if (!snapshot.resolved) imageUrl.searchParams.set("block", String(snapshot.blockNumber));
 
     const outcomeLabel = snapshot.outcome === 1 ? "YES" : snapshot.outcome === 2 ? "NO" : "INVALID";
@@ -68,15 +70,15 @@ export default async function handler(request: Request) {
       ? snapshot.outcome === 3
         ? `FINALIZED: INVALID · No strict majority · ${snapshot.settlementPoolAmount} ${snapshot.tokenSymbol} settlement pool`
         : `FINALIZED: ${outcomeLabel} · ${outcomePct} consensus weight · ${snapshot.settlementPoolAmount} ${snapshot.tokenSymbol} settlement pool`
-      : `YES ${snapshot.yesPct} · NO ${snapshot.noPct} · INVALID ${snapshot.invalidPct} · ${snapshot.totalAmount} ${snapshot.tokenSymbol} staked`;
+      : `Vault: YES ${snapshot.yesPct} · NO ${snapshot.noPct} · INVALID ${snapshot.invalidPct} · Market: YES ${snapshot.marketYesPrice} · NO ${snapshot.marketNoPrice} · ${snapshot.marketVolumeAmount} ${snapshot.tokenSymbol} volume`;
     const resultTitle = snapshot.outcome === 3 ? `No strict majority · ${snapshot.title}` : `${outcomeLabel} wins · ${snapshot.title}`;
     const title = escapeHtml(snapshot.resolved ? resultTitle : snapshot.title);
     const target = escapeHtml(vaultUrl.toString());
     const snapshotUrl = escapeHtml(url.toString());
     const cardUrl = escapeHtml(imageUrl.toString());
     const cardAlt = snapshot.resolved
-      ? `OCP finalized result: ${outcomeLabel} at Base block ${snapshot.blockNumber}`
-      : `OCP Vault stake distribution at Base block ${snapshot.blockNumber}`;
+      ? `OCP Vault and Market finalized result: ${outcomeLabel} at Base block ${snapshot.blockNumber}`
+      : `OCP Vault capital and LMSR Market prices at Base block ${snapshot.blockNumber}`;
     const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -101,7 +103,7 @@ export default async function handler(request: Request) {
   <link rel="canonical" href="${snapshotUrl}">
 </head>
 <body>
-  <p><a href="${target}">Open this OCP Vault</a></p>
+  <p><a href="${target}">Open this OCP Vault and Market</a></p>
   <script>window.location.replace(${JSON.stringify(vaultUrl.toString()).replaceAll("<", "\\u003c")});</script>
 </body>
 </html>`;

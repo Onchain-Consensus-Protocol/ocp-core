@@ -11,6 +11,14 @@ const SELECTOR = {
   settlementPool: "0xaac0297a",
   getVaultMeta: "0x1adeafed",
   isVault: "0x652b9b41",
+  marketByVault: "0xdb91027d",
+  marketVault: "0xfbfa77cf",
+  marketActivated: "0x186601ca",
+  totalYesShares: "0xd31dbc3e",
+  totalNoShares: "0x5ae01f82",
+  getYesNoPrice: "0x30639120",
+  totalTradingVolume: "0xdfb0886b",
+  liquidityParameter: "0x3a69a1be",
   decimals: "0x313ce567",
   symbol: "0x95d89b41",
 } as const;
@@ -38,6 +46,13 @@ export interface VaultSnapshot {
   outcome: number;
   settlementPoolRaw: bigint;
   settlementPoolAmount: string;
+  market: string;
+  marketYesPrice: string;
+  marketNoPrice: string;
+  marketVolumeAmount: string;
+  marketYesSharesAmount: string;
+  marketNoSharesAmount: string;
+  liquidityParameterAmount: string;
 }
 
 export function isAddress(value: string | null): value is string {
@@ -176,7 +191,16 @@ function formatPct(raw: bigint, total: bigint): string {
   return `${tenths / 10n}.${tenths % 10n}%`;
 }
 
-export async function loadVaultSnapshot(vault: string, requestedBlock?: number): Promise<VaultSnapshot> {
+function formatWadPct(raw: bigint): string {
+  const tenths = (raw * 1000n + 500_000_000_000_000_000n) / 1_000_000_000_000_000_000n;
+  return `${tenths / 10n}.${tenths % 10n}%`;
+}
+
+export async function loadVaultSnapshot(
+  vault: string,
+  requestedBlock?: number,
+  expectedMarket?: string,
+): Promise<VaultSnapshot> {
   if (!isAddress(vault)) throw new Error("Invalid Vault address");
 
   // 固定快照块由后续 eth_call 自行验证是否存在，避免每次 OG 抓取额外消耗一次
@@ -190,15 +214,21 @@ export async function loadVaultSnapshot(vault: string, requestedBlock?: number):
   const factory = decodeAddress(await ethCall(vault, SELECTOR.factory, blockTag));
   if (!isAddress(factory)) throw new Error("Vault factory is invalid");
 
-  const [registeredData, stakeTokenData, yesData, noData, invalidData, metaData] = await ethCallBatch([
+  const [registeredData, stakeTokenData, yesData, noData, invalidData, metaData, marketData] = await ethCallBatch([
     { to: factory, data: `${SELECTOR.isVault}${encodeAddress(vault)}` },
     { to: vault, data: SELECTOR.stakeToken },
     { to: vault, data: SELECTOR.totalStakeYes },
     { to: vault, data: SELECTOR.totalStakeNo },
     { to: vault, data: SELECTOR.totalStakeInvalid },
     { to: factory, data: `${SELECTOR.getVaultMeta}${encodeAddress(vault)}` },
+    { to: factory, data: `${SELECTOR.marketByVault}${encodeAddress(vault)}` },
   ], blockTag);
   if (decodeUint(registeredData) === 0n) throw new Error("Address is not registered by its OCP Factory");
+  const market = decodeAddress(marketData);
+  if (!isAddress(market) || /^0x0{40}$/i.test(market)) throw new Error("Vault has no registered Market");
+  if (expectedMarket && (!isAddress(expectedMarket) || market.toLowerCase() !== expectedMarket.toLowerCase())) {
+    throw new Error("Market is not paired with this Vault");
+  }
 
   // 结算状态读取合并为一个 JSON-RPC batch，避免 OG 爬虫触发公共 RPC 的突发限流。
   // 旧 Vault 若不支持这些 getter，再退回逐项兼容读取。
@@ -235,6 +265,33 @@ export async function loadVaultSnapshot(vault: string, requestedBlock?: number):
   const [title] = decodeStringPair(metaData);
   const tokenDecimals = Number(decodeUint(decimalsData));
   const tokenSymbol = decodeString(symbolData).slice(0, 12) || "TOKEN";
+  const [
+    marketVaultData,
+    marketActivatedData,
+    marketYesSharesData,
+    marketNoSharesData,
+    marketPriceData,
+    marketVolumeData,
+    liquidityParameterData,
+  ] = await ethCallBatch([
+    { to: market, data: SELECTOR.marketVault },
+    { to: market, data: SELECTOR.marketActivated },
+    { to: market, data: SELECTOR.totalYesShares },
+    { to: market, data: SELECTOR.totalNoShares },
+    { to: market, data: SELECTOR.getYesNoPrice },
+    { to: market, data: SELECTOR.totalTradingVolume },
+    { to: market, data: SELECTOR.liquidityParameter },
+  ], blockTag);
+  if (decodeAddress(marketVaultData).toLowerCase() !== vault.toLowerCase()) {
+    throw new Error("Market does not point back to this Vault");
+  }
+  if (decodeUint(marketActivatedData) === 0n) throw new Error("Market is not activated");
+  const marketYesPriceRaw = BigInt(`0x${word(marketPriceData, 0) || "0"}`);
+  const marketNoPriceRaw = BigInt(`0x${word(marketPriceData, 1) || "0"}`);
+  const marketYesSharesRaw = decodeUint(marketYesSharesData);
+  const marketNoSharesRaw = decodeUint(marketNoSharesData);
+  const marketVolumeRaw = decodeUint(marketVolumeData);
+  const liquidityParameterRaw = decodeUint(liquidityParameterData);
 
   return {
     vault,
@@ -257,5 +314,12 @@ export async function loadVaultSnapshot(vault: string, requestedBlock?: number):
     outcome,
     settlementPoolRaw,
     settlementPoolAmount: formatToken(settlementPoolRaw, tokenDecimals),
+    market,
+    marketYesPrice: formatWadPct(marketYesPriceRaw),
+    marketNoPrice: formatWadPct(marketNoPriceRaw),
+    marketVolumeAmount: formatToken(marketVolumeRaw, tokenDecimals),
+    marketYesSharesAmount: formatToken(marketYesSharesRaw, tokenDecimals),
+    marketNoSharesAmount: formatToken(marketNoSharesRaw, tokenDecimals),
+    liquidityParameterAmount: formatToken(liquidityParameterRaw, tokenDecimals),
   };
 }
