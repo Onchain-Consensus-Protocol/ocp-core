@@ -688,6 +688,29 @@ function AdminPage() {
     try {
       let txHash = intent.txHash;
       if (!txHash) {
+        if (intent.stage === "awaiting_signature") {
+          const [latestNonce, pendingNonce, recoveryLatestNonce, recoveryPendingNonce] = await Promise.all([
+            provider.getTransactionCount(intent.from, "latest"),
+            provider.getTransactionCount(intent.from, "pending"),
+            recoveryProvider.getTransactionCount(intent.from, "latest"),
+            recoveryProvider.getTransactionCount(intent.from, "pending"),
+          ]);
+          if (canRetryPendingWithSameNonce(
+            intent,
+            latestNonce,
+            pendingNonce,
+            recoveryLatestNonce,
+            recoveryPendingNonce,
+          )) {
+            setPendingCanRetry(true);
+            setRecoveryMessage(
+              `双 RPC 均确认 nonce ${intent.nonce} 仍未占用（latest/pending：`
+              + `${latestNonce}/${pendingNonce}、${recoveryLatestNonce}/${recoveryPendingNonce}）。`
+              + "可以使用相同 nonce 与相同 calldata 安全重试；即使旧签名稍后广播，两笔中也最多只有一笔能上链。",
+            );
+            return;
+          }
+        }
         const indexedTransaction = await findTransactionBySenderNonce(intent.from, intent.nonce);
         if (indexedTransaction) {
           if (!blockscoutTransactionMatchesIntent(indexedTransaction, intent)) {
