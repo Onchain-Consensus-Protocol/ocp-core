@@ -36,8 +36,8 @@ function Card({ snapshot, logoUrl }: { snapshot: VaultSnapshot; logoUrl: string 
       <div style={{ display: "flex", width: 1092, height: 270, gap: 18 }}>
         <div style={{ display: "flex", width: 620, height: 270, flexDirection: "column", border: "1px solid #e2e8f0", borderRadius: 16, background: "white", padding: "18px 20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <span style={{ display: "flex", color: "#64748b", fontSize: 12, fontWeight: 800, letterSpacing: 1.8 }}>OCP VAULT CAPITAL</span>
-            <span style={{ display: "flex", fontSize: 19, fontWeight: 900 }}>{snapshot.totalAmount} {snapshot.tokenSymbol}</span>
+            <span style={{ display: "flex", width: 350, color: "#64748b", fontSize: 12, fontWeight: 800, letterSpacing: 1.8 }}>OCP VAULT CAPITAL</span>
+            <span style={{ display: "flex", width: 228, justifyContent: "flex-end", fontSize: 19, fontWeight: 900 }}>{snapshot.totalAmount} {snapshot.tokenSymbol}</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {rows.map((row) => (
@@ -66,20 +66,20 @@ function Card({ snapshot, logoUrl }: { snapshot: VaultSnapshot; logoUrl: string 
           </div>
           <div style={{ display: "flex", flexDirection: "column", marginTop: 12, border: "1px solid #e9d5ff", borderRadius: 12, background: "white", padding: "13px 15px", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ display: "flex", color: "#64748b", fontSize: 13 }}>TRADING VOLUME</span>
-              <span style={{ display: "flex", color: "#0f172a", fontSize: 17, fontWeight: 900 }}>{snapshot.marketVolumeAmount} {snapshot.tokenSymbol}</span>
+              <span style={{ display: "flex", width: 205, color: "#64748b", fontSize: 13 }}>TRADING VOLUME</span>
+              <span style={{ display: "flex", width: 177, justifyContent: "flex-end", color: "#0f172a", fontSize: 17, fontWeight: 900 }}>{snapshot.marketVolumeAmount} {snapshot.tokenSymbol}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ display: "flex", color: "#64748b", fontSize: 13 }}>LIQUIDITY PARAMETER b</span>
-              <span style={{ display: "flex", color: "#6d28d9", fontSize: 17, fontWeight: 900 }}>{snapshot.liquidityParameterAmount}</span>
+              <span style={{ display: "flex", width: 245, color: "#64748b", fontSize: 13 }}>LIQUIDITY PARAMETER b</span>
+              <span style={{ display: "flex", width: 137, justifyContent: "flex-end", color: "#6d28d9", fontSize: 17, fontWeight: 900 }}>{snapshot.liquidityParameterAmount}</span>
             </div>
           </div>
         </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, paddingTop: 14, borderTop: "1px solid #e2e8f0" }}>
-        <span style={{ color: "#64748b", fontSize: 13, letterSpacing: 1.5 }}>ONE DEADLINE · VAULT OUTCOME SETTLES MARKET</span>
-        <span style={{ color: "#6d28d9", fontSize: 14, fontWeight: 900 }}>ONCHAIN · CONTINUOUS PRICING</span>
+        <span style={{ display: "flex", width: 700, color: "#64748b", fontSize: 13, letterSpacing: 1.5 }}>ONE DEADLINE · VAULT OUTCOME SETTLES MARKET</span>
+        <span style={{ display: "flex", width: 392, justifyContent: "flex-end", color: "#6d28d9", fontSize: 14, fontWeight: 900 }}>ONCHAIN · CONTINUOUS PRICING</span>
       </div>
     </div>
   );

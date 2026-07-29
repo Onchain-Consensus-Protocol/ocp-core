@@ -61,7 +61,7 @@ export default async function handler(request: Request) {
     const imageUrl = new URL(snapshot.resolved ? "/api/vault-result-card" : "/api/vault-card", origin);
     imageUrl.searchParams.set("vault", vault);
     imageUrl.searchParams.set("market", market);
-    imageUrl.searchParams.set("v", "2");
+    imageUrl.searchParams.set("v", "4");
     if (!snapshot.resolved) imageUrl.searchParams.set("block", String(snapshot.blockNumber));
 
     const outcomeLabel = snapshot.outcome === 1 ? "YES" : snapshot.outcome === 2 ? "NO" : "INVALID";
