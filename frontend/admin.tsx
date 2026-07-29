@@ -51,7 +51,9 @@ const EXPECTED_FEE_BPS = 120n;
 const EXPECTED_VAULT_FEE_BPS = 100n;
 const EXPECTED_PROTOCOL_LP_FEE_BPS = 20n;
 const REQUIRED_CONFIRMATIONS = 2;
-const PENDING_KEY = `ocp:vault-create:${ADMIN_CHAIN_ID}:${ADMIN_FACTORY.toLowerCase()}`;
+// v2 隔离 2026-07-29 之前由钱包假哈希/卡死请求留下的旧本地意图；
+// 链上 Vault/Market 不受影响，新意图继续使用完整的 nonce 防重复恢复流程。
+const PENDING_KEY = `ocp:vault-create:v2:${ADMIN_CHAIN_ID}:${ADMIN_FACTORY.toLowerCase()}`;
 const utf8 = new TextEncoder();
 const forbiddenText = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/;
 const reservedSideLabel = /(?:^|\s)(?:YES|NO|INVALID)\s*:/i;
