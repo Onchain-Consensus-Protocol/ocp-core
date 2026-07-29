@@ -840,8 +840,8 @@ function AdminPage() {
       ]);
       if (ownerBalance < ADMIN_REQUIRED_SUBSIDY) throw new Error("Owner USDC 余额不足以支付 LMSR 做市补贴");
       if (factoryAllowance < ADMIN_REQUIRED_SUBSIDY) throw new Error("Factory USDC allowance 不足");
-      if (!latest || latest.timestamp > pending.preparedBlockTimestamp + 300) {
-        throw new Error("原确认参数已超过 5 分钟；请先在钱包中用同 nonce 的取消交易占位，再创建新参数");
+      if (!latest || latest.timestamp >= pending.resolutionTime) {
+        throw new Error("原创建意图的截止时间已经到达，无法再用相同 calldata 重试");
       }
       if (
         latestNonce !== pending.nonce || pendingNonce !== pending.nonce
