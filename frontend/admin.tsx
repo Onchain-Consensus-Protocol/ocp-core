@@ -230,6 +230,21 @@ export function blockscoutTransactionMatchesIntent(transaction: BlockscoutTransa
     && keccak256(transaction.raw_input) === intent.calldataHash;
 }
 
+export function canRetryPendingWithSameNonce(
+  intent: PendingIntent,
+  latestNonce: number,
+  pendingNonce: number,
+  recoveryLatestNonce: number,
+  recoveryPendingNonce: number,
+) {
+  return intent.stage === "awaiting_signature"
+    && !intent.txHash
+    && latestNonce === intent.nonce
+    && pendingNonce === intent.nonce
+    && recoveryLatestNonce === intent.nonce
+    && recoveryPendingNonce === intent.nonce;
+}
+
 function loadPendingIntent(): PendingIntent | null {
   try {
     const raw = localStorage.getItem(PENDING_KEY);
@@ -280,6 +295,7 @@ function AdminPage() {
   const [notice, setNotice] = useState("");
   const [recoveryMessage, setRecoveryMessage] = useState("");
   const [pendingCanClear, setPendingCanClear] = useState(false);
+  const [pendingCanRetry, setPendingCanRetry] = useState(false);
   const submitLock = useRef(false);
   const recoveryLock = useRef(false);
 
@@ -667,6 +683,7 @@ function AdminPage() {
     if (recoveryLock.current) return;
     recoveryLock.current = true;
     setPendingCanClear(false);
+    setPendingCanRetry(false);
     setRecoveryMessage("正在按 sender + nonce 核对链上交易与事件…");
     try {
       let txHash = intent.txHash;
@@ -723,13 +740,26 @@ function AdminPage() {
           savePending(updated);
           intent = updated;
         } else {
-          const [latestNonce, pendingNonce] = await Promise.all([
+          const [latestNonce, pendingNonce, recoveryLatestNonce, recoveryPendingNonce] = await Promise.all([
             provider.getTransactionCount(intent.from, "latest"),
             provider.getTransactionCount(intent.from, "pending"),
+            recoveryProvider.getTransactionCount(intent.from, "latest"),
+            recoveryProvider.getTransactionCount(intent.from, "pending"),
           ]);
+          const nonceStillAvailable = canRetryPendingWithSameNonce(
+            intent,
+            latestNonce,
+            pendingNonce,
+            recoveryLatestNonce,
+            recoveryPendingNonce,
+          );
+          setPendingCanRetry(nonceStillAvailable);
           setRecoveryMessage(
-            `未定位到 nonce ${intent.nonce} 的交易（RPC latest/pending nonce：${latestNonce}/${pendingNonce}）。`
-            + "“没有发现”不能证明旧签名永远不会广播，因此页面保持锁定；请先在钱包中用同 nonce 的取消交易占用该 nonce，再重新核验。",
+            `未定位到 nonce ${intent.nonce} 的交易（双 RPC latest/pending nonce：`
+            + `${latestNonce}/${pendingNonce}、${recoveryLatestNonce}/${recoveryPendingNonce}）。`
+            + (nonceStillAvailable
+              ? "该 nonce 仍未占用，可以用同一 nonce 与同一 calldata 安全重试；两笔中最多只有一笔能上链。"
+              : "“没有发现”不能证明旧签名永远不会广播，因此页面保持锁定；请先在钱包中用同 nonce 的取消交易占用该 nonce，再重新核验。"),
           );
           return;
         }
@@ -772,6 +802,7 @@ function AdminPage() {
       setError("");
       setRecoveryMessage("");
       setPendingCanClear(false);
+      setPendingCanRetry(false);
       savePending(null);
     } catch (e) {
       setRecoveryMessage(`恢复/核验失败：${friendlyError(e)} 页面保持锁定且不会自动重发。`);
@@ -779,6 +810,71 @@ function AdminPage() {
       recoveryLock.current = false;
     }
   }, [provider, recoveryProvider, savePending, verifyReceipt]);
+
+  const retryPendingWithSameNonce = async () => {
+    if (busy || !pending || !pendingCanRetry || pending.txHash || pending.stage !== "awaiting_signature") return;
+    setBusy(true);
+    setError("");
+    try {
+      if (!preflightOk) throw new Error("生产配置预检未通过");
+      if (!wallet.signer) throw new Error("Owner 钱包未连接");
+      const { factory, token, sender } = await validateSigner(wallet.signer);
+      if (!sameAddress(sender, pending.from)) throw new Error("当前钱包不是原创建意图的 sender");
+      await assertNoDuplicate(pending.title, pending.description, wallet.signer.provider);
+      const [
+        ownerBalance,
+        factoryAllowance,
+        latest,
+        latestNonce,
+        pendingNonce,
+        recoveryLatestNonce,
+        recoveryPendingNonce,
+      ] = await Promise.all([
+        token.balanceOf(sender) as Promise<bigint>,
+        token.allowance(sender, ADMIN_FACTORY) as Promise<bigint>,
+        wallet.signer.provider.getBlock("latest"),
+        provider.getTransactionCount(sender, "latest"),
+        provider.getTransactionCount(sender, "pending"),
+        recoveryProvider.getTransactionCount(sender, "latest"),
+        recoveryProvider.getTransactionCount(sender, "pending"),
+      ]);
+      if (ownerBalance < ADMIN_REQUIRED_SUBSIDY) throw new Error("Owner USDC 余额不足以支付 LMSR 做市补贴");
+      if (factoryAllowance < ADMIN_REQUIRED_SUBSIDY) throw new Error("Factory USDC allowance 不足");
+      if (!latest || latest.timestamp > pending.preparedBlockTimestamp + 300) {
+        throw new Error("原确认参数已超过 5 分钟；请先在钱包中用同 nonce 的取消交易占位，再创建新参数");
+      }
+      if (
+        latestNonce !== pending.nonce || pendingNonce !== pending.nonce
+        || recoveryLatestNonce !== pending.nonce || recoveryPendingNonce !== pending.nonce
+      ) {
+        throw new Error("双 RPC 已不再确认原 nonce 可用，请重新核验");
+      }
+      const args = [
+        ADMIN_USDC,
+        pending.resolutionTime,
+        BigInt(pending.minStake),
+        ADMIN_LMSR_B,
+        pending.title,
+        pending.description,
+      ] as const;
+      const calldata = factory.interface.encodeFunctionData("createMarket", args);
+      if (keccak256(calldata) !== pending.calldataHash) throw new Error("恢复 calldata 与原创建意图不一致");
+      await factory.createMarket.staticCall(...args);
+      const gasEstimate = await factory.createMarket.estimateGas(...args);
+      const tx = await factory.createMarket(...args, {
+        nonce: pending.nonce,
+        gasLimit: (gasEstimate * 120n) / 100n,
+      });
+      const withHash = { ...pending, stage: "pending" as const, txHash: tx.hash, nonce: tx.nonce };
+      savePending(withHash);
+      setPendingCanRetry(false);
+      await recoverPending(withHash);
+    } catch (e) {
+      setError(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!pending || result) return;
@@ -959,12 +1055,19 @@ function AdminPage() {
                     <Button variant="outline" onClick={() => void recoverPending(pending)}>
                       <RefreshCw className="w-4 h-4" /> 重新核验
                     </Button>
+                    {pendingCanRetry && (
+                      <Button disabled={busy} onClick={() => void retryPendingWithSameNonce()}>
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                        使用同一 nonce 重试
+                      </Button>
+                    )}
                     {pendingCanClear && (
                       <Button variant="danger" onClick={() => {
                         savePending(null);
                         setError("");
                         setRecoveryMessage("");
                         setPendingCanClear(false);
+                        setPendingCanRetry(false);
                       }}>
                         清除已证明失效的本地记录
                       </Button>

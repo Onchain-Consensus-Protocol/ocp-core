@@ -3,6 +3,7 @@ import { keccak256 } from "ethers";
 import {
   ADMIN_FACTORY,
   blockscoutTransactionMatchesIntent,
+  canRetryPendingWithSameNonce,
   findTransactionBySenderNonce,
   type BlockscoutTransaction,
   type PendingIntent,
@@ -65,6 +66,25 @@ describe("pending intent transaction matching", () => {
       indexedTransaction({ to: { hash: "0x0000000000000000000000000000000000000001" } }),
       intent(),
     )).toBe(false);
+  });
+});
+
+describe("same-nonce retry guard", () => {
+  it("allows an unsigned intent only when both RPCs still expose the exact nonce", () => {
+    expect(canRetryPendingWithSameNonce(intent(), 29, 29, 29, 29)).toBe(true);
+  });
+
+  it("rejects retry when either RPC sees nonce progress", () => {
+    expect(canRetryPendingWithSameNonce(intent(), 29, 30, 29, 29)).toBe(false);
+    expect(canRetryPendingWithSameNonce(intent(), 29, 29, 30, 30)).toBe(false);
+  });
+
+  it("rejects retry after a transaction hash has been recorded", () => {
+    expect(canRetryPendingWithSameNonce({
+      ...intent(),
+      stage: "pending",
+      txHash: `0x${"cd".repeat(32)}`,
+    }, 29, 29, 29, 29)).toBe(false);
   });
 });
 
