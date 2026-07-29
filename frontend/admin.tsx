@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import {
+  AbiCoder,
   Contract,
   Interface,
   JsonRpcProvider,
@@ -26,17 +27,24 @@ import "./index.css";
 import { Button } from "./components/Button";
 import { OCPMenu } from "./components/OCPMenu";
 import { WalletButton } from "./components/WalletButton";
-import { config, ERC20_ABI, FACTORY_ABI, VAULT_ABI } from "./config";
+import { config, ERC20_ABI, FACTORY_ABI, MARKET_ABI, VAULT_ABI } from "./config";
 import { useWallet } from "./useWallet";
 
+const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
 const ADMIN_CHAIN_ID = 8453;
-const ADMIN_FACTORY = "0xe343be8F1d8572937da49234882e6a1eF4FFEb26";
+const LEGACY_V4_FACTORY = "0xe343be8F1d8572937da49234882e6a1eF4FFEb26";
+const ADMIN_FACTORY = env?.VITE_ADMIN_FACTORY_ADDRESS?.trim() || config.factoryAddress;
 const ADMIN_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const ADMIN_LMSR_B = 1_000_000_000n; // 1,000 USDC，最坏补贴约 693.15 USDC
-const EXPECTED_FACTORY_CODE_HASH = "0xc8988995765b2b285e6bae6b1947fc517dd5161e9422859a04e44ec1b418da2d";
-const ADMIN_DEPLOYMENT_ENABLED =
-  (import.meta as unknown as { env?: Record<string, string | undefined> }).env
-    ?.VITE_ADMIN_DEPLOYMENT_ENABLED === "true";
+const ADMIN_LMSR_B = 1_000_000_000n; // 1,000 USDC
+const ADMIN_REQUIRED_SUBSIDY = 693_147_183n; // ceil(1,000 USDC × ln(2)) + 2 个最小单位缓冲
+const EXPECTED_FACTORY_CODE_HASH = env?.VITE_ADMIN_FACTORY_CODE_HASH?.trim().toLowerCase() ?? "";
+const ADMIN_DEPLOYMENT_ENABLED = env?.VITE_ADMIN_DEPLOYMENT_ENABLED === "true";
+const RECOVERY_RPC_URL = env?.VITE_RECOVERY_RPC_URL?.trim() || "https://mainnet.base.org";
+const BLOCKSCOUT_API = "https://base.blockscout.com/api/v2";
+const EXPECTED_PROTOCOL_VERSION = 5n;
+const EXPECTED_FEE_BPS = 120n;
+const EXPECTED_VAULT_FEE_BPS = 100n;
+const EXPECTED_PROTOCOL_LP_FEE_BPS = 20n;
 const REQUIRED_CONFIRMATIONS = 2;
 const PENDING_KEY = `ocp:vault-create:${ADMIN_CHAIN_ID}:${ADMIN_FACTORY.toLowerCase()}`;
 const utf8 = new TextEncoder();
@@ -52,7 +60,7 @@ type FormState = {
   minStake: string;
 };
 
-type Review = {
+export type Review = {
   title: string;
   description: string;
   preparedBlockTimestamp: number;
@@ -61,9 +69,12 @@ type Review = {
   minStake: string;
   gasEstimate: string;
   calldataHash: string;
+  requiredSubsidy?: string;
+  ownerBalance?: string;
+  factoryAllowance?: string;
 };
 
-type PendingIntent = Review & {
+export type PendingIntent = Review & {
   version: 1;
   stage: "awaiting_signature" | "pending" | "reverted";
   from: string;
@@ -78,7 +89,29 @@ type DeploymentResult = {
   vault: string;
   market: string;
   blockNumber: number;
-  sourceVerified: boolean | null;
+  protocolVersion: number;
+  legacy: boolean;
+  liquidityPool?: string;
+  subsidy?: string;
+  vaultSourceVerified: boolean | null;
+  marketSourceVerified: boolean | null;
+};
+
+export type BlockscoutTransaction = {
+  hash: string;
+  nonce: number;
+  raw_input: string;
+  value?: string;
+  status?: string;
+  result?: string;
+  block_number?: number | null;
+  from?: { hash?: string } | null;
+  to?: { hash?: string } | null;
+};
+
+type BlockscoutTransactionsPage = {
+  items?: BlockscoutTransaction[];
+  next_page_params?: Record<string, string | number> | null;
 };
 
 const initialForm: FormState = {
@@ -155,9 +188,9 @@ function friendlyError(error: unknown) {
   return raw.length > 320 ? `${raw.slice(0, 320)}…` : raw;
 }
 
-async function readSourceVerification(vault: string): Promise<boolean | null> {
+async function readSourceVerification(address: string): Promise<boolean | null> {
   try {
-    const response = await fetch(`https://base.blockscout.com/api/v2/smart-contracts/${vault}`);
+    const response = await fetch(`${BLOCKSCOUT_API}/smart-contracts/${address}`);
     if (response.status === 404) return null;
     if (!response.ok) return null;
     const body = (await response.json()) as { is_verified?: boolean };
@@ -167,6 +200,35 @@ async function readSourceVerification(vault: string): Promise<boolean | null> {
   }
 }
 
+export async function findTransactionBySenderNonce(from: string, nonce: number): Promise<BlockscoutTransaction | null> {
+  let pageParams: Record<string, string | number> = { filter: "from" };
+  // Blockscout 默认每页 50 笔。限制为 20 页，避免损坏的本地记录触发无界请求。
+  for (let page = 0; page < 20; page += 1) {
+    const url = new URL(`${BLOCKSCOUT_API}/addresses/${getAddress(from)}/transactions`);
+    Object.entries(pageParams).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Blockscout 交易索引请求失败（HTTP ${response.status}）`);
+    const body = (await response.json()) as BlockscoutTransactionsPage;
+    const transactions = Array.isArray(body.items) ? body.items : [];
+    const match = transactions.find((transaction) =>
+      Number(transaction.nonce) === nonce && sameAddress(transaction.from?.hash ?? "", from)
+    );
+    if (match) return match;
+    if (!body.next_page_params) return null;
+    pageParams = body.next_page_params;
+  }
+  throw new Error("Blockscout 分页超过安全上限，无法证明该 nonce 的链上状态");
+}
+
+export function blockscoutTransactionMatchesIntent(transaction: BlockscoutTransaction, intent: PendingIntent) {
+  return sameAddress(transaction.from?.hash ?? "", intent.from)
+    && sameAddress(transaction.to?.hash ?? "", ADMIN_FACTORY)
+    && Number(transaction.nonce) === intent.nonce
+    && BigInt(transaction.value ?? "0") === 0n
+    && /^0x[0-9a-f]*$/i.test(transaction.raw_input)
+    && keccak256(transaction.raw_input) === intent.calldataHash;
+}
+
 function loadPendingIntent(): PendingIntent | null {
   try {
     const raw = localStorage.getItem(PENDING_KEY);
@@ -174,7 +236,8 @@ function loadPendingIntent(): PendingIntent | null {
     const value = JSON.parse(raw) as Partial<PendingIntent>;
     const validStage = value.stage === "awaiting_signature" || value.stage === "pending" || value.stage === "reverted";
     if (value.version !== 1 || !validStage || !value.from || !sameAddress(value.from, value.from)
-      || typeof value.title !== "string" || !value.title || typeof value.description !== "string" || !value.description
+      || typeof value.title !== "string" || !value.title || byteLength(value.title) > 180
+      || typeof value.description !== "string" || !value.description || byteLength(value.description) > 4_096
       || !Number.isSafeInteger(value.preparedBlockTimestamp) || Number(value.preparedBlockTimestamp) <= 0
       || !Number.isSafeInteger(value.durationSeconds) || Number(value.durationSeconds) < 3_600
       || !Number.isSafeInteger(value.intentBlock) || Number(value.intentBlock) < 0
@@ -183,6 +246,7 @@ function loadPendingIntent(): PendingIntent | null {
       || typeof value.minStake !== "string" || !/^\d+$/.test(value.minStake)
       || typeof value.gasEstimate !== "string" || !/^\d+$/.test(value.gasEstimate)
       || !Number.isSafeInteger(value.submittedAt) || Number(value.submittedAt) <= 0
+      || Number(value.submittedAt) > Date.now() + 300_000
       || typeof value.calldataHash !== "string" || !/^0x[0-9a-f]{64}$/i.test(value.calldataHash)
       || (value.txHash !== undefined && !/^0x[0-9a-f]{64}$/i.test(value.txHash))) {
       localStorage.removeItem(PENDING_KEY);
@@ -198,9 +262,12 @@ function loadPendingIntent(): PendingIntent | null {
 function AdminPage() {
   const wallet = useWallet();
   const provider = useMemo(() => new JsonRpcProvider(config.rpcUrl), []);
+  const recoveryProvider = useMemo(() => new JsonRpcProvider(RECOVERY_RPC_URL), []);
   const factoryInterface = useMemo(() => new Interface(FACTORY_ABI), []);
+  const marketInterface = useMemo(() => new Interface(MARKET_ABI), []);
   const [form, setForm] = useState<FormState>(initialForm);
   const [owner, setOwner] = useState("");
+  const [liquidityPool, setLiquidityPool] = useState("");
   const [preflightOk, setPreflightOk] = useState(false);
   const [preflightMessage, setPreflightMessage] = useState("正在核对 Base Factory…");
   const [review, setReview] = useState<Review | null>(null);
@@ -209,6 +276,9 @@ function AdminPage() {
   const [pending, setPending] = useState<PendingIntent | null>(() => loadPendingIntent());
   const [result, setResult] = useState<DeploymentResult | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [recoveryMessage, setRecoveryMessage] = useState("");
+  const [pendingCanClear, setPendingCanClear] = useState(false);
   const submitLock = useRef(false);
   const recoveryLock = useRef(false);
 
@@ -228,32 +298,60 @@ function AdminPage() {
 
   const runConfigPreflight = useCallback(async () => {
     setPreflightOk(false);
+    setLiquidityPool("");
     try {
-      if (!ADMIN_DEPLOYMENT_ENABLED) {
-        throw new Error("V5 Factory 尚未部署并启用，管理员创建功能已安全关闭");
-      }
       if (config.chainId !== ADMIN_CHAIN_ID) throw new Error(`构建 chainId 不是 ${ADMIN_CHAIN_ID}`);
-      if (!sameAddress(config.factoryAddress, ADMIN_FACTORY)) throw new Error("构建 Factory 不是正式 Base Factory");
       if (!sameAddress(config.depositTokenAddress, ADMIN_USDC)) throw new Error("构建代币不是 Base 原生 USDC");
       const network = await provider.getNetwork();
       if (Number(network.chainId) !== ADMIN_CHAIN_ID) throw new Error("RPC 不在 Base 主网");
       const factoryCode = await provider.getCode(ADMIN_FACTORY);
-      if (factoryCode === "0x" || keccak256(factoryCode) !== EXPECTED_FACTORY_CODE_HASH) {
-        throw new Error("Factory 字节码不匹配正式部署");
-      }
+      if (factoryCode === "0x") throw new Error("配置的 Factory 地址没有链上字节码");
       const factory = new Contract(ADMIN_FACTORY, FACTORY_ABI, provider);
       const [chainOwner, officialToken, tokenCode] = await Promise.all([
         factory.owner() as Promise<string>,
         factory.officialStakeToken() as Promise<string>,
         provider.getCode(ADMIN_USDC),
       ]);
+      setOwner(getAddress(chainOwner));
       if (!sameAddress(officialToken, ADMIN_USDC) || tokenCode === "0x") throw new Error("Factory 官方代币配置异常");
       const token = new Contract(ADMIN_USDC, ERC20_ABI, provider);
       const [decimals, symbol] = await Promise.all([token.decimals(), token.symbol()]);
       if (Number(decimals) !== 6 || String(symbol) !== "USDC") throw new Error("USDC 元数据不匹配");
-      setOwner(getAddress(chainOwner));
+
+      if (sameAddress(ADMIN_FACTORY, LEGACY_V4_FACTORY)) {
+        throw new Error("当前地址是旧 V4 Factory：不会创建 LMSR Market。V5 Factory 部署并更新地址前，创建功能已安全关闭");
+      }
+      if (!ADMIN_DEPLOYMENT_ENABLED) {
+        throw new Error("V5 Factory 尚未完成生产启用，管理员创建功能已安全关闭");
+      }
+      if (!/^0x[0-9a-f]{64}$/i.test(EXPECTED_FACTORY_CODE_HASH)) {
+        throw new Error("构建未配置 V5 Factory runtime code hash，创建功能已安全关闭");
+      }
+      if (keccak256(factoryCode) !== EXPECTED_FACTORY_CODE_HASH) {
+        throw new Error("Factory 字节码不匹配已审核的 V5 部署");
+      }
+
+      let officialLiquidityPool: string;
+      let vaultDeployer: string;
+      let marketDeployer: string;
+      try {
+        [officialLiquidityPool, vaultDeployer, marketDeployer] = await Promise.all([
+          factory.officialLiquidityPool() as Promise<string>,
+          factory.vaultDeployer() as Promise<string>,
+          factory.marketDeployer() as Promise<string>,
+        ]);
+      } catch {
+        throw new Error("配置地址不支持 V5 Factory 的流动性池与部署器接口");
+      }
+      const [vaultDeployerCode, marketDeployerCode] = await Promise.all([
+        provider.getCode(vaultDeployer),
+        provider.getCode(marketDeployer),
+      ]);
+      if (sameAddress(officialLiquidityPool, ZeroAddress)) throw new Error("Factory 官方流动性池为零地址");
+      if (vaultDeployerCode === "0x" || marketDeployerCode === "0x") throw new Error("Factory 的 Vault/Market 部署器缺少字节码");
+      setLiquidityPool(getAddress(officialLiquidityPool));
       setPreflightOk(true);
-      setPreflightMessage("配置、RPC、Factory 字节码与官方 USDC 均已核对");
+      setPreflightMessage("V5 Factory、部署器、官方 USDC、流动性池与 runtime code hash 均已核对");
     } catch (e) {
       setPreflightMessage(friendlyError(e));
     }
@@ -267,6 +365,12 @@ function AdminPage() {
     if (!ADMIN_DEPLOYMENT_ENABLED) {
       throw new Error("V5 Factory 尚未部署并启用，不能发送创建交易");
     }
+    if (sameAddress(ADMIN_FACTORY, LEGACY_V4_FACTORY)) {
+      throw new Error("旧 V4 Factory 已停用；禁止按 V5 参数发送创建交易");
+    }
+    if (!/^0x[0-9a-f]{64}$/i.test(EXPECTED_FACTORY_CODE_HASH)) {
+      throw new Error("V5 Factory runtime code hash 未配置");
+    }
     const signerProvider = signer.provider;
     const [network, sender, factoryCode] = await Promise.all([
       signerProvider.getNetwork(),
@@ -277,17 +381,34 @@ function AdminPage() {
     if (factoryCode === "0x" || keccak256(factoryCode) !== EXPECTED_FACTORY_CODE_HASH) throw new Error("钱包所见 Factory 字节码不匹配");
     const factory = new Contract(ADMIN_FACTORY, FACTORY_ABI, signer);
     const token = new Contract(ADMIN_USDC, ERC20_ABI, signerProvider);
-    const [chainOwner, officialToken, tokenCode, decimals, symbol] = await Promise.all([
+    const [
+      chainOwner, officialToken, officialLiquidityPool, vaultDeployer, marketDeployer,
+      tokenCode, decimals, symbol,
+    ] = await Promise.all([
       factory.owner() as Promise<string>,
       factory.officialStakeToken() as Promise<string>,
+      factory.officialLiquidityPool() as Promise<string>,
+      factory.vaultDeployer() as Promise<string>,
+      factory.marketDeployer() as Promise<string>,
       signerProvider.getCode(ADMIN_USDC),
       token.decimals(),
       token.symbol(),
     ]);
     if (!sameAddress(sender, chainOwner)) throw new Error(`当前钱包不是 Factory owner（owner: ${chainOwner}）`);
     if (!sameAddress(officialToken, ADMIN_USDC) || tokenCode === "0x") throw new Error("官方 USDC 配置异常");
+    if (sameAddress(officialLiquidityPool, ZeroAddress)) throw new Error("官方流动性池为零地址");
+    const [vaultDeployerCode, marketDeployerCode] = await Promise.all([
+      signerProvider.getCode(vaultDeployer),
+      signerProvider.getCode(marketDeployer),
+    ]);
+    if (vaultDeployerCode === "0x" || marketDeployerCode === "0x") throw new Error("V5 部署器字节码缺失");
     if (Number(decimals) !== 6 || String(symbol) !== "USDC") throw new Error("钱包所见 USDC 元数据不匹配");
-    return { factory, sender: getAddress(sender) };
+    return {
+      factory,
+      token: new Contract(ADMIN_USDC, ERC20_ABI, signer),
+      sender: getAddress(sender),
+      officialLiquidityPool: getAddress(officialLiquidityPool),
+    };
   }, []);
 
   const assertNoDuplicate = useCallback(async (title: string, description: string, runner: ContractRunner = provider) => {
@@ -304,6 +425,7 @@ function AdminPage() {
 
   const prepareReview = async () => {
     setError("");
+    setNotice("");
     setReview(null);
     setConfirmPhrase("");
     if (!wallet.signer || !preflightOk) {
@@ -313,15 +435,22 @@ function AdminPage() {
     setBusy(true);
     try {
       const params = buildParameters(form);
-      const { factory } = await validateSigner(wallet.signer);
+      const { factory, token, sender } = await validateSigner(wallet.signer);
       await assertNoDuplicate(params.title, params.description);
       const latest = await wallet.signer.provider.getBlock("latest");
       if (!latest) throw new Error("无法读取最新 Base 区块");
       const resolutionTime = latest.timestamp + params.durationSeconds;
       const args = [ADMIN_USDC, resolutionTime, params.minStake, ADMIN_LMSR_B, params.title, params.description] as const;
-      await factory.createMarket.staticCall(...args);
-      const gasEstimate = await factory.createMarket.estimateGas(...args);
       const calldata = factory.interface.encodeFunctionData("createMarket", args);
+      const [ownerBalance, factoryAllowance] = await Promise.all([
+        token.balanceOf(sender) as Promise<bigint>,
+        token.allowance(sender, ADMIN_FACTORY) as Promise<bigint>,
+      ]);
+      let gasEstimate = 0n;
+      if (ownerBalance >= ADMIN_REQUIRED_SUBSIDY && factoryAllowance >= ADMIN_REQUIRED_SUBSIDY) {
+        await factory.createMarket.staticCall(...args);
+        gasEstimate = await factory.createMarket.estimateGas(...args);
+      }
       setReview({
         title: params.title,
         description: params.description,
@@ -331,7 +460,41 @@ function AdminPage() {
         minStake: params.minStake.toString(),
         gasEstimate: gasEstimate.toString(),
         calldataHash: keccak256(calldata),
+        requiredSubsidy: ADMIN_REQUIRED_SUBSIDY.toString(),
+        ownerBalance: ownerBalance.toString(),
+        factoryAllowance: factoryAllowance.toString(),
       });
+      if (ownerBalance < ADMIN_REQUIRED_SUBSIDY) {
+        setError(`Owner USDC 余额不足：创建需要 ${formatUnits(ADMIN_REQUIRED_SUBSIDY, 6)} USDC 做市补贴。`);
+      } else if (factoryAllowance < ADMIN_REQUIRED_SUBSIDY) {
+        setError(`Factory allowance 不足：请先精确授权 ${formatUnits(ADMIN_REQUIRED_SUBSIDY, 6)} USDC，再重新预检。`);
+      }
+    } catch (e) {
+      setError(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const approveSubsidy = async () => {
+    if (!wallet.signer || !preflightOk) {
+      setError("请先连接 V5 Factory owner 钱包并通过生产预检。");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const { token, sender } = await validateSigner(wallet.signer);
+      const balance = await token.balanceOf(sender) as bigint;
+      if (balance < ADMIN_REQUIRED_SUBSIDY) {
+        throw new Error(`Owner 至少需要 ${formatUnits(ADMIN_REQUIRED_SUBSIDY, 6)} USDC 才能创建市场`);
+      }
+      const tx = await token.approve(ADMIN_FACTORY, ADMIN_REQUIRED_SUBSIDY);
+      await tx.wait(1);
+      setReview(null);
+      setConfirmPhrase("");
+      setNotice("USDC 授权已确认。请重新执行创建预检，以锁定最新 deadline、allowance 与 Gas。");
     } catch (e) {
       setError(friendlyError(e));
     } finally {
@@ -342,13 +505,18 @@ function AdminPage() {
   const verifyReceipt = useCallback(async (receipt: TransactionReceipt, intent: PendingIntent): Promise<DeploymentResult> => {
     if (receipt.status !== 1) throw new Error("创建交易已回滚");
     if (!receipt.to || !sameAddress(receipt.to, ADMIN_FACTORY)) throw new Error("交易目标不是正式 Factory");
-    const transaction = await provider.getTransaction(receipt.hash);
-    if (!transaction || !sameAddress(transaction.from, intent.from) || !transaction.to || !sameAddress(transaction.to, ADMIN_FACTORY)) {
-      throw new Error("链上交易 sender/target 与确认参数不一致");
+    const transaction =
+      await provider.getTransaction(receipt.hash)
+      ?? await recoveryProvider.getTransaction(receipt.hash);
+    if (!transaction || !transaction.to
+      || !sameAddress(transaction.from, intent.from)
+      || !sameAddress(transaction.to, ADMIN_FACTORY)
+      || transaction.nonce !== intent.nonce
+      || transaction.value !== 0n
+      || keccak256(transaction.data) !== intent.calldataHash) {
+      throw new Error("链上交易 sender/target/nonce/value/calldata 与确认参数不一致");
     }
-    if (transaction.nonce !== intent.nonce || transaction.value !== 0n || keccak256(transaction.data) !== intent.calldataHash) {
-      throw new Error("链上交易 nonce/value/calldata 与确认参数不一致");
-    }
+
     const matchingEvents = receipt.logs.flatMap((log) => {
       if (!sameAddress(log.address, ADMIN_FACTORY)) return [];
       try {
@@ -362,152 +530,303 @@ function AdminPage() {
     const event = matchingEvents[0];
     const market = getAddress(String(event.args.market));
     const vault = getAddress(String(event.args.vault));
-    const creator = String(event.args.creator);
-    if (market === ZeroAddress || vault === ZeroAddress) throw new Error("Market/Vault 事件参数异常");
-    if (!sameAddress(creator, intent.from)) throw new Error("事件 creator 与 owner 不一致");
+    if (vault === ZeroAddress || !sameAddress(String(event.args.creator), intent.from)) {
+      throw new Error("MarketCreated 的 vault/creator 参数异常");
+    }
     if (String(event.args.title) !== intent.title || String(event.args.description) !== intent.description) {
-      throw new Error("事件题面与确认参数不一致");
+      throw new Error("MarketCreated 题面与确认参数不一致");
     }
 
-    const blockTag = receipt.blockNumber;
+    // 仅为旧 V4 正式地址恢复历史本地锁。所有判断都使用规范 receipt + 当前不可变状态，
+    // 不把 Blockscout 索引本身当作成功证明。
+    if (market === ZeroAddress) {
+      if (!sameAddress(ADMIN_FACTORY, LEGACY_V4_FACTORY)) {
+        throw new Error("非历史 V4 Factory 返回了零地址 Market");
+      }
+      const legacyFactory = new Contract(ADMIN_FACTORY, FACTORY_ABI, recoveryProvider);
+      const legacyVault = new Contract(vault, VAULT_ABI, recoveryProvider);
+      const [
+        registered, creator, meta, version, vaultFactory, stakeToken, resolutionTime, minStake,
+      ] = await Promise.all([
+        legacyFactory.isVault(vault),
+        legacyFactory.getVaultCreator(vault),
+        legacyFactory.getVaultMeta(vault),
+        legacyVault.protocolVersion(),
+        legacyVault.factory(),
+        legacyVault.stakeToken(),
+        legacyVault.resolutionTime(),
+        legacyVault.minStake(),
+      ]);
+      if (
+        !registered || BigInt(version) !== 4n
+        || !sameAddress(creator, intent.from) || !sameAddress(vaultFactory, ADMIN_FACTORY)
+        || !sameAddress(stakeToken, ADMIN_USDC)
+        || BigInt(resolutionTime) !== BigInt(intent.resolutionTime)
+        || BigInt(minStake) !== BigInt(intent.minStake)
+        || String(meta[0]) !== intent.title || String(meta[1]) !== intent.description
+      ) throw new Error("历史 V4 Factory/Vault 的不可变状态与创建意图不一致");
+      return {
+        txHash: receipt.hash,
+        vault,
+        market,
+        blockNumber: receipt.blockNumber,
+        protocolVersion: 4,
+        legacy: true,
+        vaultSourceVerified: await readSourceVerification(vault),
+        marketSourceVerified: null,
+      };
+    }
+
     const factory = new Contract(ADMIN_FACTORY, FACTORY_ABI, provider);
     const deployedVault = new Contract(vault, VAULT_ABI, provider);
-    const [marketCode, marketRegistered, pairedMarket] = await Promise.all([
-      provider.getCode(market, blockTag),
-      factory.isMarket(market, { blockTag }),
-      factory.marketByVault(vault, { blockTag }),
-    ]);
-    if (marketCode === "0x" || !marketRegistered || !sameAddress(pairedMarket, market)) {
-      throw new Error("LMSR Market 未与 Vault 原子注册");
-    }
+    const deployedMarket = new Contract(market, MARKET_ABI, provider);
     const [
-      code, registered, creatorOnChain, meta, vaults, version, vaultFactory, stakeToken,
-      resolutionTime, minStake, totalPrincipal, totalDonations, yes, no, invalid, resolved, outcome,
+      factoryCode, vaultCode, marketCode, registeredVault, registeredMarket,
+      pairedMarket, pairedVault, officialLiquidityPool, vaults, markets, creator, meta,
     ] = await Promise.all([
-      provider.getCode(vault, blockTag),
-      factory.isVault(vault, { blockTag }),
-      factory.getVaultCreator(vault, { blockTag }),
-      factory.getVaultMeta(vault, { blockTag }),
-      factory.getVaults({ blockTag }),
-      deployedVault.protocolVersion({ blockTag }),
-      deployedVault.factory({ blockTag }),
-      deployedVault.stakeToken({ blockTag }),
-      deployedVault.resolutionTime({ blockTag }),
-      deployedVault.minStake({ blockTag }),
-      deployedVault.totalPrincipal({ blockTag }),
-      deployedVault.totalDonations({ blockTag }),
-      deployedVault.totalStakeYes({ blockTag }),
-      deployedVault.totalStakeNo({ blockTag }),
-      deployedVault.totalStakeInvalid({ blockTag }),
-      deployedVault.resolved({ blockTag }),
-      deployedVault.outcome({ blockTag }),
+      provider.getCode(ADMIN_FACTORY),
+      provider.getCode(vault),
+      provider.getCode(market),
+      factory.isVault(vault),
+      factory.isMarket(market),
+      factory.marketByVault(vault),
+      factory.vaultByMarket(market),
+      factory.officialLiquidityPool(),
+      factory.getVaults(),
+      factory.getMarkets(),
+      factory.getVaultCreator(vault),
+      factory.getVaultMeta(vault),
     ]);
-    const zeroInitialState = [totalPrincipal, totalDonations, yes, no, invalid].every((value) => BigInt(value) === 0n);
-    if (code === "0x" || !registered || !(vaults as string[]).some((item) => sameAddress(item, vault))) throw new Error("Vault 未完整注册到 Factory");
-    if (!sameAddress(creatorOnChain, intent.from) || !sameAddress(vaultFactory, ADMIN_FACTORY) || !sameAddress(stakeToken, ADMIN_USDC)) throw new Error("Vault owner/factory/token 回读不一致");
-    if (String(meta[0]) !== intent.title || String(meta[1]) !== intent.description) throw new Error("Factory metadata 回读不一致");
-    if (BigInt(version) !== 5n || BigInt(resolutionTime) !== BigInt(intent.resolutionTime) || BigInt(minStake) !== BigInt(intent.minStake)) throw new Error("Vault version/deadline/minStake 回读不一致");
-    if (!zeroInitialState || Boolean(resolved) || Number(outcome) !== 0) throw new Error("Vault 初始账本状态不是全零 PENDING");
+    if (
+      factoryCode === "0x" || keccak256(factoryCode) !== EXPECTED_FACTORY_CODE_HASH
+      || vaultCode === "0x" || marketCode === "0x" || !registeredVault || !registeredMarket
+      || !sameAddress(pairedMarket, market) || !sameAddress(pairedVault, vault)
+      || !(vaults as string[]).some((item) => sameAddress(item, vault))
+      || !(markets as string[]).some((item) => sameAddress(item, market))
+    ) throw new Error("V5 Factory runtime 或 Vault/Market 注册关系不一致");
+    if (
+      !sameAddress(creator, intent.from)
+      || String(meta[0]) !== intent.title || String(meta[1]) !== intent.description
+    ) throw new Error("Factory creator/metadata 回读不一致");
+
+    const [
+      version, vaultFactory, stakeToken, vaultResolutionTime, minStake,
+      boundMarket, emptySettlementRecipient,
+    ] = await Promise.all([
+      deployedVault.protocolVersion(),
+      deployedVault.factory(),
+      deployedVault.stakeToken(),
+      deployedVault.resolutionTime(),
+      deployedVault.minStake(),
+      deployedVault.market(),
+      deployedVault.emptySettlementRecipient(),
+    ]);
+    if (
+      BigInt(version) !== EXPECTED_PROTOCOL_VERSION
+      || !sameAddress(vaultFactory, ADMIN_FACTORY) || !sameAddress(stakeToken, ADMIN_USDC)
+      || !sameAddress(boundMarket, market)
+      || !sameAddress(emptySettlementRecipient, officialLiquidityPool)
+      || BigInt(vaultResolutionTime) !== BigInt(intent.resolutionTime)
+      || BigInt(minStake) !== BigInt(intent.minStake)
+    ) throw new Error("V5 Vault 的不可变绑定与创建意图不一致");
+
+    const [
+      marketVault, collateral, marketFactory, marketLiquidityPool, subsidyProvider,
+      subsidy, requiredSubsidy, liquidityParameter, marketResolutionTime, conditionType,
+      conditionParams, feeBps, vaultFeeBps, protocolLpFeeBps, activated,
+    ] = await Promise.all([
+      deployedMarket.vault(),
+      deployedMarket.collateral(),
+      deployedMarket.factory(),
+      deployedMarket.officialLiquidityPool(),
+      deployedMarket.subsidyProvider(),
+      deployedMarket.subsidy(),
+      deployedMarket.requiredSubsidy(),
+      deployedMarket.liquidityParameter(),
+      deployedMarket.resolutionTime(),
+      deployedMarket.conditionType(),
+      deployedMarket.conditionParams(),
+      deployedMarket.feeBps(),
+      deployedMarket.vaultFeeBps(),
+      deployedMarket.protocolLpFeeBps(),
+      deployedMarket.activated(),
+    ]);
+    const expectedConditionParams = AbiCoder.defaultAbiCoder().encode(
+      ["string", "string"],
+      [intent.title, intent.description],
+    );
+    if (
+      !sameAddress(marketVault, vault) || !sameAddress(collateral, ADMIN_USDC)
+      || !sameAddress(marketFactory, ADMIN_FACTORY)
+      || !sameAddress(marketLiquidityPool, officialLiquidityPool)
+      || !sameAddress(subsidyProvider, intent.from)
+      || BigInt(requiredSubsidy) !== ADMIN_REQUIRED_SUBSIDY
+      || BigInt(liquidityParameter) !== ADMIN_LMSR_B
+      || BigInt(subsidy) < ADMIN_REQUIRED_SUBSIDY
+      || BigInt(marketResolutionTime) !== BigInt(intent.resolutionTime)
+      || Number(conditionType) !== 1
+      || String(conditionParams).toLowerCase() !== expectedConditionParams.toLowerCase()
+      || BigInt(feeBps) !== EXPECTED_FEE_BPS
+      || BigInt(vaultFeeBps) !== EXPECTED_VAULT_FEE_BPS
+      || BigInt(protocolLpFeeBps) !== EXPECTED_PROTOCOL_LP_FEE_BPS
+      || !Boolean(activated)
+    ) throw new Error("V5 LMSR Market 的不可变参数、补贴、条件或费率不一致");
+
+    const activationEvents = receipt.logs.flatMap((log) => {
+      if (!sameAddress(log.address, market)) return [];
+      try {
+        const parsed = marketInterface.parseLog(log);
+        return parsed?.name === "MarketActivated" ? [parsed] : [];
+      } catch {
+        return [];
+      }
+    });
+    if (
+      activationEvents.length !== 1
+      || !sameAddress(String(activationEvents[0].args.subsidyProvider), intent.from)
+      || BigInt(activationEvents[0].args.subsidy) !== BigInt(subsidy)
+      || BigInt(activationEvents[0].args.liquidityParameter) !== ADMIN_LMSR_B
+    ) throw new Error("MarketActivated 事件与当前不可变补贴参数不一致");
+
+    const [vaultSourceVerified, marketSourceVerified] = await Promise.all([
+      readSourceVerification(vault),
+      readSourceVerification(market),
+    ]);
     return {
       txHash: receipt.hash,
       vault,
       market,
       blockNumber: receipt.blockNumber,
-      sourceVerified: await readSourceVerification(vault),
+      protocolVersion: 5,
+      legacy: false,
+      liquidityPool: getAddress(String(officialLiquidityPool)),
+      subsidy: BigInt(subsidy).toString(),
+      vaultSourceVerified,
+      marketSourceVerified,
     };
-  }, [factoryInterface, provider]);
+  }, [factoryInterface, marketInterface, provider, recoveryProvider]);
 
   const recoverPending = useCallback(async (intent: PendingIntent) => {
     if (recoveryLock.current) return;
     recoveryLock.current = true;
+    setPendingCanClear(false);
+    setRecoveryMessage("正在按 sender + nonce 核对链上交易与事件…");
     try {
       let txHash = intent.txHash;
-      let receipt = txHash ? await provider.getTransactionReceipt(txHash) : null;
-      if (!receipt) {
-        const currentBlock = await provider.getBlockNumber();
-        const event = factoryInterface.getEvent("MarketCreated");
-        if (!event) throw new Error("Factory ABI 缺少 MarketCreated");
-        const logs = await provider.getLogs({
-          address: ADMIN_FACTORY,
-          fromBlock: intent.intentBlock,
-          toBlock: currentBlock,
-          topics: [event.topicHash],
-        });
-        const eventCandidates = logs.flatMap((log) => {
-          try {
-            const parsed = factoryInterface.parseLog(log);
-            return parsed?.name === "MarketCreated"
-              && sameAddress(String(parsed.args.creator), intent.from)
-              && String(parsed.args.title) === intent.title
-              && String(parsed.args.description) === intent.description
-              ? [{ log, vault: getAddress(String(parsed.args.vault)) }]
-              : [];
-          } catch {
-            return [];
-          }
-        });
-        const candidateChecks = await Promise.all(eventCandidates.map(async (candidate) => {
-          try {
-            const transaction = await provider.getTransaction(candidate.log.transactionHash);
-            if (!transaction || !sameAddress(transaction.from, intent.from) || !transaction.to
-              || !sameAddress(transaction.to, ADMIN_FACTORY) || transaction.nonce !== intent.nonce
-              || transaction.value !== 0n || keccak256(transaction.data) !== intent.calldataHash) return false;
-            const vault = new Contract(candidate.vault, VAULT_ABI, provider);
-            const [stakeToken, resolutionTime, minStake] = await Promise.all([
-              vault.stakeToken(), vault.resolutionTime(), vault.minStake(),
+      if (!txHash) {
+        const indexedTransaction = await findTransactionBySenderNonce(intent.from, intent.nonce);
+        if (indexedTransaction) {
+          if (!blockscoutTransactionMatchesIntent(indexedTransaction, intent)) {
+            const replacementReceipt =
+              await provider.getTransactionReceipt(indexedTransaction.hash)
+              ?? await recoveryProvider.getTransactionReceipt(indexedTransaction.hash);
+            const replacementTransaction =
+              await provider.getTransaction(indexedTransaction.hash)
+              ?? await recoveryProvider.getTransaction(indexedTransaction.hash);
+            if (!replacementReceipt || !replacementTransaction
+              || !sameAddress(replacementTransaction.from, intent.from)
+              || replacementTransaction.nonce !== intent.nonce) {
+              setRecoveryMessage(`nonce ${intent.nonce} 存在另一笔索引记录，但规范链尚未证明它已占用该 nonce；继续锁定。`);
+              return;
+            }
+            const [currentBlock, recoveryCurrentBlock, primaryLatestNonce, recoveryLatestNonce] = await Promise.all([
+              provider.getBlockNumber(),
+              recoveryProvider.getBlockNumber(),
+              provider.getTransactionCount(intent.from, "latest"),
+              recoveryProvider.getTransactionCount(intent.from, "latest"),
             ]);
-            return sameAddress(stakeToken, ADMIN_USDC)
-              && BigInt(resolutionTime) === BigInt(intent.resolutionTime)
-              && BigInt(minStake) === BigInt(intent.minStake);
-          } catch {
-            return false;
+            const confirmations =
+              Math.min(currentBlock, recoveryCurrentBlock) - replacementReceipt.blockNumber + 1;
+            if (
+              confirmations < REQUIRED_CONFIRMATIONS
+              || primaryLatestNonce <= intent.nonce || recoveryLatestNonce <= intent.nonce
+            ) {
+              setRecoveryMessage(`nonce ${intent.nonce} 的替代交易尚未达到双 RPC nonce 与 ${REQUIRED_CONFIRMATIONS} 区块确认条件；继续锁定。`);
+              return;
+            }
+            const [primaryBlock, recoveryBlock] = await Promise.all([
+              provider.getBlock(replacementReceipt.blockNumber),
+              recoveryProvider.getBlock(replacementReceipt.blockNumber),
+            ]);
+            if (
+              !primaryBlock || !recoveryBlock
+              || primaryBlock.hash !== replacementReceipt.blockHash
+              || recoveryBlock.hash !== replacementReceipt.blockHash
+            ) {
+              throw new Error("替代交易所在区块不是当前规范链区块");
+            }
+            setPendingCanClear(true);
+            setRecoveryMessage(
+              `规范链已确认另一笔交易占用 nonce ${intent.nonce}；原创建意图不可能再上链，可以安全清除本地记录。`,
+            );
+            return;
           }
-        }));
-        const candidates = eventCandidates.filter((_, index) => candidateChecks[index]);
-        if (candidates.length === 0) {
-          setError(txHash
-            ? "原交易尚无 receipt，也未发现参数完全匹配的替代交易。页面不会自动重发。"
-            : "签名阶段状态未知：尚未发现参数完全匹配的链上事件。为防止重复 Vault，页面不会自动解锁或重发。");
+          txHash = indexedTransaction.hash;
+          const updated = { ...intent, stage: "pending" as const, txHash };
+          savePending(updated);
+          intent = updated;
+        } else {
+          const [latestNonce, pendingNonce] = await Promise.all([
+            provider.getTransactionCount(intent.from, "latest"),
+            provider.getTransactionCount(intent.from, "pending"),
+          ]);
+          setRecoveryMessage(
+            `未定位到 nonce ${intent.nonce} 的交易（RPC latest/pending nonce：${latestNonce}/${pendingNonce}）。`
+            + "“没有发现”不能证明旧签名永远不会广播，因此页面保持锁定；请先在钱包中用同 nonce 的取消交易占用该 nonce，再重新核验。",
+          );
           return;
         }
-        if (candidates.length !== 1) throw new Error(`发现 ${candidates.length} 个匹配事件，禁止自动选择`);
-        txHash = candidates[0].log.transactionHash;
-        const updated = { ...intent, stage: "pending" as const, txHash };
-        savePending(updated);
-        intent = updated;
-        receipt = await provider.getTransactionReceipt(txHash);
       }
+      let receipt =
+        await provider.getTransactionReceipt(txHash)
+        ?? await recoveryProvider.getTransactionReceipt(txHash);
       if (!receipt) {
-        setError("交易仍在 pending 或状态暂不可知。页面不会自动重发。");
+        setRecoveryMessage("交易仍在 pending 或 receipt 暂不可用。页面保持锁定并且不会自动重发。");
         return;
+      }
+      const [currentBlock, recoveryCurrentBlock] = await Promise.all([
+        provider.getBlockNumber(),
+        recoveryProvider.getBlockNumber(),
+      ]);
+      const confirmations = Math.min(currentBlock, recoveryCurrentBlock) - receipt.blockNumber + 1;
+      if (confirmations < REQUIRED_CONFIRMATIONS) {
+        setRecoveryMessage(`交易已进入区块，等待 ${REQUIRED_CONFIRMATIONS} 个确认（当前 ${confirmations}）…`);
+        return;
+      }
+      const [primaryBlock, recoveryBlock] = await Promise.all([
+        provider.getBlock(receipt.blockNumber),
+        recoveryProvider.getBlock(receipt.blockNumber),
+      ]);
+      if (
+        !primaryBlock || !recoveryBlock
+        || primaryBlock.hash !== receipt.blockHash
+        || recoveryBlock.hash !== receipt.blockHash
+      ) {
+        throw new Error("交易所在区块发生重组，禁止自动重发");
       }
       if (receipt.status !== 1) {
         savePending({ ...intent, stage: "reverted" });
-        setError("交易已回滚；链上没有创建 Vault。可以清除失败记录后重新检查参数。");
+        setPendingCanClear(true);
+        setRecoveryMessage(`交易已回滚并获得 ${confirmations} 个确认；链上没有创建 Vault，可以安全清除失败记录。`);
         return;
       }
-      const confirmations = (await provider.getBlockNumber()) - receipt.blockNumber + 1;
-      if (confirmations < REQUIRED_CONFIRMATIONS) {
-        setError(`交易已进入区块，等待 ${REQUIRED_CONFIRMATIONS} 个确认（当前 ${confirmations}）…`);
-        return;
-      }
-      const canonicalBlock = await provider.getBlock(receipt.blockNumber);
-      if (!canonicalBlock || canonicalBlock.hash !== receipt.blockHash) throw new Error("交易所在区块发生重组，禁止自动重发");
       const verified = await verifyReceipt(receipt, intent);
       setResult(verified);
       setError("");
+      setRecoveryMessage("");
+      setPendingCanClear(false);
       savePending(null);
     } catch (e) {
-      setError(`恢复/核验失败：${friendlyError(e)}`);
+      setRecoveryMessage(`恢复/核验失败：${friendlyError(e)} 页面保持锁定且不会自动重发。`);
     } finally {
       recoveryLock.current = false;
     }
-  }, [factoryInterface, provider, savePending, verifyReceipt]);
+  }, [provider, recoveryProvider, savePending, verifyReceipt]);
 
   useEffect(() => {
     if (!pending || result) return;
     void recoverPending(pending);
-    const timer = window.setInterval(() => void recoverPending(pending), 6_000);
+    const timer = window.setInterval(() => void recoverPending(pending), 15_000);
     return () => window.clearInterval(timer);
   }, [pending, recoverPending, result]);
 
@@ -524,8 +843,14 @@ function AdminPage() {
         throw new Error("另一个标签页已经开始创建，禁止重复发送");
       }
       if (!wallet.signer) throw new Error("Owner 钱包未连接");
-      const { factory, sender } = await validateSigner(wallet.signer);
+      const { factory, token, sender } = await validateSigner(wallet.signer);
       await assertNoDuplicate(review.title, review.description, wallet.signer.provider);
+      const [ownerBalance, factoryAllowance] = await Promise.all([
+        token.balanceOf(sender) as Promise<bigint>,
+        token.allowance(sender, ADMIN_FACTORY) as Promise<bigint>,
+      ]);
+      if (ownerBalance < ADMIN_REQUIRED_SUBSIDY) throw new Error("Owner USDC 余额不足以支付 LMSR 做市补贴");
+      if (factoryAllowance < ADMIN_REQUIRED_SUBSIDY) throw new Error("Factory USDC allowance 不足，请重新授权并预检");
       const latest = await wallet.signer.provider.getBlock("latest");
       if (!latest || latest.timestamp > review.preparedBlockTimestamp + 300) {
         throw new Error("确认页已超过 5 分钟，请重新预检，确保完整质押期限从接近创建时开始计算");
@@ -588,14 +913,23 @@ function AdminPage() {
     setReview(null);
     setConfirmPhrase("");
     setResult(null);
+    setNotice("");
   };
 
   const isOwner = wallet.connected && owner && sameAddress(wallet.address, owner);
-  const sourceStatus = result?.sourceVerified === true
-    ? "Blockscout 源码验证成功"
-    : result?.sourceVerified === false
-      ? "部署成功；Blockscout 显示源码尚未验证"
-      : "部署成功；Blockscout 尚未索引或状态暂不可用";
+  const reviewFundingReady = Boolean(
+    review
+    && BigInt(review.ownerBalance ?? "0") >= ADMIN_REQUIRED_SUBSIDY
+    && BigInt(review.factoryAllowance ?? "0") >= ADMIN_REQUIRED_SUBSIDY
+    && BigInt(review.gasEstimate) > 0n,
+  );
+  const sourceStatus = result?.legacy
+    ? result.vaultSourceVerified === true
+      ? "历史 V4 Vault 源码已验证"
+      : "历史 V4 Vault 已创建；源码验证状态暂不可用"
+    : result?.vaultSourceVerified === true && result?.marketSourceVerified === true
+      ? "Vault 与 Market 的 Blockscout 源码均已验证"
+      : "部署成功；Vault 或 Market 的源码验证尚未完成/尚未索引";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -644,6 +978,7 @@ function AdminPage() {
             <div className="grid sm:grid-cols-2 gap-2 mt-4 text-xs font-mono text-text-muted">
               <div>CHAIN · Base {ADMIN_CHAIN_ID}</div><div>OWNER · {owner || "读取中"}</div>
               <div className="truncate">FACTORY · {ADMIN_FACTORY}</div><div className="truncate">TOKEN · {ADMIN_USDC}</div>
+              <div className="truncate sm:col-span-2">OFFICIAL LP · {liquidityPool || "V5 预检未通过"}</div>
             </div>
           </section>
 
@@ -665,9 +1000,23 @@ function AdminPage() {
                   <h2 className="font-bold">存在未完成的创建意图，禁止再次发送</h2>
                   <p className="text-sm text-text-muted mt-2">状态：{pending.stage} · nonce {pending.nonce}</p>
                   {pending.txHash && <a className="text-sm text-accent mt-2 inline-flex items-center gap-1" href={`${config.explorer}/tx/${pending.txHash}`} target="_blank" rel="noreferrer">查看交易 <ExternalLink className="w-3 h-3" /></a>}
-                  {pending.stage === "reverted" && (
-                    <Button className="mt-4" variant="danger" onClick={() => { savePending(null); setError(""); }}>清除已回滚记录</Button>
-                  )}
+                  {recoveryMessage && <p className="text-sm text-yellow-900 mt-3 whitespace-pre-wrap">{recoveryMessage}</p>}
+                  {error && <p className="text-sm text-danger mt-3 whitespace-pre-wrap">{error}</p>}
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    <Button variant="outline" onClick={() => void recoverPending(pending)}>
+                      <RefreshCw className="w-4 h-4" /> 重新核验
+                    </Button>
+                    {pendingCanClear && (
+                      <Button variant="danger" onClick={() => {
+                        savePending(null);
+                        setError("");
+                        setRecoveryMessage("");
+                        setPendingCanClear(false);
+                      }}>
+                        清除已证明失效的本地记录
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </section>
@@ -675,23 +1024,38 @@ function AdminPage() {
             <section className="rounded-2xl border border-success/40 bg-success/5 p-6 sm:p-8">
               <div className="flex gap-3"><CheckCircle2 className="w-6 h-6 text-success shrink-0" />
                 <div className="min-w-0">
-                  <h2 className="font-display font-bold text-xl">Vault 创建并回读核验成功</h2>
-                  <p className="text-sm text-text-muted mt-2">两个区块确认；Factory 注册、题面、v4、USDC、deadline、minStake 与初始零账本均一致。</p>
+                  <h2 className="font-display font-bold text-xl">
+                    {result.legacy ? "历史 V4 创建交易已确认，旧锁已清除" : "V5 Vault 与 LMSR Market 创建并回读核验成功"}
+                  </h2>
+                  <p className="text-sm text-text-muted mt-2">
+                    {result.legacy
+                      ? "该交易属于旧 Factory，仅用于恢复历史本地记录；V5 Factory 上线前不会允许继续创建。"
+                      : "两个区块确认且位于规范链；MarketCreated/MarketActivated、Factory 双向注册、V5 Vault、LMSR 参数、补贴、费率与条件编码均一致。"}
+                  </p>
                   <div className="mt-4 space-y-2 text-sm font-mono break-all">
-                    <div>VAULT · {result.vault}</div><div>MARKET · {result.market}</div><div>TX · {result.txHash}</div><div>BLOCK · {result.blockNumber}</div>
+                    <div>VAULT · {result.vault}</div>
+                    <div>MARKET · {result.market}</div>
+                    <div>PROTOCOL · V{result.protocolVersion}</div>
+                    {result.subsidy && <div>SUBSIDY · {formatUnits(BigInt(result.subsidy), 6)} USDC</div>}
+                    {result.liquidityPool && <div>OFFICIAL LP · {result.liquidityPool}</div>}
+                    <div>TX · {result.txHash}</div><div>BLOCK · {result.blockNumber}</div>
                   </div>
-                  <div className={`mt-4 text-sm font-bold ${result.sourceVerified ? "text-success" : "text-danger"}`}>{sourceStatus}</div>
+                  <div className={`mt-4 text-sm font-bold ${result.vaultSourceVerified && (result.legacy || result.marketSourceVerified) ? "text-success" : "text-danger"}`}>{sourceStatus}</div>
                   <button
                     className="mt-2 text-xs text-accent inline-flex items-center gap-1"
-                    onClick={async () => setResult({ ...result, sourceVerified: await readSourceVerification(result.vault) })}
+                    onClick={async () => setResult({
+                      ...result,
+                      vaultSourceVerified: await readSourceVerification(result.vault),
+                      marketSourceVerified: result.legacy ? null : await readSourceVerification(result.market),
+                    })}
                   >
                     <RefreshCw className="w-3 h-3" /> 重新检查 Blockscout
                   </button>
-                  {!result.sourceVerified && (
-                    <p className="text-xs text-text-muted mt-2">在 contracts 目录执行：<code>make verify-vault ADDR={result.vault} RPC_URL=&lt;Base主网RPC&gt; CHAIN_ID=8453</code></p>
+                  {(!result.vaultSourceVerified || (!result.legacy && !result.marketSourceVerified)) && (
+                    <p className="text-xs text-text-muted mt-2">部署成功不等于源码验证成功；需要分别核对 Vault 与 Market。</p>
                   )}
                   <div className="flex flex-wrap gap-3 mt-5">
-                    <a className="text-sm text-accent inline-flex items-center gap-1" href={`/explore/vault.html?vault=${result.vault}&market=${result.market}`}>打开 Vault 与市场 <ExternalLink className="w-3 h-3" /></a>
+                    {!result.legacy && <a className="text-sm text-accent inline-flex items-center gap-1" href={`/explore/vault.html?vault=${result.vault}&market=${result.market}`}>打开 Vault 与市场 <ExternalLink className="w-3 h-3" /></a>}
                     <a className="text-sm text-accent inline-flex items-center gap-1" href={`${config.explorer}/address/${result.vault}#code`} target="_blank" rel="noreferrer">区块浏览器 <ExternalLink className="w-3 h-3" /></a>
                   </div>
                   <Button className="mt-6" variant="outline" onClick={() => { setResult(null); setForm(initialForm); setReview(null); setConfirmPhrase(""); }}>创建另一个 Vault</Button>
@@ -721,16 +1085,22 @@ function AdminPage() {
                   </label>
                 </div>
                 <div className="rounded-lg bg-slate-50 border border-border p-4 text-xs text-text-muted leading-5">
-                  固定参数：Base 主网 · 官方 USDC · LMSR b = 1,000 USDC。Vault 与预测市场在同一笔交易中创建；需要 Factory owner 预先授权约 693.15 USDC 做市补贴。空 Vault 到期自动结算为 INVALID。
+                  固定参数：Base 主网 · 官方 USDC · LMSR b = 1,000 USDC。Vault 与预测市场在同一笔交易中原子创建；
+                  Factory allowance 必须至少为 693.147183 USDC，页面可发起该精确额度的授权。补贴承担 LMSR 最坏做市亏损，终局后只能取回扣除份额兑付责任与手续费托管后的余额。
+                  质押期限 1 小时–30 天、最低质押不超过 1,000 USDC 是管理页运营限制；合约本身只要求未来截止时间和正数 minStake。
                 </div>
                 <div className="rounded-lg bg-accent/5 border border-accent/30 p-4 text-xs text-text-muted leading-5">
-                  v4 规则：题面与三侧定义只用于展示，合约不会读取文字判案。单一公开期内，同地址首次选边后不可换边或撤回。
+                  V5 Vault：题面与三侧定义只用于展示，合约不会读取文字判案。没有秘密期、挑战期或 Keeper；单一公开期内，同地址首次选边后不可换边或撤回。
                   截止时 YES 严格超过总本金 50% 则 YES，NO 严格超过总本金 50% 则 NO；否则（包括恰好 50%，即使无人押 INVALID）自动 INVALID。
-                  INVALID 时所有参与者按本金比例分配结算池。
+                  Vault 为 INVALID 时所有质押者按本金比例分配 Vault 结算池；LMSR 份额是另一套账本，INVALID 时 YES/NO 每份仅兑付 0.5 USDC。
+                  市场总手续费按税前现金流的 1.2% 向上取整，Vault 份额按 1.0% 向下取整，剩余部分归官方流动性池。
+                  其中 Vault 份额按每笔交易发生时的质押权重写入三套条件账：YES/NO 终局只兑现最终胜侧账本；INVALID 终局由 YES 与 NO 质押者共享 INVALID 条件账；
+                  直接质押 INVALID 不获得预测市场手续费奖励。
                 </div>
                 <Button onClick={() => void prepareReview()} disabled={busy || !preflightOk} className="w-full">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} 预检并生成最终确认
                 </Button>
+                {notice && <div className="rounded-lg border border-success/40 bg-success/5 p-4 text-sm text-success whitespace-pre-wrap">{notice}</div>}
                 {error && <div className="rounded-lg border border-danger/40 bg-danger/5 p-4 text-sm text-danger whitespace-pre-wrap">{error}</div>}
               </section>
 
@@ -746,18 +1116,28 @@ function AdminPage() {
                       <div>EPOCH · {review.resolutionTime}</div>
                       <div>DURATION · {review.durationSeconds} seconds</div>
                       <div>MIN STAKE · {formatUnits(BigInt(review.minStake), 6)} USDC</div>
-                      <div>EST. GAS · {review.gasEstimate}</div>
+                      <div>LMSR b · {formatUnits(ADMIN_LMSR_B, 6)} USDC</div>
+                      <div>REQUIRED SUBSIDY · {formatUnits(BigInt(review.requiredSubsidy ?? "0"), 6)} USDC</div>
+                      <div>OWNER BALANCE · {formatUnits(BigInt(review.ownerBalance ?? "0"), 6)} USDC</div>
+                      <div>FACTORY ALLOWANCE · {formatUnits(BigInt(review.factoryAllowance ?? "0"), 6)} USDC</div>
+                      <div>EST. GAS · {reviewFundingReady ? review.gasEstimate : "等待资金/授权后重新预检"}</div>
                       <div>CALLDATA HASH · <span className="break-all">{review.calldataHash}</span></div>
                     </div>
+                    {!reviewFundingReady && BigInt(review.ownerBalance ?? "0") >= ADMIN_REQUIRED_SUBSIDY && (
+                      <Button variant="outline" className="w-full" disabled={busy} onClick={() => void approveSubsidy()}>
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                        精确授权 {formatUnits(ADMIN_REQUIRED_SUBSIDY, 6)} USDC 给 Factory
+                      </Button>
+                    )}
                     <div className="rounded-lg border border-danger/40 bg-danger/5 p-3 text-xs text-danger leading-5">
-                      不可逆：每次签名都会部署一个全新 Vault。链上没有删除、编辑或去重功能。
+                      不可逆：每次创建签名都会部署一个全新 V5 Vault 与 LMSR Market，并从 owner 转入做市补贴。链上没有删除、编辑或题面去重功能。
                       跨标签页已加独占锁，但 Factory 本身没有 requestId；操作期间禁止在另一台设备或另一种浏览器同时创建。
                     </div>
                     <label className="block text-xs font-bold">输入 <code>CREATE</code> 解锁最终交易
                       <input value={confirmPhrase} onChange={(e) => setConfirmPhrase(e.target.value)} autoComplete="off" className="mt-2 w-full rounded-lg border border-border p-3 font-mono text-sm focus:border-danger outline-none" />
                     </label>
-                    <Button variant="danger" className="w-full" disabled={busy || confirmPhrase !== "CREATE"} onClick={() => void submit()}>
-                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LockKeyhole className="w-4 h-4" />} 在 Base 主网创建 Vault
+                    <Button variant="danger" className="w-full" disabled={busy || confirmPhrase !== "CREATE" || !reviewFundingReady} onClick={() => void submit()}>
+                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LockKeyhole className="w-4 h-4" />} 在 Base 主网原子创建 Vault + LMSR Market
                     </Button>
                   </div>
                 )}
@@ -770,5 +1150,5 @@ function AdminPage() {
   );
 }
 
-const root = document.getElementById("root");
+const root = typeof document === "undefined" ? null : document.getElementById("root");
 if (root) ReactDOM.createRoot(root).render(<React.StrictMode><AdminPage /></React.StrictMode>);

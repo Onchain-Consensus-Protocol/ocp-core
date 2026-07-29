@@ -526,9 +526,10 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
                     <div className="h-full bg-danger" style={{ width: `${noPct}%` }} />
                     <div className="h-full bg-yellow-400" style={{ width: `${invalidPct}%` }} />
                   </div>
-                  <div className="flex justify-between text-[10px] font-mono text-text-muted mt-0.5">
-                    <span className="text-success">YES {yesPct.toFixed(0)}%</span>
-                    <span className="text-danger">NO {noPct.toFixed(0)}%</span>
+                  <div className="grid grid-cols-3 text-[10px] font-mono text-text-muted mt-0.5">
+                    <span className="text-success text-left">YES {yesPct.toFixed(0)}%</span>
+                    <span className="text-danger text-center">NO {noPct.toFixed(0)}%</span>
+                    <span className="text-yellow-500 text-right">INVALID {invalidPct.toFixed(0)}%</span>
                   </div>
                 </div>
                 <div className="mt-1 flex justify-between text-[10px] font-mono">

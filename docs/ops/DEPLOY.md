@@ -88,6 +88,29 @@ Factory owner 必须提前授权 Factory 使用 `ceil(b × ln(2))` 加安全缓�
 - `VITE_DEPOSIT_TOKEN_ADDRESS`：与 Factory 固定代币一致；正式 Base 使用原生 USDC；
 - `VITE_CHAIN_ID`：测试网 `84532`，正式 Base `8453`；
 - `VITE_RPC_URL`：对应网络 RPC。
+- `VITE_ADMIN_FACTORY_ADDRESS`：管理页专用的 V5 Factory 地址；未配置时才回退到全局 Factory；
+- `VITE_ADMIN_FACTORY_CODE_HASH`：已审核 V5 Factory 的链上 runtime bytecode hash；
+- `VITE_ADMIN_DEPLOYMENT_ENABLED`：只有地址、源码验证、runtime hash、部署器与官方流动性池全部核对后才设为 `true`；
+- `VITE_RECOVERY_RPC_URL`：用于读取历史 receipt/区块的独立恢复 RPC。管理页不会再用大区间
+  `eth_getLogs` 猜测旧交易，而是先按 sender + nonce 从 Blockscout 定位交易，再严格核对
+  target、value、calldata、receipt 和 `MarketCreated`。
+
+管理页必须拒绝旧 V4 Factory：旧版本虽然有相同的六参数 `createMarket`，但会忽略
+`initialLiquidity`、返回零地址 Market 并部署 V4 Vault。V5 生产预检必须同时核对：
+
+- Factory runtime hash；
+- `officialStakeToken`、`officialLiquidityPool`；
+- `vaultDeployer` 与 `marketDeployer` 的链上字节码；
+- Factory owner；
+- Base 原生 USDC 的地址、6 位精度和符号。
+
+创建前页面应显示 owner 的 USDC 余额、Factory allowance 和精确
+`requiredSubsidy`。当前固定 `b = 1,000 USDC` 时，补贴为
+`693.147183 USDC`。创建成功后必须核对规范链 receipt 中的
+`MarketCreated`/`MarketActivated`，并按 latest 回读 Vault/Market 双向注册、
+LMSR 不可变参数、补贴提供者、条件编码和 1.2%/1.0%/0.2% 费率。不能用
+`receipt.blockNumber` 的区块末状态强求“零交易”：同一区块内后续交易可能已经合法
+改变份额、余额和手续费桶；初始零状态由已审核的 Factory runtime 与原子创建事件保证。
 
 Base 原生 USDC 使用 6 位小数：`1 USDC = 1_000_000` 最小单位。部署和创建 Vault 时，`minStake` 必须使用 6 位精度，不能使用 `1 ether`。
 

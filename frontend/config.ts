@@ -41,6 +41,7 @@ export const VAULT_ABI = [
   "function claimSurplus() external returns (uint256)",
   "function protocolVersion() external pure returns (uint256)",
   "function factory() external view returns (address)",
+  "function emptySettlementRecipient() external view returns (address)",
   "function stakeToken() external view returns (address)",
   "function resolutionTime() external view returns (uint256)",
   "function minStake() external view returns (uint256)",
@@ -78,6 +79,8 @@ export const FACTORY_ABI = [
   "function marketByVault(address vault) external view returns (address)",
   "function vaultByMarket(address market) external view returns (address)",
   "function officialLiquidityPool() external view returns (address)",
+  "function vaultDeployer() external view returns (address)",
+  "function marketDeployer() external view returns (address)",
   "function getMarkets() external view returns (address[])",
   "function getMarketMeta(address market) external view returns (string title, string description)",
   "function getVaults() external view returns (address[])",
@@ -93,6 +96,7 @@ export const FACTORY_ABI = [
 
 export const ERC20_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) external view returns (uint256)",
   "function balanceOf(address account) external view returns (uint256)",
   "function decimals() external view returns (uint8)",
   "function symbol() external view returns (string)",
@@ -108,6 +112,12 @@ export const ERC20_MINT_ABI = [
 export const MARKET_ABI = [
   "function vault() external view returns (address)",
   "function collateral() external view returns (address)",
+  "function factory() external view returns (address)",
+  "function officialLiquidityPool() external view returns (address)",
+  "function subsidyProvider() external view returns (address)",
+  "function subsidy() external view returns (uint256)",
+  "function conditionType() external view returns (uint8)",
+  "function conditionParams() external view returns (bytes)",
   "function feeBps() external view returns (uint256)",
   "function vaultFeeBps() external view returns (uint256)",
   "function protocolLpFeeBps() external view returns (uint256)",
@@ -137,6 +147,7 @@ export const MARKET_ABI = [
   "function redeem() external returns (uint256 payout)",
   "function claimProtocolLpFees() external returns (uint256 amount)",
   "event FeeAccrued(address indexed trader, uint256 grossCashFlow, uint256 totalFee, uint256 vaultFee, uint256 protocolLpFee)",
+  "event MarketActivated(address indexed subsidyProvider, uint256 subsidy, uint256 liquidityParameter)",
 ] as const;
 
 export const MARKET_FACTORY_ABI = [

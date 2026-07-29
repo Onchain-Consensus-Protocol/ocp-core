@@ -1563,8 +1563,8 @@ function VaultPage({
                   {lang === "zh" ? "LMSR 未结算份额" : "Outstanding LMSR shares"}
                 </div>
                 <div className="text-xs font-mono text-text-muted space-y-1">
-                  <div>YES: <span className="text-text font-bold">{detailState ? `${detailState.yesReserve} ${detailState.tokenSymbol}` : "—"}</span></div>
-                  <div>NO: <span className="text-text font-bold">{detailState ? `${detailState.noReserve} ${detailState.tokenSymbol}` : "—"}</span></div>
+                  <div>YES: <span className="text-text font-bold">{detailState ? `${detailState.yesReserve} ${lang === "zh" ? "份" : "shares"}` : "—"}</span></div>
+                  <div>NO: <span className="text-text font-bold">{detailState ? `${detailState.noReserve} ${lang === "zh" ? "份" : "shares"}` : "—"}</span></div>
                 </div>
               </div>
             </div>

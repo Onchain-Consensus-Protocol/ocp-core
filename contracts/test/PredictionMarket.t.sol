@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "../src/core/OCPVault.sol";
 import "../src/factory/OCPVaultFactory.sol";
@@ -43,10 +44,19 @@ contract PredictionMarketTest is Test {
     address internal constant YES_VOTER = address(0x1E5);
     address internal constant NO_VOTER = address(0xB0);
     address internal constant TREASURY = address(0x7EA5);
+    address internal constant OUTSIDER = address(0xBAD);
 
     uint256 internal constant USDC = 1e6;
     uint256 internal constant B = 1_000 * USDC;
     uint256 internal constant MIN_STAKE = 1 * USDC;
+    uint256 internal constant FEE_INDEX_PRECISION = 1e30;
+
+    struct LifecycleFees {
+        uint256 buyYes;
+        uint256 buyNo;
+        uint256 sellYes;
+        uint256 secondBuyNo;
+    }
 
     uint256 internal deadline;
 
@@ -303,6 +313,149 @@ contract PredictionMarketTest is Test {
         assertEq(emptyMarket.redeem(), 50 * USDC);
     }
 
+    function test_e2eYesRealTradesStakeTopUpSettlementAndAllFeeClaims() public {
+        _assertCanonicalPair();
+        LifecycleFees memory fees = _runFirstTradeStage();
+
+        // Alice 此时才进入 YES，不能追溯领取第一阶段手续费。
+        _stake(ALICE, IOCPVault.Side.YES, 101 * USDC);
+        fees = _runSecondTradeStage(fees);
+
+        uint256 earlyIndex =
+            _indexDelta(fees.buyYes, 100 * USDC) + _indexDelta(fees.buyNo, 100 * USDC);
+        uint256 finalIndex = earlyIndex + _indexDelta(fees.sellYes, 201 * USDC)
+            + _indexDelta(fees.secondBuyNo, 201 * USDC);
+        uint256 expectedYesVoter = _rewardFromIndex(100 * USDC, finalIndex);
+        uint256 expectedAlice = _rewardFromIndex(101 * USDC, finalIndex)
+            - _rewardFromIndex(101 * USDC, earlyIndex);
+        (uint256 yesVoterYes,,) = vault.conditionalMarketFees(YES_VOTER);
+        (uint256 aliceYes,,) = vault.conditionalMarketFees(ALICE);
+        assertEq(yesVoterYes, expectedYesVoter);
+        assertEq(aliceYes, expectedAlice);
+        _assertTradeFeeAccounting(fees);
+
+        vm.warp(deadline);
+        market.resolve();
+        assertEq(uint256(vault.outcome()), uint256(IOCPVault.Outcome.YES));
+        assertEq(uint256(market.outcome()), uint256(IPredictionMarket.Outcome.YES));
+        _assertSettlementBuckets();
+
+        vm.expectRevert("Not fee eligible");
+        vault.claimMarketFeesFor(NO_VOTER);
+
+        _claimForAndAssertRecipient(YES_VOTER, expectedYesVoter);
+        _claimForAndAssertRecipient(ALICE, expectedAlice);
+
+        uint256 principalPool = vault.settlementPool();
+        uint256 firstPrincipal = _withdrawDelta(YES_VOTER);
+        uint256 secondPrincipal = _withdrawDelta(ALICE);
+        assertEq(firstPrincipal, Math.mulDiv(principalPool, 100 * USDC, 201 * USDC));
+        assertEq(secondPrincipal, principalPool - firstPrincipal);
+        assertEq(_withdrawDelta(NO_VOTER), 0);
+        vm.expectRevert("Fees already claimed");
+        vault.claimMarketFeesFor(ALICE);
+
+        _claimAllOfficialFeesAndAssertVaultConservation(expectedYesVoter + expectedAlice);
+        _assertPmRedemption(IPredictionMarket.Outcome.YES);
+    }
+
+    function test_e2eNoRealTradesStakeTopUpSettlementAndAllFeeClaims() public {
+        _assertCanonicalPair();
+        LifecycleFees memory fees = _runFirstTradeStage();
+
+        // Bob 此时才进入 NO，不能追溯领取第一阶段手续费。
+        _stake(BOB, IOCPVault.Side.NO, 101 * USDC);
+        fees = _runSecondTradeStage(fees);
+
+        uint256 earlyIndex =
+            _indexDelta(fees.buyYes, 100 * USDC) + _indexDelta(fees.buyNo, 100 * USDC);
+        uint256 finalIndex = earlyIndex + _indexDelta(fees.sellYes, 201 * USDC)
+            + _indexDelta(fees.secondBuyNo, 201 * USDC);
+        uint256 expectedNoVoter = _rewardFromIndex(100 * USDC, finalIndex);
+        uint256 expectedBob = _rewardFromIndex(101 * USDC, finalIndex)
+            - _rewardFromIndex(101 * USDC, earlyIndex);
+        (, uint256 noVoterNo,) = vault.conditionalMarketFees(NO_VOTER);
+        (, uint256 bobNo,) = vault.conditionalMarketFees(BOB);
+        assertEq(noVoterNo, expectedNoVoter);
+        assertEq(bobNo, expectedBob);
+        _assertTradeFeeAccounting(fees);
+
+        vm.warp(deadline);
+        market.resolve();
+        assertEq(uint256(vault.outcome()), uint256(IOCPVault.Outcome.NO));
+        assertEq(uint256(market.outcome()), uint256(IPredictionMarket.Outcome.NO));
+        _assertSettlementBuckets();
+
+        vm.expectRevert("Not fee eligible");
+        vault.claimMarketFeesFor(YES_VOTER);
+        _claimForAndAssertRecipient(NO_VOTER, expectedNoVoter);
+        _claimForAndAssertRecipient(BOB, expectedBob);
+
+        uint256 principalPool = vault.settlementPool();
+        uint256 firstPrincipal = _withdrawDelta(NO_VOTER);
+        uint256 secondPrincipal = _withdrawDelta(BOB);
+        assertEq(firstPrincipal, Math.mulDiv(principalPool, 100 * USDC, 201 * USDC));
+        assertEq(secondPrincipal, principalPool - firstPrincipal);
+        assertEq(_withdrawDelta(YES_VOTER), 0);
+        vm.expectRevert("Fees already claimed");
+        vault.claimMarketFeesFor(BOB);
+
+        _claimAllOfficialFeesAndAssertVaultConservation(expectedNoVoter + expectedBob);
+        _assertPmRedemption(IPredictionMarket.Outcome.NO);
+    }
+
+    function test_e2eInvalidRealTradesStakeTopUpSettlementAndAllFeeClaims() public {
+        _assertCanonicalPair();
+        LifecycleFees memory fees = _runFirstTradeStage();
+
+        _stake(ALICE, IOCPVault.Side.YES, 100 * USDC);
+        _stake(BOB, IOCPVault.Side.INVALID, 100 * USDC);
+        fees = _runSecondTradeStage(fees);
+
+        uint256 earlyIndex =
+            _indexDelta(fees.buyYes, 200 * USDC) + _indexDelta(fees.buyNo, 200 * USDC);
+        uint256 finalIndex = earlyIndex + _indexDelta(fees.sellYes, 300 * USDC)
+            + _indexDelta(fees.secondBuyNo, 300 * USDC);
+        uint256 expectedYesVoter = _rewardFromIndex(100 * USDC, finalIndex);
+        uint256 expectedNoVoter = expectedYesVoter;
+        uint256 expectedAlice = _rewardFromIndex(100 * USDC, finalIndex)
+            - _rewardFromIndex(100 * USDC, earlyIndex);
+        (,, uint256 yesVoterInvalid) = vault.conditionalMarketFees(YES_VOTER);
+        (,, uint256 noVoterInvalid) = vault.conditionalMarketFees(NO_VOTER);
+        (,, uint256 aliceInvalid) = vault.conditionalMarketFees(ALICE);
+        (,, uint256 bobInvalid) = vault.conditionalMarketFees(BOB);
+        assertEq(yesVoterInvalid, expectedYesVoter);
+        assertEq(noVoterInvalid, expectedNoVoter);
+        assertEq(aliceInvalid, expectedAlice);
+        assertEq(bobInvalid, 0);
+        _assertTradeFeeAccounting(fees);
+
+        vm.warp(deadline);
+        market.resolve();
+        assertEq(uint256(vault.outcome()), uint256(IOCPVault.Outcome.INVALID));
+        assertEq(uint256(market.outcome()), uint256(IPredictionMarket.Outcome.INVALID));
+        _assertSettlementBuckets();
+
+        vm.expectRevert("Not fee eligible");
+        vault.claimMarketFeesFor(BOB);
+        _claimForAndAssertRecipient(YES_VOTER, expectedYesVoter);
+        _claimForAndAssertRecipient(NO_VOTER, expectedNoVoter);
+        _claimForAndAssertRecipient(ALICE, expectedAlice);
+
+        uint256 principalPool = vault.settlementPool();
+        assertEq(_withdrawDelta(YES_VOTER), 100 * USDC);
+        assertEq(_withdrawDelta(NO_VOTER), 100 * USDC);
+        assertEq(_withdrawDelta(ALICE), 100 * USDC);
+        assertEq(_withdrawDelta(BOB), principalPool - 300 * USDC);
+        vm.expectRevert("Fees already claimed");
+        vault.claimMarketFeesFor(YES_VOTER);
+
+        _claimAllOfficialFeesAndAssertVaultConservation(
+            expectedYesVoter + expectedNoVoter + expectedAlice
+        );
+        _assertPmRedemption(IPredictionMarket.Outcome.INVALID);
+    }
+
     function test_atomicPairCreationRevertsWithoutSubsidyAllowance() public {
         OCPVaultFactory freshFactory =
             new OCPVaultFactory(address(token), TREASURY);
@@ -490,6 +643,208 @@ contract PredictionMarketTest is Test {
 
         uint256 loss = lockedSubsidy > recovered ? lockedSubsidy - recovered : 0;
         assertLe(loss, market.initialCostX18() / 1e18);
+    }
+
+    function _assertCanonicalPair() internal view {
+        assertTrue(vaultFactory.isVault(address(vault)));
+        assertTrue(vaultFactory.isMarket(address(market)));
+        assertEq(vaultFactory.marketByVault(address(vault)), address(market));
+        assertEq(vaultFactory.vaultByMarket(address(market)), address(vault));
+        assertEq(vault.market(), address(market));
+        assertEq(market.vault(), address(vault));
+    }
+
+    function _runFirstTradeStage() internal returns (LifecycleFees memory fees) {
+        fees.buyYes = _buyAndRecordVaultFee(ALICE, true, 120 * USDC);
+        fees.buyNo = _buyAndRecordVaultFee(BOB, false, 90 * USDC);
+    }
+
+    function _runSecondTradeStage(LifecycleFees memory fees)
+        internal
+        returns (LifecycleFees memory)
+    {
+        fees.sellYes = _sellAndRecordVaultFee(ALICE, true, 40 * USDC);
+        fees.secondBuyNo = _buyAndRecordVaultFee(BOB, false, 30 * USDC);
+        return fees;
+    }
+
+    function _buyAndRecordVaultFee(address user, bool isYes, uint256 shares)
+        internal
+        returns (uint256 vaultFee)
+    {
+        (uint256 totalCost, uint256 quotedFee) = market.quoteBuy(isYes, shares);
+        uint256 gross = totalCost - quotedFee;
+        vaultFee = gross * 100 / 10_000;
+        assertEq(quotedFee, _ceilFee(gross));
+
+        uint256 accruedBefore = vault.totalMarketFeesAccrued();
+        uint256 protocolBefore = market.pendingProtocolLpFees();
+        assertEq(_buy(user, isYes, shares), totalCost);
+        assertEq(vault.totalMarketFeesAccrued() - accruedBefore, vaultFee);
+        assertEq(
+            market.pendingProtocolLpFees() - protocolBefore, quotedFee - vaultFee
+        );
+        assertEq(token.allowance(address(market), address(vault)), 0);
+    }
+
+    function _sellAndRecordVaultFee(address user, bool isYes, uint256 shares)
+        internal
+        returns (uint256 vaultFee)
+    {
+        (uint256 quotedPayout, uint256 quotedFee) = market.quoteSell(isYes, shares);
+        uint256 gross = quotedPayout + quotedFee;
+        vaultFee = gross * 100 / 10_000;
+        assertEq(quotedFee, _ceilFee(gross));
+
+        uint256 accruedBefore = vault.totalMarketFeesAccrued();
+        uint256 protocolBefore = market.pendingProtocolLpFees();
+        vm.prank(user);
+        uint256 payout = isYes
+            ? market.sellYes(shares, quotedPayout, block.timestamp)
+            : market.sellNo(shares, quotedPayout, block.timestamp);
+        assertEq(payout, quotedPayout);
+        assertEq(vault.totalMarketFeesAccrued() - accruedBefore, vaultFee);
+        assertEq(
+            market.pendingProtocolLpFees() - protocolBefore, quotedFee - vaultFee
+        );
+        assertEq(token.allowance(address(market), address(vault)), 0);
+    }
+
+    function _indexDelta(uint256 fee, uint256 denominator)
+        internal
+        pure
+        returns (uint256)
+    {
+        return Math.mulDiv(fee, FEE_INDEX_PRECISION, denominator);
+    }
+
+    function _rewardFromIndex(uint256 stake, uint256 index)
+        internal
+        pure
+        returns (uint256)
+    {
+        return Math.mulDiv(stake, index, FEE_INDEX_PRECISION);
+    }
+
+    function _totalVaultFees(LifecycleFees memory fees)
+        internal
+        pure
+        returns (uint256)
+    {
+        return fees.buyYes + fees.buyNo + fees.sellYes + fees.secondBuyNo;
+    }
+
+    function _assertTradeFeeAccounting(LifecycleFees memory fees) internal view {
+        uint256 totalVaultFees = _totalVaultFees(fees);
+        assertGt(totalVaultFees, 0);
+        assertEq(vault.totalMarketFeesAccrued(), totalVaultFees);
+        assertEq(market.totalVaultFeesPaid(), totalVaultFees);
+        assertEq(market.pendingVaultFees(), 0);
+        assertEq(market.feeEscrow(), market.pendingProtocolLpFees());
+    }
+
+    function _assertSettlementBuckets() internal view {
+        assertTrue(vault.resolved());
+        assertTrue(vault.settlementReady());
+        assertTrue(market.resolved());
+        assertEq(vault.marketFeesInSettlementPool(), vault.totalMarketFeesAccrued());
+        assertEq(vault.settlementPool(), vault.totalPrincipal());
+        assertEq(vault.remainingSettlementPool(), vault.settlementPool());
+        assertEq(
+            vault.marketFeeUserPoolRemaining() + vault.officialMarketFeesClaimable(),
+            vault.totalMarketFeesAccrued()
+        );
+        assertEq(
+            token.balanceOf(address(vault)),
+            vault.settlementPool() + vault.totalMarketFeesAccrued()
+        );
+    }
+
+    function _claimAllOfficialFeesAndAssertVaultConservation(uint256 userFeesPaid)
+        internal
+    {
+        uint256 vaultOfficialFees = vault.officialMarketFeesClaimable();
+        uint256 protocolFees = market.pendingProtocolLpFees();
+        assertEq(userFeesPaid + vaultOfficialFees, vault.totalMarketFeesAccrued());
+        assertEq(vault.marketFeeUserPoolRemaining(), 0);
+        assertEq(vault.remainingSettlementPool(), 0);
+        assertEq(vault.remainingMarketFeeClaims(), 0);
+        assertEq(vault.remainingEligibleClaims(), 0);
+
+        uint256 treasuryBefore = token.balanceOf(TREASURY);
+        uint256 outsiderBefore = token.balanceOf(OUTSIDER);
+        vm.startPrank(OUTSIDER);
+        if (vaultOfficialFees > 0) {
+            vault.claimOfficialMarketFees();
+        }
+        if (protocolFees > 0) {
+            market.claimProtocolLpFees();
+        }
+        vm.stopPrank();
+
+        assertEq(
+            token.balanceOf(TREASURY) - treasuryBefore, vaultOfficialFees + protocolFees
+        );
+        assertEq(token.balanceOf(OUTSIDER), outsiderBefore);
+        assertEq(vault.officialMarketFeesClaimable(), 0);
+        assertEq(vault.marketFeeUserPoolRemaining(), 0);
+        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(market.pendingProtocolLpFees(), 0);
+        assertEq(market.feeEscrow(), 0);
+
+        vm.expectRevert("Nothing to claim");
+        vault.claimOfficialMarketFees();
+        vm.expectRevert(PredictionMarket.NoFees.selector);
+        market.claimProtocolLpFees();
+    }
+
+    function _assertPmRedemption(IPredictionMarket.Outcome expectedOutcome) internal {
+        uint256 expectedAlice;
+        uint256 expectedBob;
+        if (expectedOutcome == IPredictionMarket.Outcome.YES) {
+            expectedAlice = 80 * USDC;
+        } else if (expectedOutcome == IPredictionMarket.Outcome.NO) {
+            expectedBob = 120 * USDC;
+        } else {
+            expectedAlice = 40 * USDC;
+            expectedBob = 60 * USDC;
+        }
+
+        uint256 aliceBefore = token.balanceOf(ALICE);
+        vm.prank(ALICE);
+        assertEq(market.redeem(), expectedAlice);
+        assertEq(token.balanceOf(ALICE) - aliceBefore, expectedAlice);
+
+        uint256 bobBefore = token.balanceOf(BOB);
+        vm.prank(BOB);
+        assertEq(market.redeem(), expectedBob);
+        assertEq(token.balanceOf(BOB) - bobBefore, expectedBob);
+
+        assertEq(market.yesShares(ALICE), 0);
+        assertEq(market.noShares(BOB), 0);
+        assertEq(market.totalYesShares(), 0);
+        assertEq(market.totalNoShares(), 0);
+        assertEq(market.remainingLiability(), 0);
+
+        vm.prank(ALICE);
+        vm.expectRevert(PredictionMarket.NoShares.selector);
+        market.redeem();
+    }
+
+    function _claimForAndAssertRecipient(address user, uint256 expected) internal {
+        uint256 userBefore = token.balanceOf(user);
+        uint256 outsiderBefore = token.balanceOf(OUTSIDER);
+        vm.prank(OUTSIDER);
+        assertEq(vault.claimMarketFeesFor(user), expected);
+        assertEq(token.balanceOf(user) - userBefore, expected);
+        assertEq(token.balanceOf(OUTSIDER), outsiderBefore);
+    }
+
+    function _withdrawDelta(address user) internal returns (uint256 amount) {
+        uint256 balanceBefore = token.balanceOf(user);
+        vm.prank(user);
+        vault.withdraw();
+        return token.balanceOf(user) - balanceBefore;
     }
 
     function _buy(address user, bool isYes, uint256 shares) internal returns (uint256 totalCost) {
