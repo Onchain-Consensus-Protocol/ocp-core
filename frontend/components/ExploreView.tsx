@@ -445,11 +445,10 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
             const yesPct = total > 0 ? (Number(oc?.totalStakeYes || 0) / total) * 100 : 0;
             const noPct = total > 0 ? (Number(oc?.totalStakeNo || 0) / total) * 100 : 0;
             const invalidPct = total > 0 ? (Number(oc?.totalStakeInvalid || 0) / total) * 100 : 0;
-            const marketYesShares = Number(oc?.yesReserve ?? 0);
-            const marketNoShares = Number(oc?.noReserve ?? 0);
-            const totalMarketShares = marketYesShares + marketNoShares;
-            const marketYesPct = totalMarketShares > 0 ? (marketYesShares / totalMarketShares) * 100 : 0;
-            const marketNoPct = totalMarketShares > 0 ? (marketNoShares / totalMarketShares) * 100 : 0;
+            const marketYesPrice = oc?.yesPrice ?? 0.5;
+            const marketNoPrice = oc?.noPrice ?? 0.5;
+            const marketYesPct = marketYesPrice * 100;
+            const marketNoPct = marketNoPrice * 100;
             const vaultUrl = `/explore/vault.html?vault=${encodeURIComponent(m.vault)}&market=${encodeURIComponent(m.market)}`;
             type VaultPhase = "staking" | "ready" | "finalized";
             const vaultPhase: VaultPhase | null = oc
@@ -543,8 +542,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
                       <div className="h-full bg-danger transition-all" style={{ width: `${marketNoPct}%` }} />
                     </div>
                     <div className="flex justify-between text-[10px] font-mono text-text-muted mt-0.5">
-                      <span className="text-success">YES {marketYesPct.toFixed(0)}%</span>
-                      <span className="text-danger">NO {marketNoPct.toFixed(0)}%</span>
+                      <span className="text-success">YES {marketYesPrice.toFixed(2)}</span>
+                      <span className="text-danger">NO {marketNoPrice.toFixed(2)}</span>
                     </div>
                   </div>
                 )}

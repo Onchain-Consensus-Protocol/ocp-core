@@ -1354,15 +1354,15 @@ function VaultPage({
             <div className="space-y-4">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5 text-text-muted font-display">
-                  {lang === "zh" ? "预测市场行情" : "Market odds"}
+                  {lang === "zh" ? "预测市场价格" : "Market prices"}
                 </div>
                 <div className="h-6 bg-transparent border border-border rounded overflow-hidden flex">
                   <div className="h-full bg-success transition-all" style={{ width: `${marketYesPct}%` }} />
                   <div className="h-full bg-danger transition-all" style={{ width: `${marketNoPct}%` }} />
                 </div>
                 <div className="flex justify-between text-xs font-bold font-mono mt-1">
-                  <span className="text-success">YES {(prices.yes * 100).toFixed(0)}%</span>
-                  <span className="text-danger">NO {(prices.no * 100).toFixed(0)}%</span>
+                  <span className="text-success">YES {prices.yes.toFixed(2)}</span>
+                  <span className="text-danger">NO {prices.no.toFixed(2)}</span>
                 </div>
               </div>
               <div>

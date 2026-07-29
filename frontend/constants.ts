@@ -136,7 +136,7 @@ export const CONTENT = {
       my_position_proto: "Protocol (Vote)",
       my_position_market: "Market (Shares)",
       showing_proto: "Showing: Protocol Consensus (Outcome Decider)",
-      showing_market: "Showing: Market Liquidity (Trading Odds)",
+      showing_market: "Showing: Prediction Market Prices",
 
       // Balance/Holding Display
       amm_avail_balance: "Available Balance",
@@ -330,7 +330,7 @@ export const CONTENT = {
       my_position_proto: "OCP质押投票",
       my_position_market: "预测份额",
       showing_proto: "正在显示: 协议层共识 (决定结果)",
-      showing_market: "正在显示: 市场流动性 (交易赔率)",
+      showing_market: "正在显示：预测市场价格",
 
       // Balance/Holding Display
       amm_avail_balance: "可用余额",
