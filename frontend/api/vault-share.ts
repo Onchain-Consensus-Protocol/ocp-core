@@ -30,11 +30,15 @@ function isCrawlerRequest(request: Request): boolean {
 }
 
 export default async function handler(request: Request) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+  }
   const url = new URL(request.url);
   const vault = url.searchParams.get("vault");
   const market = url.searchParams.get("market");
   const blockParam = url.searchParams.get("block");
   const block = blockParam ? Number(blockParam) : undefined;
+  const finalizedHint = url.searchParams.get("finalized") === "1";
 
   if (!isAddress(vault) || !isAddress(market) || !Number.isSafeInteger(block) || !block) {
     return new Response("Invalid Vault share URL", { status: 400 });
@@ -50,17 +54,29 @@ export default async function handler(request: Request) {
   }
 
   try {
-    const snapshot = await loadVaultSnapshot(vault, block);
-    const imageUrl = new URL("/api/vault-card", origin);
+    // 已结算状态的 totals/outcome/settlementPool 不再变化。新分享显式携带
+    // finalized=1 后读取 latest 并再次验证 resolved，避免 OG 爬虫依赖归档 RPC。
+    const snapshot = await loadVaultSnapshot(vault, finalizedHint ? undefined : block);
+    if (finalizedHint && !snapshot.resolved) throw new Error("Vault is not finalized");
+    const imageUrl = new URL(snapshot.resolved ? "/api/vault-result-card" : "/api/vault-card", origin);
     imageUrl.searchParams.set("vault", vault);
-    imageUrl.searchParams.set("block", String(snapshot.blockNumber));
+    if (!snapshot.resolved) imageUrl.searchParams.set("block", String(snapshot.blockNumber));
 
-    const description = `YES ${snapshot.yesPct} · NO ${snapshot.noPct} · INVALID ${snapshot.invalidPct} · ${snapshot.totalAmount} ${snapshot.tokenSymbol} staked`;
-    const title = escapeHtml(snapshot.title);
+    const outcomeLabel = snapshot.outcome === 1 ? "YES" : snapshot.outcome === 2 ? "NO" : "INVALID";
+    const outcomePct = snapshot.outcome === 1 ? snapshot.yesPct : snapshot.outcome === 2 ? snapshot.noPct : null;
+    const description = snapshot.resolved
+      ? snapshot.outcome === 3
+        ? `FINALIZED: INVALID · No strict majority · ${snapshot.settlementPoolAmount} ${snapshot.tokenSymbol} settlement pool`
+        : `FINALIZED: ${outcomeLabel} · ${outcomePct} consensus weight · ${snapshot.settlementPoolAmount} ${snapshot.tokenSymbol} settlement pool`
+      : `YES ${snapshot.yesPct} · NO ${snapshot.noPct} · INVALID ${snapshot.invalidPct} · ${snapshot.totalAmount} ${snapshot.tokenSymbol} staked`;
+    const resultTitle = snapshot.outcome === 3 ? `No strict majority · ${snapshot.title}` : `${outcomeLabel} wins · ${snapshot.title}`;
+    const title = escapeHtml(snapshot.resolved ? resultTitle : snapshot.title);
     const target = escapeHtml(vaultUrl.toString());
     const snapshotUrl = escapeHtml(url.toString());
     const cardUrl = escapeHtml(imageUrl.toString());
-    const cardAlt = `OCP Vault stake distribution at Base block ${snapshot.blockNumber}`;
+    const cardAlt = snapshot.resolved
+      ? `OCP finalized result: ${outcomeLabel} at Base block ${snapshot.blockNumber}`
+      : `OCP Vault stake distribution at Base block ${snapshot.blockNumber}`;
     const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -93,7 +109,7 @@ export default async function handler(request: Request) {
     return new Response(html, {
       headers: {
         "content-type": "text/html; charset=utf-8",
-        "cache-control": "public, max-age=31536000, immutable",
+        "cache-control": "public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable",
       },
     });
   } catch (error) {

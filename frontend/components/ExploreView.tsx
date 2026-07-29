@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "./Button";
 import { HowToPlay } from "./HowToPlay";
-import { config, VAULT_ABI, ERC20_ABI, ERC20_MINT_ABI, FACTORY_ABI } from "../config";
+import { config, VAULT_ABI, MARKET_ABI, ERC20_ABI, ERC20_MINT_ABI, FACTORY_ABI } from "../config";
 
 import type { JsonRpcSigner } from "ethers";
 
@@ -36,6 +36,8 @@ interface OnChainState {
   tokenDecimals?: number;
   yesReserve?: string;
   noReserve?: string;
+  marketVolume?: string;
+  vaultFeeRevenue?: string;
   yesPrice?: number;
   noPrice?: number;
 }
@@ -83,6 +85,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       resolution: "结算时间",
       status: "状态",
       totalStake: "总质押",
+      ocpTotalStake: "OCP 总质押",
+      marketTotalVolume: "市场总交易量",
+      vaultFeeRoi: "Vault 手续费 ROI",
+      countdown: "剩余时间",
+      marketPrices: "市场价格",
       hiddenDirection: "方向与资金公开可见",
       finalizedResult: "最终结果",
       yes: "YES",
@@ -92,7 +99,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       ready: "可结算",
       ended: "已结束",
       protocol: "协议 (OCP)",
-      marketTab: "市场 (AMM)",
+      marketTab: "预测市场 (LMSR)",
       protoDesc: "",
       stakeAmount: "数量",
       stakeYes: "质押 YES",
@@ -104,7 +111,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       openVault: "点击进入金库",
       buy: "买入",
       sell: "卖出",
-      fee: "手续费 0.3%",
+      fee: "手续费 1.2%",
       balance: "余额",
       myStake: "我的质押",
       myShares: "我的份额",
@@ -142,6 +149,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       resolution: "Resolution",
       status: "Status",
       totalStake: "Total stake",
+      ocpTotalStake: "OCP total stake",
+      marketTotalVolume: "Market total volume",
+      vaultFeeRoi: "Vault fee ROI",
+      countdown: "Time left",
+      marketPrices: "Market price",
       hiddenDirection: "Directions and capital are public",
       finalizedResult: "Final result",
       yes: "YES",
@@ -151,7 +163,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       ready: "Ready",
       ended: "Ended",
       protocol: "Protocol (OCP)",
-      marketTab: "Market (AMM)",
+      marketTab: "Prediction Market (LMSR)",
       protoDesc: "",
       stakeAmount: "Amount",
       stakeYes: "Stake YES",
@@ -163,7 +175,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       openVault: "Open vault",
       buy: "Buy",
       sell: "Sell",
-      fee: "Fee 0.3%",
+      fee: "Fee 1.2%",
       balance: "Balance",
       myStake: "My stake",
       myShares: "My shares",
@@ -232,6 +244,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
         stakeToken: "0x0000000000000000000000000000000000000000",
         yesReserve: "0",
         noReserve: "0",
+        marketVolume: "0",
+        vaultFeeRevenue: "0",
         yesPrice: 0.5,
         noPrice: 0.5,
         tokenSymbol: undefined,
@@ -306,9 +320,58 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
             if (import.meta.env.DEV) console.warn("[ExploreView] Vault OnChain read failed, showing fallback", addr, e);
           }
 
+          let marketAddr = "0x0000000000000000000000000000000000000000";
+          if (marketEnabled) {
+            try {
+              marketAddr = String(await factory.marketByVault(addr));
+              if (marketAddr !== "0x0000000000000000000000000000000000000000") {
+                const market = new Contract(marketAddr, MARKET_ABI, provider);
+                const marketVolumePromise = (async (): Promise<bigint> => {
+                  try {
+                    return await market.totalTradingVolume() as bigint;
+                  } catch {
+                    // 旧版 Market 没有累计 getter；从不可变的 FeeAccrued 日志还原
+                    // 每笔手续费前 gross USDC 现金流，保持旧市场的交易量展示准确。
+                    const events = await market.queryFilter(market.filters.FeeAccrued(), 0, "latest");
+                    return events.reduce((sum: bigint, event) => {
+                      const args = "args" in event ? event.args : undefined;
+                      return sum + BigInt(args?.grossCashFlow ?? 0);
+                    }, 0n);
+                  }
+                })();
+                const [
+                  totalYesShares,
+                  totalNoShares,
+                  priceTuple,
+                  marketVolume,
+                  pendingVaultFees,
+                  totalVaultFeesPaid,
+                ] = await Promise.all([
+                  market.totalYesShares(),
+                  market.totalNoShares(),
+                  market.getYesNoPrice(),
+                  marketVolumePromise,
+                  market.pendingVaultFees(),
+                  market.totalVaultFeesPaid(),
+                ]);
+                onChain = {
+                  ...onChain,
+                  yesReserve: totalYesShares.toString(),
+                  noReserve: totalNoShares.toString(),
+                  yesPrice: Number(priceTuple[0]) / 1e18,
+                  noPrice: Number(priceTuple[1]) / 1e18,
+                  marketVolume: marketVolume.toString(),
+                  vaultFeeRevenue: (pendingVaultFees + totalVaultFeesPaid).toString(),
+                };
+              }
+            } catch (e) {
+              if (import.meta.env.DEV) console.warn("[ExploreView] Market OnChain read failed", addr, e);
+            }
+          }
+
           return {
             vault: addr,
-            market: "0x0000000000000000000000000000000000000000",
+            market: marketAddr,
             meta,
             onChain,
           } as MarketItem;
@@ -393,10 +456,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
             const yesPct = total > 0 ? (Number(oc?.totalStakeYes || 0) / total) * 100 : 0;
             const noPct = total > 0 ? (Number(oc?.totalStakeNo || 0) / total) * 100 : 0;
             const invalidPct = total > 0 ? (Number(oc?.totalStakeInvalid || 0) / total) * 100 : 0;
-            const yesPrice = oc?.yesPrice ?? 0.5;
-            const noPrice = oc?.noPrice ?? (1 - yesPrice);
-            const displayYesPrice = noPrice;
-            const displayNoPrice = yesPrice;
+            const marketYesShares = Number(oc?.yesReserve ?? 0);
+            const marketNoShares = Number(oc?.noReserve ?? 0);
+            const totalMarketShares = marketYesShares + marketNoShares;
+            const marketYesPct = totalMarketShares > 0 ? (marketYesShares / totalMarketShares) * 100 : 0;
+            const marketNoPct = totalMarketShares > 0 ? (marketNoShares / totalMarketShares) * 100 : 0;
             const vaultUrl = `/explore/vault.html?vault=${encodeURIComponent(m.vault)}&market=${encodeURIComponent(m.market)}`;
             type VaultPhase = "staking" | "ready" | "finalized";
             const vaultPhase: VaultPhase | null = oc
@@ -419,6 +483,12 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
             const totalStakeFormatted = oc?.totalPrincipal
               ? (Number(oc.totalPrincipal) / 10 ** (oc.tokenDecimals ?? 18)).toLocaleString(undefined, { maximumFractionDigits: 2 })
               : "—";
+            const marketVolumeFormatted = oc?.marketVolume
+              ? (Number(oc.marketVolume) / 10 ** (oc.tokenDecimals ?? 18)).toLocaleString(undefined, { maximumFractionDigits: 2 })
+              : "0";
+            const vaultFeeRoi = Number(oc?.totalPrincipal ?? 0) > 0
+              ? (Number(oc?.vaultFeeRevenue ?? 0) / Number(oc?.totalPrincipal ?? 1)) * 100
+              : 0;
             const symbol = oc?.tokenSymbol ?? "";
             const countdownStr = timeLeft > 0
               ? `${Math.floor(timeLeft / 86400)}d ${Math.floor((timeLeft % 86400) / 3600)}h ${Math.floor((timeLeft % 3600) / 60)}m ${timeLeft % 60}s`
@@ -447,39 +517,44 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
                   <span className="text-text font-bold tabular-nums">{countdownStr}</span>
                 </div>
                 <div className="mt-1 text-[10px] font-mono text-text-muted">
-                  <span className="text-text-muted">{t.totalStake}:</span>{" "}
+                  <span className="text-text-muted">{t.ocpTotalStake}:</span>{" "}
                   <span className="text-text font-bold">{totalStakeFormatted} {symbol}</span>
                 </div>
-                {vaultPhase === "finalized" && oc?.outcome !== null ? (
-                  <div className="mt-2 min-h-11 border border-border rounded-md px-3 py-2 flex items-center justify-center gap-2 text-xs font-mono text-text-muted">
+                <div className="mt-1.5">
+                  <div className="h-2 bg-transparent border border-border rounded overflow-hidden flex">
+                    <div className="h-full bg-success" style={{ width: `${yesPct}%` }} />
+                    <div className="h-full bg-danger" style={{ width: `${noPct}%` }} />
+                    <div className="h-full bg-yellow-400" style={{ width: `${invalidPct}%` }} />
+                  </div>
+                  <div className="flex justify-between text-[10px] font-mono text-text-muted mt-0.5">
+                    <span className="text-success">YES {yesPct.toFixed(0)}%</span>
+                    <span className="text-danger">NO {noPct.toFixed(0)}%</span>
+                  </div>
+                </div>
+                <div className="mt-1 flex justify-between text-[10px] font-mono">
+                  <span className="text-text-muted">{t.vaultFeeRoi}</span>
+                  <span className="font-bold text-accent">{vaultFeeRoi.toFixed(2)}%</span>
+                </div>
+                {vaultPhase === "finalized" && oc?.outcome !== null && (
+                  <div className="mt-2 border border-border rounded-md px-3 py-1.5 flex items-center justify-center gap-2 text-[10px] font-mono text-text-muted">
                     <span>{t.finalizedResult}:</span>
                     <strong className={oc.outcome === 1 ? "text-success" : oc.outcome === 2 ? "text-danger" : "text-yellow-500"}>
                       {oc.outcome === 1 ? "YES" : oc.outcome === 2 ? "NO" : "INVALID"}
                     </strong>
                   </div>
-                ) : (
-                  <div className="mt-2">
-                    <div className="h-1.5 bg-transparent border border-border rounded overflow-hidden flex">
-                      <div className="h-full bg-success" style={{ width: `${yesPct}%` }} />
-                      <div className="h-full bg-danger" style={{ width: `${noPct}%` }} />
-                      <div className="h-full bg-yellow-400" style={{ width: `${invalidPct}%` }} />
-                    </div>
-                    <div className="flex justify-between text-[10px] font-mono text-text-muted mt-0.5">
-                      <span className="text-success">YES {yesPct.toFixed(0)}%</span>
-                      <span className="text-danger">NO {noPct.toFixed(0)}%</span>
-                    </div>
-                  </div>
                 )}
                 {marketEnabled && (
                   <div className="mt-2">
-                    <div className="text-[10px] font-mono text-text-muted">{t.marketPrices}</div>
+                    <div className="text-[10px] font-mono text-text-muted">
+                      {t.marketTotalVolume}: <span className="font-bold text-text">{marketVolumeFormatted} {symbol}</span>
+                    </div>
                     <div className="h-2 bg-transparent border border-border rounded overflow-hidden mt-0.5 flex">
-                      <div className="h-full bg-success transition-all" style={{ width: `${displayYesPrice * 100}%` }} />
-                      <div className="h-full bg-danger transition-all" style={{ width: `${displayNoPrice * 100}%` }} />
+                      <div className="h-full bg-success transition-all" style={{ width: `${marketYesPct}%` }} />
+                      <div className="h-full bg-danger transition-all" style={{ width: `${marketNoPct}%` }} />
                     </div>
                     <div className="flex justify-between text-[10px] font-mono text-text-muted mt-0.5">
-                      <span className="text-success">YES {displayYesPrice.toFixed(2)}</span>
-                      <span className="text-danger">NO {displayNoPrice.toFixed(2)}</span>
+                      <span className="text-success">YES {marketYesPct.toFixed(0)}%</span>
+                      <span className="text-danger">NO {marketNoPct.toFixed(0)}%</span>
                     </div>
                   </div>
                 )}

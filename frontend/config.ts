@@ -7,6 +7,7 @@ const env = (import.meta as unknown as { env?: Record<string, string | undefined
 /** Base Mainnet 当前部署的工厂与代币地址 */
 const DEFAULT_FACTORY_ADDRESS = "0xe343be8F1d8572937da49234882e6a1eF4FFEb26";
 const DEFAULT_DEPOSIT_TOKEN_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export const config = {
   /** ocp-api 根地址，如 https://your-api.vercel.app */
@@ -15,6 +16,11 @@ export const config = {
   factoryAddress: env?.VITE_FACTORY_ADDRESS ?? DEFAULT_FACTORY_ADDRESS,
   /** 默认质押代币地址 */
   depositTokenAddress: env?.VITE_DEPOSIT_TOKEN_ADDRESS ?? DEFAULT_DEPOSIT_TOKEN_ADDRESS,
+  /** Vault 与 LMSR 市场由同一个官方 Factory 原子创建并登记 */
+  marketFactoryAddress:
+    env?.VITE_MARKET_FACTORY_ADDRESS
+    ?? env?.VITE_FACTORY_ADDRESS
+    ?? DEFAULT_FACTORY_ADDRESS,
   /** 链 ID: Base Mainnet 8453 */
   chainId: parseInt(env?.VITE_CHAIN_ID ?? "8453", 10),
   /** RPC URL，用于钱包与合约读取 */
@@ -30,6 +36,9 @@ export const VAULT_ABI = [
   "function donate(uint256 amount) external",
   "function finalize() external",
   "function withdraw() external",
+  "function claimMarketFeesFor(address user) external returns (uint256)",
+  "function claimOfficialMarketFees() external returns (uint256)",
+  "function claimSurplus() external returns (uint256)",
   "function protocolVersion() external pure returns (uint256)",
   "function factory() external view returns (address)",
   "function stakeToken() external view returns (address)",
@@ -37,9 +46,21 @@ export const VAULT_ABI = [
   "function minStake() external view returns (uint256)",
   "function totalPrincipal() external view returns (uint256)",
   "function totalDonations() external view returns (uint256)",
+  "function settlementPool() external view returns (uint256)",
+  "function remainingSettlementPool() external view returns (uint256)",
+  "function remainingEligibleClaims() external view returns (uint256)",
   "function totalStakeYes() external view returns (uint256)",
   "function totalStakeNo() external view returns (uint256)",
   "function totalStakeInvalid() external view returns (uint256)",
+  "function market() external view returns (address)",
+  "function settlementReady() external view returns (bool)",
+  "function marketFeesInSettlementPool() external view returns (uint256)",
+  "function totalMarketFeesAccrued() external view returns (uint256)",
+  "function marketFeeUserPoolRemaining() external view returns (uint256)",
+  "function officialMarketFeesClaimable() external view returns (uint256)",
+  "function conditionalMarketFees(address user) external view returns (uint256 yesFees, uint256 noFees, uint256 invalidFees)",
+  "function claimableMarketFees(address user) external view returns (uint256)",
+  "function emptySettlementClaimable() external view returns (uint256)",
   "function stakeOf(address user) external view returns (uint256 yesAmount, uint256 noAmount, uint256 invalidAmount)",
   "function canResolve() external view returns (bool)",
   "function resolved() external view returns (bool)",
@@ -53,6 +74,10 @@ export const FACTORY_ABI = [
   "function officialStakeToken() external view returns (address)",
   "function pendingOwner() external view returns (address)",
   "function isVault(address vault) external view returns (bool)",
+  "function isMarket(address market) external view returns (bool)",
+  "function marketByVault(address vault) external view returns (address)",
+  "function vaultByMarket(address market) external view returns (address)",
+  "function officialLiquidityPool() external view returns (address)",
   "function getMarkets() external view returns (address[])",
   "function getMarketMeta(address market) external view returns (string title, string description)",
   "function getVaults() external view returns (address[])",
@@ -84,20 +109,37 @@ export const MARKET_ABI = [
   "function vault() external view returns (address)",
   "function collateral() external view returns (address)",
   "function feeBps() external view returns (uint256)",
+  "function vaultFeeBps() external view returns (uint256)",
+  "function protocolLpFeeBps() external view returns (uint256)",
+  "function feeEscrow() external view returns (uint256)",
+  "function pendingVaultFees() external view returns (uint256)",
+  "function pendingProtocolLpFees() external view returns (uint256)",
+  "function totalVaultFeesPaid() external view returns (uint256)",
+  "function totalTradingVolume() external view returns (uint256)",
+  "function liquidityParameter() external view returns (uint256)",
+  "function requiredSubsidy() external view returns (uint256)",
+  "function activated() external view returns (bool)",
   "function resolutionTime() external view returns (uint256)",
   "function resolved() external view returns (bool)",
   "function outcome() external view returns (uint8)",
-  "function yesReserve() external view returns (uint256)",
-  "function noReserve() external view returns (uint256)",
   "function getYesNoPrice() external view returns (uint256 yesPrice, uint256 noPrice)",
   "function yesShares(address) external view returns (uint256)",
   "function noShares(address) external view returns (uint256)",
   "function totalYesShares() external view returns (uint256)",
   "function totalNoShares() external view returns (uint256)",
-  "function buyYes(uint256 amountIn, uint256 minOut) external returns (uint256 amountOut)",
-  "function buyNo(uint256 amountIn, uint256 minOut) external returns (uint256 amountOut)",
-  "function sellYes(uint256 amountIn, uint256 minOut) external returns (uint256 amountOut)",
-  "function sellNo(uint256 amountIn, uint256 minOut) external returns (uint256 amountOut)",
+  "function quoteBuy(bool isYes, uint256 sharesOut) external view returns (uint256 totalCost, uint256 fee)",
+  "function quoteSell(bool isYes, uint256 sharesIn) external view returns (uint256 netPayout, uint256 fee)",
+  "function buyYes(uint256 sharesOut, uint256 maxTotalCost, uint256 deadline) external returns (uint256 totalCost)",
+  "function buyNo(uint256 sharesOut, uint256 maxTotalCost, uint256 deadline) external returns (uint256 totalCost)",
+  "function sellYes(uint256 sharesIn, uint256 minPayout, uint256 deadline) external returns (uint256 netPayout)",
+  "function sellNo(uint256 sharesIn, uint256 minPayout, uint256 deadline) external returns (uint256 netPayout)",
   "function resolve() external",
-  "function redeem(uint256 yesAmount, uint256 noAmount) external returns (uint256 payout)",
+  "function redeem() external returns (uint256 payout)",
+  "function claimProtocolLpFees() external returns (uint256 amount)",
+  "event FeeAccrued(address indexed trader, uint256 grossCashFlow, uint256 totalFee, uint256 vaultFee, uint256 protocolLpFee)",
+] as const;
+
+export const MARKET_FACTORY_ABI = [
+  "function isMarket(address market) external view returns (bool)",
+  "function marketByVault(address vault) external view returns (address)",
 ] as const;

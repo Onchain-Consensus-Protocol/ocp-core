@@ -34,7 +34,7 @@ contract DeployScript is Script {
         address deployer = vm.addr(deployerPrivateKey);
         token.mint(deployer, 1_000_000 * 1e18);
 
-        OCPVaultFactory factory = new OCPVaultFactory(address(token));
+        OCPVaultFactory factory = new OCPVaultFactory(address(token), deployer);
 
         vm.stopBroadcast();
 

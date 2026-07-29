@@ -13,15 +13,18 @@ contract DeployVaultFactoryScript is Script {
     function run() external returns (OCPVaultFactory factory) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address stakeToken = vm.envAddress("STAKE_TOKEN");
+        address officialLiquidityPool = vm.envAddress("OFFICIAL_LIQUIDITY_POOL");
         require(deployerPrivateKey != 0, "Invalid PRIVATE_KEY");
         require(stakeToken != address(0), "Invalid STAKE_TOKEN");
+        require(officialLiquidityPool != address(0), "Invalid OFFICIAL_LIQUIDITY_POOL");
         require(stakeToken.code.length > 0, "STAKE_TOKEN has no code");
         if (block.chainid == 8453) require(stakeToken == BASE_USDC, "Base requires native USDC");
         vm.startBroadcast(deployerPrivateKey);
-        factory = new OCPVaultFactory(stakeToken);
+        factory = new OCPVaultFactory(stakeToken, officialLiquidityPool);
         vm.stopBroadcast();
         console.log("OCPVaultFactory:", address(factory));
         console.log("Official stake token:", stakeToken);
+        console.log("Official liquidity pool:", officialLiquidityPool);
         console.log("Vaults created: 0");
     }
 }
