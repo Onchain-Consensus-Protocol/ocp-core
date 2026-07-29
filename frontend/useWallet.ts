@@ -11,7 +11,7 @@ const BASE_MAINNET_PARAMS = {
   chainId: "0x2105", // 8453
   chainName: "Base",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: ["https://mainnet.base.org"],
+  rpcUrls: [config.rpcUrl],
   blockExplorerUrls: ["https://basescan.org"],
 };
 
