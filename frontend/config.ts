@@ -4,8 +4,8 @@
  */
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
 
-/** Base Mainnet 当前部署的工厂与代币地址 */
-const DEFAULT_FACTORY_ADDRESS = "0xe343be8F1d8572937da49234882e6a1eF4FFEb26";
+/** Base Mainnet 当前唯一支持的 V5 Factory 与原生 USDC */
+const DEFAULT_FACTORY_ADDRESS = "0x97B33092848a38Bb1abCAD3FEf0c72e2e3B8bBf0";
 const DEFAULT_DEPOSIT_TOKEN_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -24,11 +24,11 @@ export const config = {
   /** 链 ID: Base Mainnet 8453 */
   chainId: parseInt(env?.VITE_CHAIN_ID ?? "8453", 10),
   /** RPC URL，用于钱包与合约读取 */
-  rpcUrl: env?.VITE_RPC_URL ?? "https://base.publicnode.com",
+  rpcUrl: env?.VITE_RPC_URL ?? "https://base-rpc.publicnode.com",
   /** 区块浏览器 */
   explorer: env?.VITE_EXPLORER ?? "https://basescan.org",
-  /** 预测市场功能开关（默认关闭，可用 VITE_MARKET_ENABLED=true 开启） */
-  marketEnabled: env?.VITE_MARKET_ENABLED === "true",
+  /** V5 Factory 原子创建 Vault + LMSR Market；仅可显式设为 false 关闭 */
+  marketEnabled: env?.VITE_MARKET_ENABLED !== "false",
 };
 
 export const VAULT_ABI = [
@@ -41,6 +41,7 @@ export const VAULT_ABI = [
   "function claimSurplus() external returns (uint256)",
   "function protocolVersion() external pure returns (uint256)",
   "function factory() external view returns (address)",
+  "function emptySettlementRecipient() external view returns (address)",
   "function stakeToken() external view returns (address)",
   "function resolutionTime() external view returns (uint256)",
   "function minStake() external view returns (uint256)",
@@ -78,6 +79,8 @@ export const FACTORY_ABI = [
   "function marketByVault(address vault) external view returns (address)",
   "function vaultByMarket(address market) external view returns (address)",
   "function officialLiquidityPool() external view returns (address)",
+  "function vaultDeployer() external view returns (address)",
+  "function marketDeployer() external view returns (address)",
   "function getMarkets() external view returns (address[])",
   "function getMarketMeta(address market) external view returns (string title, string description)",
   "function getVaults() external view returns (address[])",
@@ -93,6 +96,7 @@ export const FACTORY_ABI = [
 
 export const ERC20_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) external view returns (uint256)",
   "function balanceOf(address account) external view returns (uint256)",
   "function decimals() external view returns (uint8)",
   "function symbol() external view returns (string)",
@@ -108,6 +112,12 @@ export const ERC20_MINT_ABI = [
 export const MARKET_ABI = [
   "function vault() external view returns (address)",
   "function collateral() external view returns (address)",
+  "function factory() external view returns (address)",
+  "function officialLiquidityPool() external view returns (address)",
+  "function subsidyProvider() external view returns (address)",
+  "function subsidy() external view returns (uint256)",
+  "function conditionType() external view returns (uint8)",
+  "function conditionParams() external view returns (bytes)",
   "function feeBps() external view returns (uint256)",
   "function vaultFeeBps() external view returns (uint256)",
   "function protocolLpFeeBps() external view returns (uint256)",
@@ -137,9 +147,12 @@ export const MARKET_ABI = [
   "function redeem() external returns (uint256 payout)",
   "function claimProtocolLpFees() external returns (uint256 amount)",
   "event FeeAccrued(address indexed trader, uint256 grossCashFlow, uint256 totalFee, uint256 vaultFee, uint256 protocolLpFee)",
+  "event MarketActivated(address indexed subsidyProvider, uint256 subsidy, uint256 liquidityParameter)",
 ] as const;
 
 export const MARKET_FACTORY_ABI = [
+  "function isVault(address vault) external view returns (bool)",
   "function isMarket(address market) external view returns (bool)",
   "function marketByVault(address vault) external view returns (address)",
+  "function vaultByMarket(address market) external view returns (address)",
 ] as const;

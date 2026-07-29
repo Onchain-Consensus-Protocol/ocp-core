@@ -6,7 +6,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import ReactDOM from "react-dom/client";
 import "../index.css";
 import { OCPMenu } from "../components/OCPMenu";
-import { Contract, JsonRpcProvider, formatUnits, parseUnits, type JsonRpcSigner } from "ethers";
+import {
+  Contract,
+  JsonRpcProvider,
+  formatUnits,
+  parseUnits,
+  type ContractRunner,
+  type JsonRpcSigner,
+} from "ethers";
 import {
   ShieldAlert, Zap, ArrowLeftRight, LayoutDashboard, AlertTriangle,
   ArrowRight, Share2,
@@ -28,6 +35,64 @@ import { useWallet } from "../useWallet";
 
 type TabMode = "PROTOCOL" | "MARKET";
 type TradeMode = "BUY" | "SELL";
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
+
+function sameAddress(left: string, right: string) {
+  return /^0x[0-9a-f]{40}$/i.test(left)
+    && /^0x[0-9a-f]{40}$/i.test(right)
+    && left.toLowerCase() === right.toLowerCase();
+}
+
+async function assertCanonicalPair(
+  runner: ContractRunner,
+  vaultAddress: string,
+  marketAddress: string,
+) {
+  if (
+    !config.marketEnabled
+    || sameAddress(marketAddress, ZERO_ADDR)
+    || sameAddress(config.factoryAddress, ZERO_ADDR)
+    || !sameAddress(config.factoryAddress, config.marketFactoryAddress)
+  ) {
+    throw new Error("The official OCP Vault + Market deployment is not enabled.");
+  }
+
+  const registry = new Contract(config.factoryAddress, MARKET_FACTORY_ABI, runner);
+  const vault = new Contract(vaultAddress, VAULT_ABI, runner);
+  const market = new Contract(marketAddress, MARKET_ABI, runner);
+  const [
+    registeredVault,
+    registeredMarket,
+    canonicalMarket,
+    canonicalVault,
+    vaultFactory,
+    boundMarket,
+    marketFactory,
+    boundVault,
+  ] = await Promise.all([
+    registry.isVault(vaultAddress) as Promise<boolean>,
+    registry.isMarket(marketAddress) as Promise<boolean>,
+    registry.marketByVault(vaultAddress) as Promise<string>,
+    registry.vaultByMarket(marketAddress) as Promise<string>,
+    vault.factory() as Promise<string>,
+    vault.market() as Promise<string>,
+    market.factory() as Promise<string>,
+    market.vault() as Promise<string>,
+  ]);
+  if (
+    !registeredVault
+    || !registeredMarket
+    || !sameAddress(canonicalMarket, marketAddress)
+    || !sameAddress(canonicalVault, vaultAddress)
+    || !sameAddress(vaultFactory, config.factoryAddress)
+    || !sameAddress(boundMarket, marketAddress)
+    || !sameAddress(marketFactory, config.factoryAddress)
+    || !sameAddress(boundVault, vaultAddress)
+  ) {
+    throw new Error("This Vault + Market pair is not registered by the current official Factory.");
+  }
+  return { vault, market };
+}
 
 interface MarketQuotePreview {
   fee: bigint;
@@ -273,32 +338,8 @@ function VaultPage({
         setDetailError("The Vault RPC is not configured. Set VITE_RPC_URL and reload the page.");
         return;
       }
-      const vault = new Contract(vaultAddr, VAULT_ABI, provider);
-      const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
-      const hasMarket = marketEnabled && marketAddr?.toLowerCase() !== ZERO_ADDR.toLowerCase();
-      const market = hasMarket ? new Contract(marketAddr, MARKET_ABI, provider) : null;
-      if (hasMarket && market) {
-        if (config.marketFactoryAddress.toLowerCase() === ZERO_ADDR.toLowerCase()) {
-          throw new Error("The official prediction market factory is not configured.");
-        }
-        const registry = new Contract(
-          config.marketFactoryAddress,
-          MARKET_FACTORY_ABI,
-          provider,
-        );
-        const [registered, canonicalMarket, boundVault] = await Promise.all([
-          registry.isMarket(marketAddr) as Promise<boolean>,
-          registry.marketByVault(vaultAddr) as Promise<string>,
-          market.vault() as Promise<string>,
-        ]);
-        if (
-          !registered
-          || canonicalMarket.toLowerCase() !== marketAddr.toLowerCase()
-          || boundVault.toLowerCase() !== vaultAddr.toLowerCase()
-        ) {
-          throw new Error("This prediction market is not registered to this Vault by the official factory.");
-        }
-      }
+      const { vault, market } = await assertCanonicalPair(provider, vaultAddr, marketAddr);
+      const hasMarket = true;
       let userAddr: string | null = walletAddress?.trim() || null;
       if (!userAddr && signer) {
         try {
@@ -514,10 +555,11 @@ function VaultPage({
       });
 
       try {
-        // Vault 自己记录创建它的 Factory。切换到 V2 Factory 后，旧 Vault 页面仍应从
-        // 原 Factory 读取题面，不能错误地只查询当前全局配置中的新 Factory。
-        const vaultFactoryAddress = await vault.factory();
-        const factory = new Contract(vaultFactoryAddress, ["function getVaultMeta(address) view returns (string, string)" as const], provider);
+        const factory = new Contract(
+          config.factoryAddress,
+          ["function getVaultMeta(address) view returns (string, string)" as const],
+          provider,
+        );
         const [t0, d0] = await factory.getVaultMeta(vaultAddr);
         if (t0) setTitle(String(t0));
         setDescription(d0 ? String(d0) : "");
@@ -717,7 +759,7 @@ function VaultPage({
     try {
       const amountWei = parseUnits(amount.trim(), detailState.tokenDecimals ?? 18);
       if (amountWei <= 0n) throw new Error("Amount must be greater than zero");
-      const vault = new Contract(vaultAddr, VAULT_ABI, signer);
+      const { vault } = await assertCanonicalPair(signer, vaultAddr, marketAddr);
       const tokenAddr = await vault.stakeToken();
       const token = new Contract(tokenAddr, ERC20_ABI, signer);
       const sideId = (side === "YES" ? 0 : side === "NO" ? 1 : 2) as 0 | 1 | 2;
@@ -743,24 +785,7 @@ function VaultPage({
     try {
       const amountWei = parseUnits(amount.trim(), detailState.tokenDecimals ?? 18);
       if (amountWei <= 0n) throw new Error("Amount must be greater than zero");
-      const market = new Contract(marketAddr, MARKET_ABI, signer);
-      const registry = new Contract(
-        config.marketFactoryAddress,
-        MARKET_FACTORY_ABI,
-        signer,
-      );
-      const [registered, canonicalMarket, boundVault] = await Promise.all([
-        registry.isMarket(marketAddr) as Promise<boolean>,
-        registry.marketByVault(vaultAddr) as Promise<string>,
-        market.vault() as Promise<string>,
-      ]);
-      if (
-        !registered
-        || canonicalMarket.toLowerCase() !== marketAddr.toLowerCase()
-        || boundVault.toLowerCase() !== vaultAddr.toLowerCase()
-      ) {
-        throw new Error("This prediction market is not registered to this Vault by the official factory.");
-      }
+      const { market } = await assertCanonicalPair(signer, vaultAddr, marketAddr);
       const txDeadline = BigInt(Math.floor(Date.now() / 1000) + 10 * 60);
       const isYes = side === "YES";
       if (tradeMode === "BUY") {
@@ -791,7 +816,7 @@ function VaultPage({
     setTxLoading(true);
     setError(null);
     try {
-      const vault = new Contract(vaultAddr, VAULT_ABI, signer);
+      const { vault } = await assertCanonicalPair(signer, vaultAddr, marketAddr);
       await (await vault.withdraw()).wait();
       await fetchDetailState();
     } catch (e) {
@@ -806,8 +831,8 @@ function VaultPage({
     setTxLoading(true);
     setError(null);
     try {
-      const vault = new Contract(vaultAddr, VAULT_ABI, signer);
-      await (await vault.finalize()).wait();
+      const { market } = await assertCanonicalPair(signer, vaultAddr, marketAddr);
+      await (await market.resolve()).wait();
       await fetchDetailState();
     } catch (e) {
       setError(friendlyActionError(e, lang));
@@ -825,24 +850,7 @@ function VaultPage({
     setTxLoading(true);
     setError(null);
     try {
-      const market = new Contract(marketAddr, MARKET_ABI, signer);
-      const registry = new Contract(
-        config.marketFactoryAddress,
-        MARKET_FACTORY_ABI,
-        signer,
-      );
-      const [registered, canonicalMarket, boundVault] = await Promise.all([
-        registry.isMarket(marketAddr) as Promise<boolean>,
-        registry.marketByVault(vaultAddr) as Promise<string>,
-        market.vault() as Promise<string>,
-      ]);
-      if (
-        !registered
-        || canonicalMarket.toLowerCase() !== marketAddr.toLowerCase()
-        || boundVault.toLowerCase() !== vaultAddr.toLowerCase()
-      ) {
-        throw new Error("This prediction market is not registered to this Vault by the official factory.");
-      }
+      const { market } = await assertCanonicalPair(signer, vaultAddr, marketAddr);
       const resolved = await market.resolved();
       if (!resolved) {
         await (await market.resolve()).wait();
@@ -1362,8 +1370,8 @@ function VaultPage({
                   {lang === "zh" ? "LMSR 未结算份额" : "Outstanding LMSR shares"}
                 </div>
                 <div className="text-xs font-mono text-text-muted space-y-1">
-                  <div>YES: <span className="text-text font-bold">{detailState ? `${detailState.yesReserve} ${detailState.tokenSymbol}` : "—"}</span></div>
-                  <div>NO: <span className="text-text font-bold">{detailState ? `${detailState.noReserve} ${detailState.tokenSymbol}` : "—"}</span></div>
+                  <div>YES: <span className="text-text font-bold">{detailState ? `${detailState.yesReserve} ${lang === "zh" ? "份" : "shares"}` : "—"}</span></div>
+                  <div>NO: <span className="text-text font-bold">{detailState ? `${detailState.noReserve} ${lang === "zh" ? "份" : "shares"}` : "—"}</span></div>
                 </div>
               </div>
             </div>

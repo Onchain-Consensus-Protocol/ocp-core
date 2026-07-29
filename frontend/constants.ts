@@ -186,6 +186,8 @@ export const CONTENT = {
       ai_response_unsafe: "I cannot fulfill this request. The OnChain Consensus Protocol (OCP) has determined via economic consensus that this information is unsafe to propagate.",
       ai_response_safe: "Table salt, or Sodium Chloride (NaCl), is an ionic compound...",
       ai_response_safe_risky: "Consensus Approved. Here is the technical breakdown for the requested compound... [SIMULATED OUTPUT]",
+      ai_stake_yes_safe: "Stake YES (Safe)",
+      ai_stake_no_unsafe: "Stake NO (Unsafe)",
 
       bridge_demo_title: "Bridge + Fact Verification Layer (OCP)",
       bridge_demo_subtitle: "OCP provides the fact layer only; the bridge (liquidity, release) can be built by partners. This demo shows how the two layers interact.",
