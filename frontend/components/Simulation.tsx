@@ -453,10 +453,10 @@ export const Simulation: React.FC<Props> = ({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl leading-7 font-bold text-text tracking-tight font-display">
-              {zh ? "OCP 会成为巨头吗？" : "Will OCP become a major player in crypto?"}
+              {zh ? "OCP 会成为币圈的重要玩家吗？" : "Will OCP become a major player in crypto?"}
             </h2>
             <p className="mt-2 text-xs leading-5 text-text-muted font-mono">
-              {zh ? "YES：会成为巨头 · NO：不会成为巨头 · INVALID：条件无法有效判断" : "YES: becomes a major player · NO: does not become a major player · INVALID: cannot be resolved"}
+              {zh ? "YES：会成为重要玩家 · NO：不会成为重要玩家 · INVALID：条件无法有效判断" : "YES: becomes a major player · NO: does not become a major player · INVALID: cannot be resolved"}
             </p>
           </div>
           <span className={`inline-flex shrink-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border font-mono ${phaseBadgeClass}`}>
@@ -713,11 +713,11 @@ export const Simulation: React.FC<Props> = ({
         <div className="hidden md:flex justify-between items-start mb-6 animate-fade-in border-b border-border pb-4">
           <div className="min-w-0 pr-8">
             <h2 className="text-2xl font-bold text-text mb-3 tracking-wide font-display text-glow break-words leading-tight">
-              {zh ? "OCP 会成为巨头吗？" : "Will OCP become a major player in crypto?"}
+              {zh ? "OCP 会成为币圈的重要玩家吗？" : "Will OCP become a major player in crypto?"}
             </h2>
             <div className="mb-3 px-3 py-2 rounded-lg bg-accent/5 border border-accent/20">
               <p className="text-sm leading-6 text-text font-mono">
-                {zh ? "YES：会成为巨头。NO：不会成为巨头。INVALID：条件无法有效判断。" : "YES: becomes a major player. NO: does not become a major player. INVALID: the premise cannot be resolved."}
+                {zh ? "YES：会成为重要玩家。NO：不会成为重要玩家。INVALID：条件无法有效判断。" : "YES: becomes a major player. NO: does not become a major player. INVALID: the premise cannot be resolved."}
               </p>
             </div>
             <span className={`px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded border font-mono ${phaseBadgeClass}`}>
