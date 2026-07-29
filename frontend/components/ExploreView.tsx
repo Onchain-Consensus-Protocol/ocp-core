@@ -489,10 +489,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-bold text-text truncate">{m.meta?.title ?? "—"}</div>
-                    <div className="text-xs text-text-muted font-mono mt-0.5 line-clamp-2">
-                      {m.meta?.description || "—"}
-                    </div>
+                    <div className="font-bold text-text line-clamp-2">{m.meta?.title ?? "—"}</div>
                   </div>
                   {phaseLabel && (
                     <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded border font-mono shrink-0 border-accent/50 text-accent bg-accent/10">
