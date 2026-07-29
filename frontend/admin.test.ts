@@ -5,6 +5,8 @@ import {
   blockscoutTransactionMatchesIntent,
   canRetryPendingWithSameNonce,
   findTransactionBySenderNonce,
+  walletErrorDiagnostic,
+  withWalletTimeout,
   type BlockscoutTransaction,
   type PendingIntent,
 } from "./admin";
@@ -121,5 +123,37 @@ describe("Blockscout sender + nonce lookup", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 })));
 
     await expect(findTransactionBySenderNonce(OWNER, 29)).rejects.toThrow("HTTP 503");
+  });
+});
+
+describe("wallet request safety", () => {
+  it("keeps only allowlisted diagnostic fields", () => {
+    const diagnostic = walletErrorDiagnostic({
+      code: -32000,
+      message: "wallet broadcast failed",
+      data: "0xprivate-signed-transaction",
+      info: { error: { code: -32603, message: "rpc unavailable", data: "secret" } },
+    });
+
+    expect(diagnostic).toContain("code=-32000");
+    expect(diagnostic).toContain("message=wallet broadcast failed");
+    expect(diagnostic).toContain("rpc.code=-32603");
+    expect(diagnostic).toContain("rpc.message=rpc unavailable");
+    expect(diagnostic).not.toContain("private-signed-transaction");
+    expect(diagnostic).not.toContain("secret");
+  });
+
+  it("releases a hanging wallet request after the configured timeout", async () => {
+    const neverReturns = new Promise<string>(() => {});
+
+    await expect(withWalletTimeout(neverReturns, 5)).rejects.toThrow(
+      "钱包在 1 秒内没有返回交易哈希或错误",
+    );
+  });
+
+  it("does not echo an unstructured error that may contain signed transaction data", () => {
+    expect(walletErrorDiagnostic("0xprivate-signed-transaction")).toBe(
+      "钱包请求失败（钱包未提供可安全显示的错误字段）",
+    );
   });
 });
