@@ -234,6 +234,20 @@ export async function withWalletTimeout<T>(promise: Promise<T>, timeoutMs: numbe
   }
 }
 
+async function withRpcTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}超过 ${Math.round(timeoutMs / 1_000)} 秒，已停止等待`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function readSourceVerification(address: string): Promise<boolean | null> {
   try {
     const response = await fetch(`${BLOCKSCOUT_API}/smart-contracts/${address}`);
@@ -362,8 +376,14 @@ function loadPendingIntent(): PendingIntent | null {
 
 function AdminPage() {
   const wallet = useWallet();
-  const provider = useMemo(() => new JsonRpcProvider(ADMIN_RPC_URL), []);
-  const recoveryProvider = useMemo(() => new JsonRpcProvider(RECOVERY_RPC_URL), []);
+  const provider = useMemo(
+    () => new JsonRpcProvider(ADMIN_RPC_URL, undefined, { batchMaxCount: 1 }),
+    [],
+  );
+  const recoveryProvider = useMemo(
+    () => new JsonRpcProvider(RECOVERY_RPC_URL, undefined, { batchMaxCount: 1 }),
+    [],
+  );
   const factoryInterface = useMemo(() => new Interface(FACTORY_ABI), []);
   const marketInterface = useMemo(() => new Interface(MARKET_ABI), []);
   const [form, setForm] = useState<FormState>(initialForm);
@@ -936,7 +956,11 @@ function AdminPage() {
                 stage: "pending",
                 txHash: replacementTransaction.hash,
               };
-              const verified = await verifyReceipt(replacementReceipt, recoveredIntent);
+              const verified = await withRpcTimeout(
+                verifyReceipt(replacementReceipt, recoveredIntent),
+                30_000,
+                "Vault 与 Market 链上核验",
+              );
               setResult({
                 ...verified,
                 recoveryNote:
@@ -1034,7 +1058,11 @@ function AdminPage() {
         setRecoveryMessage(`交易已回滚并获得 ${confirmations} 个确认；链上没有创建 Vault，可以安全清除失败记录。`);
         return;
       }
-      const verified = await verifyReceipt(receipt, intent);
+      const verified = await withRpcTimeout(
+        verifyReceipt(receipt, intent),
+        30_000,
+        "Vault 与 Market 链上核验",
+      );
       setResult(verified);
       setError("");
       setRecoveryMessage("");
