@@ -19,6 +19,7 @@ import {
   getAddress,
   keccak256,
   parseUnits,
+  zeroPadValue,
   type ContractRunner,
   type ContractTransactionResponse,
   type JsonRpcSigner,
@@ -264,6 +265,45 @@ export async function findTransactionBySenderNonce(from: string, nonce: number):
   throw new Error("Blockscout 分页超过安全上限，无法证明该 nonce 的链上状态");
 }
 
+async function findFactoryCreateBySenderNonce(
+  rpcProvider: JsonRpcProvider,
+  factoryInterface: Interface,
+  from: string,
+  nonce: number,
+  fromBlock: number,
+): Promise<BlockscoutTransaction | null> {
+  const marketCreated = factoryInterface.getEvent("MarketCreated");
+  if (!marketCreated) throw new Error("Factory ABI 缺少 MarketCreated 事件");
+  const logs = await rpcProvider.getLogs({
+    address: ADMIN_FACTORY,
+    fromBlock,
+    toBlock: "latest",
+    topics: [marketCreated.topicHash, null, null, zeroPadValue(getAddress(from), 32)],
+  });
+  if (logs.length > 50) throw new Error("Factory 创建事件数量超过恢复安全上限");
+  for (const log of logs) {
+    const transaction = await rpcProvider.getTransaction(log.transactionHash);
+    if (
+      transaction
+      && sameAddress(transaction.from, from)
+      && transaction.nonce === nonce
+      && transaction.to
+      && sameAddress(transaction.to, ADMIN_FACTORY)
+    ) {
+      return {
+        hash: transaction.hash,
+        nonce: transaction.nonce,
+        raw_input: transaction.data,
+        value: transaction.value.toString(),
+        block_number: transaction.blockNumber,
+        from: { hash: transaction.from },
+        to: { hash: transaction.to },
+      };
+    }
+  }
+  return null;
+}
+
 export function blockscoutTransactionMatchesIntent(transaction: BlockscoutTransaction, intent: PendingIntent) {
   return sameAddress(transaction.from?.hash ?? "", intent.from)
     && sameAddress(transaction.to?.hash ?? "", ADMIN_FACTORY)
@@ -340,6 +380,7 @@ function AdminPage() {
   const [recoveryMessage, setRecoveryMessage] = useState("");
   const [pendingCanClear, setPendingCanClear] = useState(false);
   const [pendingCanRetry, setPendingCanRetry] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const submitLock = useRef(false);
   const recoveryLock = useRef(false);
 
@@ -755,6 +796,7 @@ function AdminPage() {
   const recoverPending = useCallback(async (intent: PendingIntent) => {
     if (recoveryLock.current) return;
     recoveryLock.current = true;
+    setRecovering(true);
     setPendingCanClear(false);
     setPendingCanRetry(false);
     setRecoveryMessage("正在按 sender + nonce 核对链上交易与事件…");
@@ -784,7 +826,26 @@ function AdminPage() {
             return;
           }
         }
-        const indexedTransaction = await findTransactionBySenderNonce(intent.from, intent.nonce);
+        let indexedTransaction =
+          await findFactoryCreateBySenderNonce(
+            provider,
+            factoryInterface,
+            intent.from,
+            intent.nonce,
+            intent.intentBlock,
+          ).catch(() => null);
+        if (!indexedTransaction) {
+          indexedTransaction = await findFactoryCreateBySenderNonce(
+            recoveryProvider,
+            factoryInterface,
+            intent.from,
+            intent.nonce,
+            intent.intentBlock,
+          ).catch(() => null);
+        }
+        if (!indexedTransaction) {
+          indexedTransaction = await findTransactionBySenderNonce(intent.from, intent.nonce);
+        }
         if (indexedTransaction) {
           if (!blockscoutTransactionMatchesIntent(indexedTransaction, intent)) {
             const replacementReceipt =
@@ -983,6 +1044,7 @@ function AdminPage() {
       setRecoveryMessage(`恢复/核验失败：${friendlyError(e)} 页面保持锁定且不会自动重发。`);
     } finally {
       recoveryLock.current = false;
+      setRecovering(false);
     }
   }, [factoryInterface, provider, recoveryProvider, savePending, verifyReceipt]);
 
@@ -1252,7 +1314,10 @@ function AdminPage() {
             </section>
           ) : pending ? (
             <section className="rounded-2xl border border-yellow-500/40 bg-yellow-50 p-6">
-              <div className="flex gap-3"><Loader2 className="w-5 h-5 animate-spin text-yellow-700 shrink-0" />
+              <div className="flex gap-3">
+                {recovering
+                  ? <Loader2 className="w-5 h-5 animate-spin text-yellow-700 shrink-0" />
+                  : <RefreshCw className="w-5 h-5 text-yellow-700 shrink-0" />}
                 <div>
                   <h2 className="font-bold">存在未完成的创建意图，禁止再次发送</h2>
                   <p className="text-sm text-text-muted mt-2">状态：{pending.stage} · nonce {pending.nonce}</p>
