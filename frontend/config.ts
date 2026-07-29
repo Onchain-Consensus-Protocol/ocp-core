@@ -24,7 +24,7 @@ export const config = {
   /** 链 ID: Base Mainnet 8453 */
   chainId: parseInt(env?.VITE_CHAIN_ID ?? "8453", 10),
   /** RPC URL，用于钱包与合约读取 */
-  rpcUrl: env?.VITE_RPC_URL ?? "https://base.gateway.tenderly.co",
+  rpcUrl: env?.VITE_RPC_URL ?? "https://base-rpc.publicnode.com",
   /** 区块浏览器 */
   explorer: env?.VITE_EXPLORER ?? "https://basescan.org",
   /** V5 Factory 原子创建 Vault + LMSR Market；仅可显式设为 false 关闭 */
