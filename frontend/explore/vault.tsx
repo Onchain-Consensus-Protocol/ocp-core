@@ -922,7 +922,7 @@ function VaultPage({
             <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">
               {lang === "zh" ? "阶段剩余时间" : "Phase time left"}
             </div>
-            <div className="text-lg leading-none font-bold text-text tabular-nums font-display tracking-tight">
+            <div className="w-[15ch] shrink-0 whitespace-nowrap text-right text-lg leading-none font-bold text-text tabular-nums font-display tracking-tight">
               {timeLeft > 0 ? `${Math.floor(timeLeft / 3600)}h ${(Math.floor(timeLeft / 60) % 60)}m ${timeLeft % 60}s` : "—"}
             </div>
           </div>
@@ -1326,8 +1326,8 @@ function VaultPage({
               </span>
             )}
           </div>
-          <div className="text-right shrink-0">
-            <div className="text-4xl font-bold text-text tabular-nums font-display tracking-widest text-glow">
+          <div className="w-[16rem] shrink-0 text-right">
+            <div className="whitespace-nowrap text-4xl font-bold text-text tabular-nums font-display tracking-widest text-glow">
               {timeLeft > 0 ? `${Math.floor(timeLeft / 3600)}h ${(Math.floor(timeLeft / 60) % 60)}m ${timeLeft % 60}s` : "—"}
             </div>
             <Button

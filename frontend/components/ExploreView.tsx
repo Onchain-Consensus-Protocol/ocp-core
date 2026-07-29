@@ -498,8 +498,10 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
                   )}
                 </div>
                 <div className="mt-2 text-[10px] font-mono text-text-muted">
-                  <span className="text-text-muted">{t.countdown}:</span>{" "}
-                  <span className="text-text font-bold tabular-nums">{countdownStr}</span>
+                  <span className="inline-block w-20 whitespace-nowrap text-text-muted">{t.countdown}:</span>
+                  <span className="inline-block w-[15ch] whitespace-nowrap text-right text-text font-bold tabular-nums">
+                    {countdownStr}
+                  </span>
                 </div>
                 <div className="mt-1 text-[10px] font-mono text-text-muted">
                   <span className="text-text-muted">{t.ocpTotalStake}:</span>{" "}
