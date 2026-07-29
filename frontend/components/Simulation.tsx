@@ -710,22 +710,22 @@ export const Simulation: React.FC<Props> = ({
       </div>
 
       <div className="px-4 py-5 sm:p-6 md:w-2/3 bg-slate-50/40 md:bg-transparent relative flex flex-col font-mono md:rounded-r-2xl">
-        <div className="hidden md:flex justify-between items-start mb-6 animate-fade-in border-b border-border pb-4">
-          <div className="min-w-0 pr-8">
-            <h2 className="text-2xl font-bold text-text mb-3 tracking-wide font-display text-glow break-words leading-tight">
-              {zh ? "OCP 会成为币圈的重要玩家吗？" : "Will OCP become a major player in crypto?"}
-            </h2>
-            <div className="mb-3 px-3 py-2 rounded-lg bg-accent/5 border border-accent/20">
-              <p className="text-sm leading-6 text-text font-mono">
-                {zh ? "YES：会成为重要玩家。NO：不会成为重要玩家。INVALID：条件无法有效判断。" : "YES: becomes a major player. NO: does not become a major player. INVALID: the premise cannot be resolved."}
-              </p>
-            </div>
-            <span className={`px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded border font-mono ${phaseBadgeClass}`}>
-              {phaseLabel}
-            </span>
+        <div className="hidden md:block mb-6 animate-fade-in border-b border-border pb-4">
+          <h2 className="text-2xl font-bold text-text mb-3 tracking-wide font-display text-glow break-words leading-tight">
+            {zh ? "OCP 会成为币圈的重要玩家吗？" : "Will OCP become a major player in crypto?"}
+          </h2>
+          <div className="mb-3 px-3 py-2 rounded-lg bg-accent/5 border border-accent/20">
+            <p className="text-sm leading-6 text-text font-mono">
+              {zh ? "YES：会成为重要玩家。NO：不会成为重要玩家。INVALID：条件无法有效判断。" : "YES: becomes a major player. NO: does not become a major player. INVALID: the premise cannot be resolved."}
+            </p>
           </div>
-          <div className="w-[16rem] shrink-0 text-right">
-            <div className="whitespace-nowrap text-4xl font-bold text-text tabular-nums font-display tracking-widest text-glow">
+          <div className="flex items-start justify-between gap-4">
+            <div className="pt-1.5">
+              <span className={`px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded border font-mono ${phaseBadgeClass}`}>
+                {phaseLabel}
+              </span>
+            </div>
+            <div className="w-[15ch] shrink-0 whitespace-nowrap text-right text-3xl font-bold text-text tabular-nums font-display tracking-normal text-glow">
               {timeLeft > 0 ? `0h 0m ${timeLeft}s` : "—"}
             </div>
           </div>
