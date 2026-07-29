@@ -54,26 +54,19 @@ function Card({ snapshot, logoUrl }: { snapshot: VaultSnapshot; logoUrl: string 
 
         <div style={{ display: "flex", width: 454, height: 270, flexDirection: "column", border: "1px solid #c4b5fd", borderRadius: 16, background: "#faf8ff", padding: "18px 20px" }}>
           <span style={{ display: "flex", color: "#6d28d9", fontSize: 12, fontWeight: 850, letterSpacing: 1.8 }}>LMSR PREDICTION MARKET</span>
-          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-            <div style={{ display: "flex", width: 197, flexDirection: "column", border: "1px solid #bbf7d0", borderRadius: 12, background: "#f0fdf4", padding: "15px" }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
+            <div style={{ display: "flex", width: 197, height: 142, flexDirection: "column", justifyContent: "center", border: "1px solid #bbf7d0", borderRadius: 12, background: "#f0fdf4", padding: "18px" }}>
               <span style={{ display: "flex", color: colors.yes, fontSize: 14, fontWeight: 850 }}>YES PRICE</span>
-              <span style={{ display: "flex", color: colors.yes, fontSize: 34, fontWeight: 950, marginTop: 5 }}>{snapshot.marketYesPrice}</span>
+              <span style={{ display: "flex", color: colors.yes, fontSize: 48, fontWeight: 950, marginTop: 7 }}>{snapshot.marketYesPrice}</span>
             </div>
-            <div style={{ display: "flex", width: 197, flexDirection: "column", border: "1px solid #fecaca", borderRadius: 12, background: "#fef2f2", padding: "15px" }}>
+            <div style={{ display: "flex", width: 197, height: 142, flexDirection: "column", justifyContent: "center", border: "1px solid #fecaca", borderRadius: 12, background: "#fef2f2", padding: "18px" }}>
               <span style={{ display: "flex", color: colors.no, fontSize: 14, fontWeight: 850 }}>NO PRICE</span>
-              <span style={{ display: "flex", color: colors.no, fontSize: 34, fontWeight: 950, marginTop: 5 }}>{snapshot.marketNoPrice}</span>
+              <span style={{ display: "flex", color: colors.no, fontSize: 48, fontWeight: 950, marginTop: 7 }}>{snapshot.marketNoPrice}</span>
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", marginTop: 12, border: "1px solid #e9d5ff", borderRadius: 12, background: "white", padding: "13px 15px", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ display: "flex", width: 205, color: "#64748b", fontSize: 13 }}>TRADING VOLUME</span>
-              <span style={{ display: "flex", width: 177, justifyContent: "flex-end", color: "#0f172a", fontSize: 17, fontWeight: 900 }}>{snapshot.marketVolumeAmount} {snapshot.tokenSymbol}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ display: "flex", width: 245, color: "#64748b", fontSize: 13 }}>LIQUIDITY PARAMETER b</span>
-              <span style={{ display: "flex", width: 137, justifyContent: "flex-end", color: "#6d28d9", fontSize: 17, fontWeight: 900 }}>{snapshot.liquidityParameterAmount}</span>
-            </div>
-          </div>
+          <span style={{ display: "flex", marginTop: 18, color: "#7c3aed", fontSize: 13, fontWeight: 800, letterSpacing: 1.4 }}>
+            CURRENT MARGINAL PRICE · LMSR
+          </span>
         </div>
       </div>
 

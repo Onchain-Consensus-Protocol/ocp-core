@@ -88,7 +88,7 @@ function ResultCard({ snapshot, logoUrl }: { snapshot: VaultSnapshot; logoUrl: s
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 22, paddingTop: 17, borderTop: "1px solid #1e293b" }}>
         <span style={{ display: "flex", color: "#a78bfa", fontSize: 13, fontWeight: 850, letterSpacing: 1.6 }}>LMSR FINAL MARKET STATE</span>
         <span style={{ display: "flex", color: "#cbd5e1", fontSize: 14, fontWeight: 800 }}>
-          YES {snapshot.marketYesPrice} · NO {snapshot.marketNoPrice} · VOLUME {snapshot.marketVolumeAmount} {snapshot.tokenSymbol}
+          YES {snapshot.marketYesPrice} · NO {snapshot.marketNoPrice}
         </span>
       </div>
     </div>
