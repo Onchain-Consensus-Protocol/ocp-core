@@ -41,7 +41,7 @@ const EXPECTED_FACTORY_CODE_HASH = (
   ?? "0xd35a9a60cfa96671b443e0f89b4f065d926b3a191d7a6d4ab0678feaeeece319"
 ).trim().toLowerCase();
 const ADMIN_DEPLOYMENT_ENABLED = env?.VITE_ADMIN_DEPLOYMENT_ENABLED !== "false";
-const RECOVERY_RPC_URL = env?.VITE_RECOVERY_RPC_URL?.trim() || "https://mainnet.base.org";
+const RECOVERY_RPC_URL = env?.VITE_RECOVERY_RPC_URL?.trim() || "https://base.drpc.org";
 const BLOCKSCOUT_API = "https://base.blockscout.com/api/v2";
 const EXPECTED_PROTOCOL_VERSION = 5n;
 const EXPECTED_FEE_BPS = 120n;
@@ -861,9 +861,15 @@ function AdminPage() {
       if (keccak256(calldata) !== pending.calldataHash) throw new Error("恢复 calldata 与原创建意图不一致");
       await factory.createMarket.staticCall(...args);
       const gasEstimate = await factory.createMarket.estimateGas(...args);
+      const feeData = await provider.getFeeData();
+      const baseMaxFee = feeData.maxFeePerGas ?? feeData.gasPrice;
+      const basePriorityFee = feeData.maxPriorityFeePerGas ?? 1_000_000n;
+      if (!baseMaxFee) throw new Error("无法读取 Base EIP-1559 Gas 报价");
       const tx = await factory.createMarket(...args, {
         nonce: pending.nonce,
         gasLimit: (gasEstimate * 120n) / 100n,
+        maxFeePerGas: baseMaxFee * 2n,
+        maxPriorityFeePerGas: basePriorityFee * 2n,
       });
       const withHash = { ...pending, stage: "pending" as const, txHash: tx.hash, nonce: tx.nonce };
       savePending(withHash);
