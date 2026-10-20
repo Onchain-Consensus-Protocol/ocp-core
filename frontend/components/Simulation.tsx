@@ -1,462 +1,98 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, LayoutDashboard, ShieldAlert, Zap } from "lucide-react";
-import { Button } from "./Button";
-import type { Language } from "../types";
+import React,{useEffect,useState} from 'react';
+import {ArrowLeftRight,ShieldAlert,LayoutDashboard,Zap} from 'lucide-react';
+import {Button} from './Button';
+import {GenesisPriceChart} from './GenesisPriceChart';
+import {genesisTokens,genesisShares,genesisPrice} from './genesisDisplay';
+import type {Language} from '../types';
+import {createDlpDemo,dlpCreate,dlpBuy,dlpSell,dlpFormalBuyBudget,dlpFormalBuy,dlpFormalSell,dlpQuoteBuy,dlpQuoteSell,dlpQuoteFormalBuyBudget,dlpQuoteFormalBuy,dlpQuoteFormalSell,dlpCoreStake,dlpAdvanceTime,dlpFinalize,dlpClaim,dlpClaimCore,dlpClaimPreview,dlpRedeemPairs,dlpPrices,type DlpState,type DlpTradeQuote,type Side,type Outcome} from './dlpDemoModel';
+interface Props{lang:Language;isWalletConnected:boolean;balance:number;setBalance:(n:number)=>void;connectWallet:()=>void}
+const num=(v:number,d=2)=>v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const clock=(v:number)=>{const n=Math.max(0,Math.floor(v));return [Math.floor(n/3600),Math.floor(n/60)%60,n%60].map(x=>String(x).padStart(2,'0')).join(':')};
+const box='rounded-xl border border-border p-4';
+const small='rounded-lg border border-border px-3 py-2 text-xs hover:bg-accent/5 disabled:opacity-40';
+const feeRecipients={creatorAccount:-1,protocolAccount:-1};
+export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,connectWallet})=>{
+ const zh=lang==='zh',t=(cn:string,en:string)=>zh?cn:en;
+ const [s,setS]=useState<DlpState>(()=>createDlpDemo(feeRecipients));
+ const [topic,setTopic]=useState({title:'',YES:'',NO:'',INVALID:''});
+ const topicRules=`YES：${topic.YES} · NO：${topic.NO} · INVALID：${topic.INVALID}`;
+ const [id,setId]=useState(0),[tab,setTab]=useState<'MARKET'|'PROTOCOL'>('MARKET'),[mode,setMode]=useState<'BUY'|'SELL'>('BUY');
+ const [amount,setAmount]=useState(10),[running,setRunning]=useState(false),[notice,setNotice]=useState('');
+ const [snapshot,setSnapshot]=useState(2000),[depth,setDepth]=useState(150);
+ const [pairs,setPairs]=useState(1);
+ const a=s.accounts[id],names=[t('账户1','Account 1'),t('账户2','Account 2'),t('账户3','Account 3')];
+ const gen=s.phase==='GENESIS'&&s.now<s.TG,formal=s.phase==='FORMAL'&&s.now<s.TF,terminal=['SETTLED','FAILED'].includes(s.phase);
+ const coreOpen=s.core.openedAt!==null&&s.now<s.TC&&!terminal,ticking=!['CREATE','FAILED','SETTLED'].includes(s.phase)&&s.now<s.TC;
+ const cut=gen?s.TG:s.now<s.TF?s.TF:s.TC,stage=gen?'Genesis':s.now<s.TF?'Formal':'Core';
+ const phases={CREATE:t('待创建','Not created'),GENESIS:'Genesis',FORMAL:'Formal',WAIT_CORE:t('等待Core结果','Awaiting Core'),SETTLED:t('已结算','Settled'),FAILED:t('未毕业清算','Funding failed')};
+ const px=dlpPrices(s),preview=dlpClaimPreview(s,id);
+ const genesisCost=s.events.filter(e=>e.actor===id).reduce((v,e)=>{if(e.kind==='GENESIS_BUY')return {qty:v.qty+(e.quantity??0),cost:v.cost+(e.amount??0)*.955};if(e.kind==='GENESIS_SELL'){const fraction=v.qty>0?Math.max(0,1-(e.quantity??0)/v.qty):0;return {qty:Math.max(0,v.qty-(e.quantity??0)),cost:v.cost*fraction}}return v},{qty:0,cost:0});
+ const genesisPnl=(a.g>0&&gen?dlpQuoteSell(s,a.g).net:0)-genesisCost.cost;
+ const lpBEstimates=(['YES','NO','INVALID'] as Outcome[]).map(outcome=>{const inventory=outcome==='YES'?s.inventory[0]:outcome==='NO'?s.inventory[1]:(s.inventory[0]+s.inventory[1])/2;const nav=s.cash+s.lpFees+inventory;const cover=Math.min(s.B,Math.max(s.basis-nav,0));const totalB=s.accounts.reduce((v,x)=>v+x.z,0);return {outcome,lp:s.lpSupply>0?(nav+cover)*a.lp/s.lpSupply:0,B:totalB>0?(s.B-cover)*a.z/totalB:0}});
+ const lpBValuePanel=s.phase==='SETTLED'?<div className="mt-2 text-[10px]"><span>{t("可领取金额","Claimable")}</span><div>LP {num(preview.lp,4)} · B {num(preview.B,4)} dUSDC</div></div>:['FORMAL','WAIT_CORE'].includes(s.phase)?<details className="mt-2 text-[10px]"><summary className="cursor-pointer">{t("LP／B 预计领取金额","Estimated LP / B payouts")}</summary><table className="w-full mt-2 text-right"><thead><tr><th className="text-left">{t("最终结果","Outcome")}</th><th>LP</th><th>B</th></tr></thead><tbody>{lpBEstimates.map(v=><tr key={v.outcome}><td className="text-left">{v.outcome}</td><td>{num(v.lp,4)}</td><td>{num(v.B,4)}</td></tr>)}</tbody></table><p className="mt-1">{t("单位 dUSDC。按当前资金状态估算，不含未来交易及费用；以最终结算为准。","In dUSDC. Current-state estimates exclude future trading and fees; final settlement determines payouts.")}</p></details>:null;
+ const hasClaim=(s.phase==='FAILED'?a.g+a.z:a.lp+a.z+a.yes+a.no)>0;
+ const errors:Record<string,string>={HOLDINGS:t('持仓不足，请检查数量。','Check holdings and amount.'),BALANCE:t('余额不足。','Insufficient balance.'),CLAIM:t('当前没有可领取权益。','No claim available.'),SIDE_LOCKED:t('Core方向已锁定，只能同侧追加。','Core side is locked.'),AMOUNT:t('请输入有效的正数。','Enter a positive amount.'),INVENTORY:t('可用结果库存不足，请减少买入。','Reduce the buy; inventory is limited.'),CORE_CLOSED:t('Core尚未开启或已经截止。','Core is not open.'),CASH:t('当前报价无法执行。','Quote cannot be executed.'),PHASE:t('当前阶段不可执行。','Unavailable in this phase.')};
+ const act=(fn:(s:DlpState)=>DlpState,msg=t('操作成功。','Done.'))=>{try{setS(fn(s));setNotice(msg);return true}catch(e){setNotice(errors[e instanceof Error?e.message:'']??t('请检查金额、持仓和阶段。','Check amount, holdings and stage.'));return false}};
+ useEffect(()=>setBalance(a.wallet),[a.wallet,setBalance]);
+ useEffect(()=>{if(!running||!ticking)return;const timer=window.setInterval(()=>setS(v=>dlpAdvanceTime(v,Math.min(v.TC,v.now+1))),1000);return()=>window.clearInterval(timer)},[running,ticking]);
+ useEffect(()=>{if(!ticking)setRunning(false)},[ticking]);
+ const reset=()=>{try{const config={...feeRecipients,Q:snapshot,b:depth,TC:10800};setS(createDlpDemo(config));setRunning(false);setNotice('');setId(0);setTab('MARKET');setMode('BUY');setAmount(10)}catch{setNotice(t('请检查创建参数。','Check creation parameters.'))}};
+ const quote=(side:Side|'G'):DlpTradeQuote|null=>{try{if(!(amount>0)||!Number.isFinite(amount))return null;if(gen){if(mode==='BUY'&&amount>a.wallet||mode==='SELL'&&genesisShares(amount)>a.g)return null;return mode==='BUY'?dlpQuoteBuy(s,amount):dlpQuoteSell(s,genesisShares(amount))}if(!formal||side==='G')return null;if(mode==='BUY'){if(amount>a.wallet)return null;return dlpQuoteFormalBuy(s,side,amount)}if(amount>(side==='YES'?a.yes:a.no))return null;return dlpQuoteFormalSell(s,side,amount)}catch{return null}};
+ const execute=(side:Side|'G')=>act(v=>gen?(mode==='BUY'?dlpBuy(v,id,amount):dlpSell(v,id,genesisShares(amount))):mode==='BUY'?dlpFormalBuy(v,id,side as Side,amount):dlpFormalSell(v,id,side as Side,amount),t('交易完成。','Trade completed.'));
+ const Row=({label,value}:{label:string,value:React.ReactNode})=><div className="flex justify-between gap-3 py-1"><span className="text-text-muted">{label}</span><strong className="tabular-nums text-right break-words">{value}</strong></div>;
+ const quotes=(gen?['G']:['YES','NO']) as (Side|'G')[];
+ const stakeTotal=s.core.yes+s.core.no+s.core.invalid;
 
-interface Props {
-  lang: Language;
-  isWalletConnected: boolean;
-  balance: number;
-  setBalance: (amount: number) => void;
-  connectWallet: () => void;
-}
-
-export type VaultSide = "YES" | "NO" | "INVALID";
-export type MarketSide = "YES" | "NO";
-export type TradeMode = "BUY" | "SELL";
-type Phase = "STAKING" | "READY" | "FINALIZED";
-type Tab = "PROTOCOL" | "MARKET";
-
-const INITIAL_BALANCE = 10_000;
-const INITIAL_STAKES: Record<VaultSide, number> = { YES: 40, NO: 30, INVALID: 0 };
-const INITIAL_MARKET_SHARES: Record<MarketSide, number> = { YES: 0, NO: 0 };
-const INITIAL_USER_SHARES: Record<MarketSide, number> = { YES: 0, NO: 0 };
-const INITIAL_FEES: Record<VaultSide, number> = { YES: 0, NO: 0, INVALID: 0 };
-const LIQUIDITY_PARAMETER = 100;
-const REQUIRED_SUBSIDY = LIQUIDITY_PARAMETER * Math.log(2);
-const MIN_STAKE = 1;
-const TOTAL_FEE_RATE = 0.012;
-const VAULT_FEE_RATE = 0.01;
-const PROTOCOL_LP_FEE_RATE = 0.002;
-const SLIPPAGE_RATE = 0.01;
-
-function lmsrCost(yesShares: number, noShares: number): number {
-  const yes = yesShares / LIQUIDITY_PARAMETER;
-  const no = noShares / LIQUIDITY_PARAMETER;
-  const max = Math.max(yes, no);
-  return LIQUIDITY_PARAMETER * (
-    max + Math.log(Math.exp(yes - max) + Math.exp(no - max)) - Math.log(2)
-  );
-}
-
-export function lmsrYesPrice(yesShares: number, noShares: number): number {
-  return 1 / (1 + Math.exp((noShares - yesShares) / LIQUIDITY_PARAMETER));
-}
-
-export function deriveOutcome(stakes: Record<VaultSide, number>): VaultSide {
-  const total = stakes.YES + stakes.NO + stakes.INVALID;
-  if (stakes.YES > total - stakes.YES) return "YES";
-  if (stakes.NO > total - stakes.NO) return "NO";
-  return "INVALID";
-}
-
-export function buildQuote(
-  amount: number,
-  marketShares: Record<MarketSide, number>,
-  side: MarketSide,
-  mode: TradeMode,
-) {
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  if (mode === "SELL" && amount > marketShares[side]) return null;
-
-  const currentYesPrice = lmsrYesPrice(marketShares.YES, marketShares.NO);
-  const currentSidePrice = side === "YES" ? currentYesPrice : 1 - currentYesPrice;
-  const beforeCost = lmsrCost(marketShares.YES, marketShares.NO);
-  const nextShares = { ...marketShares };
-  nextShares[side] += mode === "BUY" ? amount : -amount;
-  const afterCost = lmsrCost(nextShares.YES, nextShares.NO);
-  const gross = mode === "BUY" ? afterCost - beforeCost : beforeCost - afterCost;
-  if (gross <= 0) return null;
-
-  const fee = gross * TOTAL_FEE_RATE;
-  const cashFlow = mode === "BUY" ? gross + fee : gross - fee;
-  const nextYesPrice = lmsrYesPrice(nextShares.YES, nextShares.NO);
-  const nextPrice = side === "YES" ? nextYesPrice : 1 - nextYesPrice;
-
-  return {
-    gross,
-    fee,
-    cashFlow,
-    averagePrice: gross / amount,
-    nextPrice,
-    priceImpact: Math.abs(((nextPrice - currentSidePrice) / currentSidePrice) * 100),
-    protectedCashFlow:
-      mode === "BUY"
-        ? cashFlow * (1 + SLIPPAGE_RATE)
-        : cashFlow * (1 - SLIPPAGE_RATE),
-  };
-}
-
-export function marketRedemption(
-  outcome: VaultSide,
-  shares: Record<MarketSide, number>,
-): number {
-  if (outcome === "YES") return shares.YES;
-  if (outcome === "NO") return shares.NO;
-  return (shares.YES + shares.NO) / 2;
-}
-
-function formatAmount(value: number, digits = 2): string {
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
-function sideTextColor(side: VaultSide): string {
-  if (side === "YES") return "text-success";
-  if (side === "NO") return "text-danger";
-  return "text-yellow-600";
-}
-
-export const Simulation: React.FC<Props> = ({
-  lang,
-  isWalletConnected,
-  balance,
-  setBalance,
-  connectWallet,
-}) => {
-  const zh = lang === "zh";
-  const [phase, setPhase] = useState<Phase>("STAKING");
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [activeTab, setActiveTab] = useState<Tab>("PROTOCOL");
-  const [amount, setAmount] = useState(10);
-  const [tradeMode, setTradeMode] = useState<TradeMode>("BUY");
-  const [stakes, setStakes] = useState<Record<VaultSide, number>>(INITIAL_STAKES);
-  const [userVaultSide, setUserVaultSide] = useState<VaultSide | null>(null);
-  const [userStake, setUserStake] = useState(0);
-  const [marketShares, setMarketShares] =
-    useState<Record<MarketSide, number>>(INITIAL_MARKET_SHARES);
-  const [userShares, setUserShares] =
-    useState<Record<MarketSide, number>>(INITIAL_USER_SHARES);
-  const [totalVolume, setTotalVolume] = useState(0);
-  const [vaultFees, setVaultFees] = useState(0);
-  const [protocolLpFees, setProtocolLpFees] = useState(0);
-  const [distributedFees, setDistributedFees] =
-    useState<Record<VaultSide, number>>(INITIAL_FEES);
-  const [userConditionalFees, setUserConditionalFees] =
-    useState<Record<VaultSide, number>>(INITIAL_FEES);
-  const [finalOutcome, setFinalOutcome] = useState<VaultSide | null>(null);
-  const [vaultClaimed, setVaultClaimed] = useState(false);
-  const [marketRedeemed, setMarketRedeemed] = useState(false);
-  const [notice, setNotice] = useState("");
-
-  useEffect(() => {
-    if (phase !== "STAKING") return;
-    const timer = window.setInterval(() => {
-      setTimeLeft((value) => {
-        if (value <= 1) {
-          window.clearInterval(timer);
-          setPhase("READY");
-          return 0;
-        }
-        return value - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [phase]);
-
-  const totalStake = stakes.YES + stakes.NO + stakes.INVALID;
-  const yesStakePct = totalStake > 0 ? (stakes.YES / totalStake) * 100 : 0;
-  const noStakePct = totalStake > 0 ? (stakes.NO / totalStake) * 100 : 0;
-  const invalidStakePct = Math.max(0, 100 - yesStakePct - noStakePct);
-  const yesPrice = lmsrYesPrice(marketShares.YES, marketShares.NO);
-  const noPrice = 1 - yesPrice;
-  const feeRoi = totalStake > 0 ? (vaultFees / totalStake) * 100 : 0;
-  const provisionalOutcome = deriveOutcome(stakes);
-  const quoteYes = useMemo(
-    () => buildQuote(amount, marketShares, "YES", tradeMode),
-    [amount, marketShares, tradeMode],
-  );
-  const quoteNo = useMemo(
-    () => buildQuote(amount, marketShares, "NO", tradeMode),
-    [amount, marketShares, tradeMode],
-  );
-
-  const requireWallet = (): boolean => {
-    if (isWalletConnected) return true;
-    connectWallet();
-    setNotice(zh ? "模拟钱包已连接，请再次操作。" : "Demo wallet connected. Try again.");
-    return false;
-  };
-
-  const accrueVaultFee = (grossCashFlow: number) => {
-    const vaultFee = grossCashFlow * VAULT_FEE_RATE;
-    const lpFee = grossCashFlow * PROTOCOL_LP_FEE_RATE;
-    const totalYes = stakes.YES;
-    const totalNo = stakes.NO;
-    const totalEligible = totalYes + totalNo;
-
-    setVaultFees((value) => value + vaultFee);
-    setProtocolLpFees((value) => value + lpFee);
-    setDistributedFees((value) => ({
-      YES: value.YES + (totalYes > 0 ? vaultFee : 0),
-      NO: value.NO + (totalNo > 0 ? vaultFee : 0),
-      INVALID: value.INVALID + (totalEligible > 0 ? vaultFee : 0),
-    }));
-
-    // 与 OCPVault 的三套条件账一致：交易发生时按在场资本记账，
-    // 后续新增质押只能参与未来手续费，不能追溯领取历史手续费。
-    if (userStake > 0 && userVaultSide === "YES") {
-      setUserConditionalFees((value) => ({
-        ...value,
-        YES: value.YES + vaultFee * userStake / totalYes,
-        INVALID: value.INVALID + vaultFee * userStake / totalEligible,
-      }));
-    } else if (userStake > 0 && userVaultSide === "NO") {
-      setUserConditionalFees((value) => ({
-        ...value,
-        NO: value.NO + vaultFee * userStake / totalNo,
-        INVALID: value.INVALID + vaultFee * userStake / totalEligible,
-      }));
-    }
-  };
-
-  const stake = (side: VaultSide) => {
-    if (!requireWallet() || phase !== "STAKING") return;
-    if (!Number.isFinite(amount) || amount < MIN_STAKE) {
-      setNotice(zh ? `最小质押为 ${MIN_STAKE} dUSDC。` : `Minimum stake is ${MIN_STAKE} dUSDC.`);
-      return;
-    }
-    if (amount > balance) {
-      setNotice(zh ? "模拟钱包余额不足。" : "Insufficient demo balance.");
-      return;
-    }
-    if (userVaultSide && userVaultSide !== side) {
-      setNotice(zh ? "质押方向已经锁定，不能换边。" : "Your stake side is locked.");
-      return;
-    }
-
-    setUserVaultSide(side);
-    setUserStake((value) => value + amount);
-    setStakes((value) => ({ ...value, [side]: value[side] + amount }));
-    setBalance(balance - amount);
-    setNotice(
-      zh
-        ? `已在 ${side} 方向质押 ${formatAmount(amount)} dUSDC。`
-        : `Staked ${formatAmount(amount)} dUSDC on ${side}.`,
-    );
-  };
-
-  const trade = (side: MarketSide) => {
-    if (!requireWallet() || phase !== "STAKING") return;
-    const quote = side === "YES" ? quoteYes : quoteNo;
-    if (!quote) {
-      setNotice(
-        tradeMode === "SELL"
-          ? (zh ? `可卖出的 ${side} 份额不足。` : `Not enough ${side} shares to sell.`)
-          : (zh ? "请输入有效份额。" : "Enter a valid share amount."),
-      );
-      return;
-    }
-    if (tradeMode === "BUY" && quote.cashFlow > balance) {
-      setNotice(zh ? "模拟钱包余额不足。" : "Insufficient demo balance.");
-      return;
-    }
-    if (tradeMode === "SELL" && amount > userShares[side]) {
-      setNotice(
-        zh ? `可卖出的 ${side} 份额不足。` : `Not enough ${side} shares to sell.`,
-      );
-      return;
-    }
-
-    const direction = tradeMode === "BUY" ? 1 : -1;
-    setMarketShares((value) => ({
-      ...value,
-      [side]: value[side] + direction * amount,
-    }));
-    setUserShares((value) => ({
-      ...value,
-      [side]: value[side] + direction * amount,
-    }));
-    setBalance(
-      tradeMode === "BUY" ? balance - quote.cashFlow : balance + quote.cashFlow,
-    );
-    setTotalVolume((value) => value + quote.gross);
-    accrueVaultFee(quote.gross);
-    setNotice(
-      zh
-        ? `${tradeMode === "BUY" ? "买入" : "卖出"} ${formatAmount(amount)} 份 ${side}；报价成交并完成手续费分流。`
-        : `${tradeMode === "BUY" ? "Bought" : "Sold"} ${formatAmount(amount)} ${side} shares; fees were routed.`,
-    );
-  };
-
-  const fastForward = () => {
-    if (phase !== "STAKING") return;
-    setTimeLeft(0);
-    setPhase("READY");
-    setNotice(zh ? "模拟时间已推进到质押截止。" : "Demo advanced to the deadline.");
-  };
-
-  const finalize = () => {
-    if (!requireWallet() || phase !== "READY") return;
-    const outcome = deriveOutcome(stakes);
-    setFinalOutcome(outcome);
-    setPhase("FINALIZED");
-    setNotice(
-      zh
-        ? `Vault 已 finalize，市场同步解析为 ${outcome}。`
-        : `Vault finalized; the market resolved to ${outcome}.`,
-    );
-  };
-
-  const selectedFeePayout =
-    finalOutcome === null ? 0 : userConditionalFees[finalOutcome];
-  const principalPayout = (() => {
-    if (!finalOutcome || !userVaultSide || userStake <= 0) return 0;
-    if (finalOutcome === "INVALID") return userStake;
-    if (userVaultSide !== finalOutcome) return 0;
-    return totalStake * userStake / stakes[finalOutcome];
-  })();
-  const vaultPayout = principalPayout + selectedFeePayout;
-  const marketPayout =
-    finalOutcome === null ? 0 : marketRedemption(finalOutcome, userShares);
-  const officialUnallocatedVaultFees =
-    finalOutcome === null
-      ? 0
-      : Math.max(0, vaultFees - distributedFees[finalOutcome]);
-
-  const withdrawVault = () => {
-    if (!requireWallet() || phase !== "FINALIZED" || vaultClaimed || userStake <= 0) return;
-    setBalance(balance + vaultPayout);
-    setVaultClaimed(true);
-    setNotice(
-      zh
-        ? `Vault 已领取 ${formatAmount(vaultPayout)} dUSDC，其中手续费 ${formatAmount(selectedFeePayout, 4)}。`
-        : `Claimed ${formatAmount(vaultPayout)} dUSDC from the Vault, including ${formatAmount(selectedFeePayout, 4)} in fees.`,
-    );
-  };
-
-  const redeemMarket = () => {
-    if (
-      !requireWallet()
-      || phase !== "FINALIZED"
-      || marketRedeemed
-      || userShares.YES + userShares.NO <= 0
-    ) return;
-    setBalance(balance + marketPayout);
-    setMarketRedeemed(true);
-    setNotice(
-      zh
-        ? `市场份额已兑换 ${formatAmount(marketPayout)} dUSDC。`
-        : `Market shares redeemed for ${formatAmount(marketPayout)} dUSDC.`,
-    );
-  };
-
-  const reset = () => {
-    setPhase("STAKING");
-    setTimeLeft(60);
-    setActiveTab("PROTOCOL");
-    setAmount(10);
-    setTradeMode("BUY");
-    setStakes(INITIAL_STAKES);
-    setUserVaultSide(null);
-    setUserStake(0);
-    setMarketShares(INITIAL_MARKET_SHARES);
-    setUserShares(INITIAL_USER_SHARES);
-    setTotalVolume(0);
-    setVaultFees(0);
-    setProtocolLpFees(0);
-    setDistributedFees(INITIAL_FEES);
-    setUserConditionalFees(INITIAL_FEES);
-    setFinalOutcome(null);
-    setVaultClaimed(false);
-    setMarketRedeemed(false);
-    setNotice("");
-    setBalance(INITIAL_BALANCE);
-  };
-
-  const phaseLabel =
-    phase === "STAKING"
-      ? (zh ? "质押期" : "STAKE PERIOD")
-      : phase === "READY"
-        ? (zh ? "可结算" : "READY TO FINALIZE")
-        : (zh ? "已完结" : "FINALIZED");
-  const phaseBadgeClass =
-    phase === "STAKING"
-      ? "border-accent/50 text-accent bg-accent/10"
-      : "border-success/50 text-success bg-success/10";
-  const maxStake = Math.max(stakes.YES, stakes.NO, stakes.INVALID);
-  const leaders = (["YES", "NO", "INVALID"] as VaultSide[]).filter(
-    (side) => stakes[side] === maxStake,
-  );
-  const leaderSide = leaders.length === 1 ? leaders[0] : null;
-  const primaryActionTitle =
-    phase === "STAKING"
-      ? activeTab === "MARKET"
-        ? (zh ? "交易预测份额" : "Trade prediction shares")
-        : (zh ? "选择方向并质押" : "Choose a side and stake")
-      : phase === "READY"
-        ? (zh ? "任何人都可以链上结算" : "Anyone can finalize on-chain")
-        : (zh ? "领取结算资金" : "Claim settlement");
-  const primaryActionDescription =
-    phase === "STAKING"
-      ? activeTab === "MARKET"
-        ? (zh
-          ? "买入或卖出 YES / NO 份额。输入数量后查看实时成交报价与价格影响。"
-          : "Buy or sell YES / NO shares. Enter an amount to preview execution and price impact.")
-        : (zh
-          ? "选择 YES、NO 或 INVALID。选定后只能同侧追加，不能换边。"
-          : "Choose YES, NO or INVALID. Once selected, you may only add to that side.")
-      : phase === "READY"
-        ? (zh ? "质押截止后即可结算。" : "The Vault can be finalized after staking closes.")
-        : (zh ? "根据最终结果领取 Vault 资金并兑换市场份额。" : "Claim Vault funds and redeem shares using the final result.");
-
-  const quoteRows = (side: MarketSide) => {
-    const quote = side === "YES" ? quoteYes : quoteNo;
-    return (
-      <div className="rounded-lg border border-border bg-white/60 px-2.5 py-2 text-[10px] font-mono">
-        <div className={`mb-1.5 font-bold ${sideTextColor(side)}`}>{side}</div>
-        <div className="space-y-1 text-text-muted">
-          <div className="flex justify-between gap-2">
-            <span>{zh ? "平均成交价" : "Avg. price"}</span>
-            <strong className="text-text">{quote ? quote.averagePrice.toFixed(4) : "—"}</strong>
-          </div>
-          <div className="flex justify-between gap-2">
-            <span>{zh ? "价格影响" : "Price impact"}</span>
-            <strong className={
-              quote && quote.priceImpact >= 5
-                ? "text-danger"
-                : quote && quote.priceImpact >= 2
-                  ? "text-amber-600"
-                  : "text-success"
-            }>
-              {quote ? `${quote.priceImpact.toFixed(2)}%` : "—"}
-            </strong>
-          </div>
-          <div className="flex justify-between gap-2">
-            <span>{zh ? "手续费" : "Fee"}</span>
-            <strong className="text-text">{quote ? formatAmount(quote.fee, 4) : "—"}</strong>
-          </div>
-          <div className="flex justify-between gap-2 border-t border-border pt-1">
-            <span>{tradeMode === "BUY" ? (zh ? "预计支付" : "Est. payment") : (zh ? "预计到账" : "Est. receipt")}</span>
-            <strong className="text-text">{quote ? formatAmount(quote.cashFlow, 2) : "—"}</strong>
-          </div>
-          <div className="flex justify-between gap-2">
-            <span>
-              {tradeMode === "BUY"
-                ? (zh ? "最大支付（滑点上限 1%）" : "Max payment (1% slippage)")
-                : (zh ? "最低到账（滑点上限 1%）" : "Min receipt (1% slippage)")}
-            </span>
-            <strong className="text-text">{quote ? formatAmount(quote.protectedCashFlow, 2) : "—"}</strong>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
+ type MarketSide=Side;type VaultSide=Outcome;
+ const activeTab=tab,setActiveTab=setTab,tradeMode=mode,setTradeMode=setMode;
+ const balance=a.wallet,userShares={YES:a.yes,NO:a.no},userStake=a.coreStake,userVaultSide=a.coreSide;
+ const stakes={YES:s.core.yes,NO:s.core.no,INVALID:s.core.invalid},totalStake=stakeTotal;
+ const phase=s.phase==='CREATE'?'CREATE':terminal?'FINALIZED':s.now>=s.TC?'READY':'STAKING';
+ const finalOutcome=s.result,vaultClaimed=a.coreClaimed,marketRedeemed=!hasClaim;
+ const phaseLabel=phases[s.phase],phaseBadgeClass='border-accent/50 text-accent bg-accent/10';
+ const displayDeadline=activeTab==='PROTOCOL'?s.TC:(s.phase==='CREATE'||s.phase==='GENESIS'?s.TG:s.TF);
+ const timeLeft=terminal?0:Math.max(0,displayDeadline-s.now);
+ const yesPrice=px.probability?.[0]??(s.result==='YES'?1:s.result==='NO'?0:.5),noPrice=1-yesPrice;
+ const yesStakePct=totalStake?stakes.YES/totalStake*100:0,noStakePct=totalStake?stakes.NO/totalStake*100:0,invalidStakePct=totalStake?stakes.INVALID/totalStake*100:0;
+ const provisionalOutcome:Outcome=stakes.YES>totalStake/2?'YES':stakes.NO>totalStake/2?'NO':'INVALID';
+ const leaders=(['YES','NO','INVALID'] as Outcome[]).filter(v=>stakes[v]===Math.max(...Object.values(stakes))),leaderSide=leaders.length===1?leaders[0]:null;
+ const marketShares={YES:s.accounts.reduce((n,a)=>n+a.yes,0),NO:s.accounts.reduce((n,a)=>n+a.no,0)};
+ const totalVolume=s.formalVolume??0,vaultFees=s.core.feeTotal,feeRoi=totalStake?vaultFees/totalStake*100:0;
+ const formatAmount=num,sideTextColor=(side:Outcome)=>side==='YES'?'text-success':side==='NO'?'text-danger':'text-yellow-700';
+ const primaryActionTitle=terminal?t('领取结算资金','Claim settlement'):activeTab==='MARKET'?(gen?t('交易gToken','Trade gToken'):t('交易','Trade')):t('选择方向并质押','Choose a side and stake');
+ const primaryActionDescription=activeTab==='MARKET'?t('输入数量，查看成交报价与价格影响。','Enter an amount to preview execution and price impact.'):t('选择方向后只能同侧追加，资金锁定至结算。','Once selected, add only to the same side until settlement.');
+ const MIN_STAKE=1;
+ const stake=(side:Outcome)=>act(v=>dlpCoreStake(v,id,side,amount));
+ const trade=(side:Side)=>execute(gen?'G':side);
+ const fastForward=()=>act(v=>dlpAdvanceTime(v,Math.min(v.TC,v.now+600)));
+ const finalize=()=>act(dlpFinalize);
+ const selectedFeePayout=s.result?a.coreRewards[s.result==='YES'?0:s.result==='NO'?1:2]:0;
+ const vaultPayout=s.corePayouts[id]??0,marketPayout=preview.total;
+ const withdrawVault=()=>act(v=>dlpClaimCore(v,id));
+ const redeemMarket=()=>act(v=>dlpClaim(v,id),t('对应LP／B已销毁，结算款已到账。','LP / B burned; payout received.'));
+ const userConditionalFees={YES:a.coreRewards[0],NO:a.coreRewards[1],INVALID:a.coreRewards[2]};
+ const quoteRows=(side:Side)=>{
+  const q=quote(gen?'G':side),tokens=q?(gen?genesisTokens(q.quantity):q.quantity):0;
+  const fee=q?q.creatorFee+q.protocolFee+q.lpFee+q.coreFee+(gen?0:q.B):0;
+  const cash=q?(mode==='BUY'?q.gross:q.net):0;
+  const before=side==='YES'?yesPrice:noPrice;
+  const endDifference=(s.basis-s.inventory[0])-(s.basis-s.inventory[1])+(side==='YES'?1:-1)*(mode==='BUY'?1:-1)*(q?.quantity??0);
+  const endYes=1/(1+Math.exp(-endDifference/s.b));const impact=gen?0:Math.abs((side==='YES'?endYes:1-endYes)-before)*100;
+  return <div className="rounded-lg border border-border bg-white/60 px-2.5 py-2 text-[10px] font-mono"><div className={`mb-1.5 font-bold ${sideTextColor(side)}`}>{gen?'Genesis':side}</div><div className="space-y-1 text-text-muted"><Row label={t('平均成交价','Avg. price')} value={q?(gen?num(cash/tokens,10):num((mode==='BUY'?q.net:q.gross)/q.quantity,4)):'—'}/><Row label={gen?t('获得／卖出代币','Tokens'):t('价格影响','Price impact')} value={q?(gen?num(tokens):`${num(impact)}%`):'—'}/><Row label={t('手续费','Fee')} value={q?num(fee,4):'—'}/>{gen&&<Row label={t('做市风险准备金（4.5%）','Market-making risk reserve (4.5%)')} value={q?num(q.contribution,4):'—'}/>}<div className="border-t border-border pt-1"><Row label={mode==='BUY'?t('预计支付','Est. payment'):t('预计到账','Est. receipt')} value={q?num(cash):'—'}/></div><Row label={mode==='BUY'?t('最大支付（滑点上限1%）','Max payment (1% slippage)'):t('最低到账（滑点上限1%）','Min receipt (1% slippage)')} value={q?num(cash*(mode==='BUY'?1.01:.99)):'—'}/>{gen&&q?.wouldGraduate&&<p className="text-accent mt-2">{t('本笔触发毕业，持仓转为LP；权益估值可能低于成本。','This trade graduates into LP; value may be below cost.')}</p>}</div></div>
+ };
+  if(s.phase==='CREATE')return <div className="max-w-xl mx-auto bg-white/80 border border-border rounded-2xl p-6 sm:p-8" data-testid="launch-market-card"><h2 className="text-xl font-display font-bold mb-5">{t('0成本发射你的市场','Launch your market at zero cost')}</h2><form className="space-y-4" onSubmit={e=>{e.preventDefault();if(!Object.values(topic).every(v=>v.trim()))return;if(act(()=>dlpCreate(createDlpDemo({...feeRecipients,Q:snapshot,b:depth,TC:10800})),t('已发射，Genesis倒计时开始。','Launched; Genesis countdown started.'))){setTopic(v=>({title:v.title.trim(),YES:v.YES.trim(),NO:v.NO.trim(),INVALID:v.INVALID.trim()}));setRunning(true);setTab('MARKET')}}}><label className="block text-sm">{t('话题内容','Market question')}<textarea required maxLength={300} rows={2} value={topic.title} onChange={e=>setTopic(v=>({...v,title:e.target.value}))} placeholder={t('输入你想发射的市场话题','Enter your market question')} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white"/></label>{(['YES','NO','INVALID'] as const).map(side=><label key={side} className="block text-sm">{side} {t('判定条件','resolution criteria')}<textarea required maxLength={1000} rows={2} value={topic[side]} onChange={e=>setTopic(v=>({...v,[side]:e.target.value}))} placeholder={t(side==='INVALID'?'什么情况下无法有效判定？':'什么情况下判定为 '+side+'？','When should the result be '+side+'?')} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white"/></label>)}<p className="text-xs text-text-muted">{t('Genesis 1小时 · 市场 2小时 · Core 3小时截止','Genesis closes at 1h · Market at 2h · Core at 3h')}</p><Button type="submit" className="w-full" disabled={!Object.values(topic).every(v=>v.trim())}>{t('发射市场，开始模拟','Launch market and start demo')}</Button><p className="text-xs text-text-muted">{t('本地模拟演示，不会发起链上交易。','Local simulation; no on-chain transactions.')}</p></form></div>;
   return (
-    <div className="vault-shell bg-white/80 border-y sm:border border-border sm:rounded-2xl shadow-sm sm:shadow-2xl flex flex-col md:flex-row max-w-6xl mx-auto md:min-h-[600px] overflow-hidden backdrop-blur-xl relative">
+    <div data-testid="homepage-lifecycle" className="vault-shell bg-white/80 border-y sm:border border-border sm:rounded-2xl shadow-sm sm:shadow-2xl flex flex-col md:flex-row max-w-6xl mx-auto md:min-h-[600px] overflow-hidden backdrop-blur-xl relative">
       <div className="absolute top-10 right-10 w-72 sm:w-96 h-72 sm:h-96 bg-accent/5 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="md:hidden w-full px-4 pt-5 pb-4 border-b border-border relative z-10 bg-gradient-to-b from-orange-50/70 to-transparent">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl leading-7 font-bold text-text tracking-tight font-display">
-              {zh ? "OCP 会成为币圈的重要玩家吗？" : "Will OCP become a major player in crypto?"}
+              {topic.title}
             </h2>
             <p className="mt-2 text-xs leading-5 text-text-muted font-mono">
-              {zh ? "YES：会成为重要玩家 · NO：不会成为重要玩家 · INVALID：条件无法有效判断" : "YES: becomes a major player · NO: does not become a major player · INVALID: cannot be resolved"}
+              {topicRules}
             </p>
           </div>
           <span className={`inline-flex shrink-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border font-mono ${phaseBadgeClass}`}>
@@ -468,7 +104,7 @@ export const Simulation: React.FC<Props> = ({
             {zh ? "阶段剩余时间" : "Phase time left"}
           </div>
           <div className="w-[15ch] shrink-0 whitespace-nowrap text-right text-lg leading-none font-bold text-text tabular-nums font-display">
-            {timeLeft > 0 ? `0h 0m ${timeLeft}s` : "—"}
+            {timeLeft > 0 ? `${Math.floor(timeLeft/3600)}h ${Math.floor(timeLeft/60)%60}m ${Math.floor(timeLeft)%60}s` : "—"}
           </div>
         </div>
       </div>
@@ -504,7 +140,7 @@ export const Simulation: React.FC<Props> = ({
             }`}
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            {zh ? "底层协议 (OCP)" : "Protocol (OCP)"}
+            {zh ? "OCP Core" : "OCP Core"}
           </button>
           <button
             type="button"
@@ -516,16 +152,18 @@ export const Simulation: React.FC<Props> = ({
             }`}
           >
             <ArrowLeftRight className="w-3.5 h-3.5" />
-            {zh ? "预测市场 (LMSR)" : "Prediction Market (LMSR)"}
+            {zh ? "市场" : "Market"}
           </button>
         </div>
+
+        <label className="flex justify-between items-center text-xs font-mono text-text-muted">{t("当前账户","Account")}<select aria-label={t("当前模拟账户","Demo account")} value={id} onChange={e=>{setId(Number(e.target.value));setNotice('')}} className="border border-border rounded-lg p-2 bg-white">{names.map((n,i)=><option key={n} value={i}>{n}</option>)}</select></label>
 
         {phase === "STAKING" && activeTab === "PROTOCOL" && (
           <div className="space-y-4 animate-fade-in">
             <div className="bg-transparent border border-border rounded-xl p-4 mb-2 text-xs text-text-muted">
               <h5 className="font-bold text-text flex items-center gap-1.5 mb-2 font-display">
                 <ShieldAlert className="w-3.5 h-3.5 text-accent" />
-                {zh ? "底层协议 (OCP)" : "Protocol (OCP)"}
+                {zh ? "OCP Core" : "OCP Core"}
               </h5>
               <p className="leading-relaxed font-mono">
                 {zh ? "质押资本决定最终结果。资金锁定至结算；市场交易不会改变结果。" : "Staked capital decides the result. Funds remain locked until settlement; market trades do not change it."}
@@ -558,7 +196,7 @@ export const Simulation: React.FC<Props> = ({
                 min="1"
                 step="0.01"
                 value={amount}
-                onChange={(event) => setAmount(Number(event.target.value))}
+                aria-label={t("Core质押金额","Core stake amount")} onChange={(event) => setAmount(Number(event.target.value))}
                 className="w-full bg-transparent border border-border rounded-lg px-3 py-3 text-text font-mono text-sm"
               />
             </label>
@@ -566,20 +204,20 @@ export const Simulation: React.FC<Props> = ({
               {zh ? "YES、NO、INVALID 全程开放。选定方向后只能同侧追加，不能撤回或换边。" : "YES, NO and INVALID stay open until the deadline. Once selected, you may only add to that side."}
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Button onClick={() => stake("YES")} disabled={Boolean(userVaultSide && userVaultSide !== "YES")} variant="success" className="w-full">
+              <Button onClick={() => stake("YES")} disabled={!coreOpen||Boolean(userVaultSide && userVaultSide !== "YES")} variant="success" className="w-full">
                 {zh ? "质押 YES" : "Stake YES"}
               </Button>
-              <Button onClick={() => stake("NO")} disabled={Boolean(userVaultSide && userVaultSide !== "NO")} variant="danger" className="w-full">
+              <Button onClick={() => stake("NO")} disabled={!coreOpen||Boolean(userVaultSide && userVaultSide !== "NO")} variant="danger" className="w-full">
                 {zh ? "质押 NO" : "Stake NO"}
               </Button>
             </div>
-            <Button onClick={() => stake("INVALID")} disabled={Boolean(userVaultSide && userVaultSide !== "INVALID")} variant="secondary" className="w-full text-yellow-700">
+            <Button onClick={() => stake("INVALID")} disabled={!coreOpen||Boolean(userVaultSide && userVaultSide !== "INVALID")} variant="secondary" className="w-full text-yellow-700">
               {zh ? "质押 INVALID" : "Stake INVALID"}
             </Button>
           </div>
         )}
 
-        {phase === "STAKING" && activeTab === "MARKET" && (
+        {(gen||formal) && activeTab === "MARKET" && (
           <div className="space-y-4 animate-fade-in">
             <div className="bg-transparent border border-border rounded-xl p-4">
               <div className="mb-4 flex items-start gap-3">
@@ -588,10 +226,10 @@ export const Simulation: React.FC<Props> = ({
                 </div>
                 <div>
                   <h5 className="font-bold text-text text-sm font-display tracking-wide">
-                    {zh ? "预测市场 (LMSR)" : "Prediction Market (LMSR)"}
+                    {zh ? "市场" : "Market"}
                   </h5>
                   <p className="text-xs text-text-muted mt-1 font-mono">
-                    {zh ? "无需外部 LP，由 LMSR 连续报价 YES / NO 份额。" : "LMSR continuously quotes YES / NO shares without external LPs."}
+                    {gen?t("买卖gToken；双池达标后转为LP。","Trade gToken; holdings become LP at graduation."):t("连续报价YES／NO，LP资产留池做市。","YES / NO are continuously quoted while LP assets remain in the pool.")}
                   </p>
                 </div>
               </div>
@@ -604,55 +242,62 @@ export const Simulation: React.FC<Props> = ({
                 </button>
               </div>
               <label className="flex justify-between text-xs font-bold text-text-muted uppercase tracking-wider mb-2 font-display">
-                <span>{zh ? "份额" : "Shares"}</span>
-                <span className="text-[10px] text-accent font-mono">{zh ? "手续费 1.2%" : "Fee 1.2%"}</span>
+                <span>{gen&&mode==="BUY"?t("金额（dUSDC）","Amount (dUSDC)"):t("份额","Shares")}</span>
+                <span className="text-[10px] text-accent font-mono">{gen?t("手续费 1%","Fee 1%"):t("手续费 2%","Fee 2%")}</span>
               </label>
+              <div className="flex items-stretch gap-2 mb-3">
               <input
                 type="number"
                 min="0.01"
                 step="0.01"
                 value={amount}
-                onChange={(event) => setAmount(Number(event.target.value))}
-                className="w-full bg-transparent border border-border rounded-lg px-3 py-3 text-text text-lg font-mono"
+                aria-label={t("交易金额或份额","Trade amount or tokens")} onChange={(event) => setAmount(Number(event.target.value))}
+                className="min-w-0 w-0 flex-1 h-11 bg-transparent border border-border rounded-lg px-3 py-2 text-text text-base font-mono"
               />
-              <div className="text-[10px] text-text-muted my-2 px-1 font-mono">
-                {zh ? "两个方向均按当前 LMSR 状态显示精确报价。" : "Both sides show exact quotes from the current LMSR state."}
-              </div>
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                {quoteRows("YES")}
-                {quoteRows("NO")}
-              </div>
-              <div role="note" className="mb-3 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2.5 text-text">
-                <div className="text-xs font-bold text-accent">{zh ? "手续费说明" : "Fee details"}</div>
-                <p className="mt-1 text-[10px] leading-relaxed text-text-muted font-mono">
-                  {zh ? "1.0% 原子进入 Vault，并按交易发生时的在场质押累计；0.2% 进入官方初始流动性池。" : "1.0% enters the Vault and is indexed to stake present at the trade; 0.2% goes to official initial liquidity."}
-                </p>
-              </div>
-              <div className="flex justify-end text-[10px] text-text-muted mb-3 font-mono">
-                {tradeMode === "BUY"
-                  ? <span>{zh ? "可用余额" : "Available"}: <strong className="text-text">{formatAmount(balance)} dUSDC</strong></span>
-                  : <span>YES: <strong className="text-text">{formatAmount(userShares.YES)}</strong> · NO: <strong className="text-text">{formatAmount(userShares.NO)}</strong></span>}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {(["YES", "NO"] as MarketSide[]).map((side) => (
+              <div className={`grid ${gen?"grid-cols-1":"grid-cols-2"} gap-2 flex-1 min-w-0`}>
+                {((gen?["YES"]:["YES","NO"]) as MarketSide[]).map((side) => (
                   <button
                     type="button"
                     key={side}
                     onClick={() => trade(side)}
-                    disabled={tradeMode === "SELL" && amount > userShares[side]}
-                    className={`flex flex-col items-center border rounded-lg p-3 transition-all active:scale-95 disabled:opacity-50 ${
+                    disabled={!quote(side)}
+                    className={`flex flex-col items-center border rounded-lg h-11 px-2 py-1 transition-all active:scale-95 disabled:opacity-50 ${
                       side === "YES"
                         ? "bg-success/10 border-success/30 hover:border-success"
                         : "bg-danger/10 border-danger/30 hover:border-danger"
                     }`}
                   >
-                    <span className={`font-bold text-sm font-display tracking-wider ${sideTextColor(side)}`}>{side}</span>
-                    <span className="text-text-muted text-xs font-mono mt-1">
-                      {(side === "YES" ? yesPrice : noPrice).toFixed(2)}
+                    <span className={`font-bold text-xs font-display tracking-wider ${sideTextColor(side)}`}>{gen?(mode==="BUY"?t("买入gToken","Buy gToken"):t("卖出gToken","Sell gToken")):side}</span>
+                    <span className="text-text-muted text-[10px] font-mono mt-0.5">
+                      {gen?genesisPrice(s.phase==='FAILED'?2*s.k*s.failedSupply:px.genesis):(side === "YES" ? yesPrice : noPrice).toFixed(2)}
                     </span>
                   </button>
                 ))}
               </div>
+              </div>
+              <div className="space-y-1 text-[10px] text-text-muted mb-3 font-mono" data-testid="my-trade-holdings">
+                <div className="flex justify-between gap-2"><span>{t("可用余额","Available balance")}</span><strong className="text-text">{formatAmount(balance)} dUSDC</strong></div>
+                <div className="flex justify-between gap-2"><span>{gen?t("我的gToken","My gToken"):t("我的份额","My shares")}</span><strong className="text-text">{gen?num(genesisTokens(a.g)):<>YES {formatAmount(userShares.YES)} · NO {formatAmount(userShares.NO)}</>}</strong></div>
+                {!gen&&<><div className="flex justify-between gap-2"><span>{t("我的LP份额","My LP shares")}</span><strong className="text-text">{num(a.lp,4)}</strong></div><div className="flex justify-between gap-2"><span>{t("我的B份额","My B shares")}</span><strong className="text-text">{num(a.z,4)}</strong></div>{lpBValuePanel}</>}
+                {gen&&<div className="flex justify-between gap-2" title={t("gToken当前全部卖出净额减剩余持仓成本；不含B权益及已实现盈亏。","Net sale value less remaining cost; excludes B rights and realized P/L.")}><span>{t("盈亏","P/L")}</span><strong className={genesisPnl>=0?"text-success":"text-danger"}>{genesisPnl>0?"+":""}{num(genesisPnl,2)} dUSDC</strong></div>}
+              </div>
+              <div className="text-[10px] text-text-muted my-2 px-1 font-mono">
+                {gen?t("按曲线积分成交；买卖都可能触发毕业。","Integrated curve pricing; buys or sells may trigger graduation."):t("两个方向均显示当前报价。","Both sides show current quotes.")}
+              </div>
+              <div className={`mb-3 grid ${gen?"grid-cols-1":"grid-cols-2"} gap-2`}>
+                {quoteRows("YES")}
+                {!gen&&quoteRows("NO")}
+              </div>
+              <div role="note" className="mb-3 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2.5 text-text">
+                <div className="text-xs font-bold text-accent">{zh ? "费用说明" : "Cost details"}</div>
+                <p className="mt-1 text-[10px] leading-relaxed text-text-muted font-mono">
+                  {gen?(mode==="BUY"?t("买入 100 dUSDC，94.5 买 gToken，4.5 计入做市风险准备金，1 是话题创建者手续费。","Buy with 100 dUSDC: 94.5 buys gToken, 4.5 goes to the market-making risk reserve, and 1 pays the topic creator fee."):t("卖出成交金额为 100 dUSDC，94.5 到账，4.5 计入做市风险准备金，1 是话题创建者手续费。","For a gross sale of 100 dUSDC: you receive 94.5, 4.5 goes to the market-making risk reserve, and 1 pays the topic creator fee.")):(mode==="BUY"?t("买入 100 dUSDC：98 用于购买份额，0.5 给LP，0.5 计入做市风险准备金，1 给Core。","Buy with 100 dUSDC: 98 buys shares, 0.5 goes to LP, 0.5 to the market-making risk reserve, and 1 to Core."):t("卖出成交金额为 100 dUSDC：98 到账，0.5 给LP，0.5 计入做市风险准备金，1 给Core。","For a gross sale of 100 dUSDC: you receive 98, 0.5 goes to LP, 0.5 to the market-making risk reserve, and 1 to Core."))}
+                </p>
+                {gen&&<details className="mt-2 text-[10px] text-text-muted font-mono"><summary className="cursor-pointer">{t("准备金说明","About the risk reserve")}</summary><p className="mt-1 leading-relaxed">{t("这笔准备金进入B池，用于优先承担做市亏损。你获得对应的B代币，结算后按持有份额领取补损后的剩余准备金；若准备金耗尽，B代币无款可领。","This reserve enters B and absorbs market-making losses first. You receive corresponding B tokens and may redeem your share of the residual reserve at settlement. If the reserve is exhausted, B tokens have no payout.")}</p></details>}
+
+              </div>
+
+
             </div>
           </div>
         )}
@@ -668,7 +313,7 @@ export const Simulation: React.FC<Props> = ({
           </div>
         )}
 
-        {phase === "FINALIZED" && finalOutcome && (
+        {terminal && (
           <div className="border-t border-border pt-4 mt-2 space-y-3">
             <div className="bg-transparent border border-border rounded-lg p-3 text-xs font-mono text-text-muted">
               <div className="text-[10px] font-bold uppercase tracking-widest mb-2 text-text-muted font-display">
@@ -683,40 +328,41 @@ export const Simulation: React.FC<Props> = ({
                 <strong className="text-text">{formatAmount(selectedFeePayout, 4)} dUSDC</strong>
               </div>
               <div className="flex justify-between mt-1">
-                <span>{zh ? "市场份额兑换" : "Market redemption"}</span>
+                <span>{zh ? "市场／LP／B结算" : "Market / LP / B payout"}</span>
                 <strong className="text-text">{formatAmount(marketPayout)} dUSDC</strong>
               </div>
             </div>
-            <Button onClick={withdrawVault} disabled={vaultClaimed || userStake <= 0} className="w-full">
+            <Button onClick={withdrawVault} disabled={vaultClaimed||s.phase!=="SETTLED"} className="w-full">
               {vaultClaimed ? (zh ? "已领取" : "Claimed") : (zh ? "领取 Vault" : "Claim Vault")}
             </Button>
-            <Button onClick={redeemMarket} disabled={marketRedeemed || userShares.YES + userShares.NO <= 0} variant="secondary" className="w-full">
-              {marketRedeemed ? (zh ? "已兑换" : "Redeemed") : (zh ? "兑换市场份额" : "Redeem market shares")}
+            <Button onClick={redeemMarket} disabled={!hasClaim} variant="secondary" className="w-full">
+              {marketRedeemed ? (zh ? "已兑换" : "Redeemed") : (zh ? "领取并销毁LP／B代币" : "Claim & burn LP / B tokens")}
             </Button>
-            <Button onClick={reset} variant="ghost" className="w-full">
+            <Button onClick={()=>reset()} variant="ghost" className="w-full">
               {zh ? "重新模拟" : "Reset simulation"}
             </Button>
           </div>
         )}
 
-        {phase === "STAKING" && (
+   {tab==='MARKET'&&['FORMAL','WAIT_CORE'].includes(s.phase)&&Math.min(a.yes,a.no)>0&&<details className={box+' text-xs'}><summary className="cursor-pointer">{t('YES＋NO成对兑换','Redeem YES + NO pairs')}</summary><p className="my-3 text-text-muted">{t('每对兑回1 dUSDC，不收交易费。','Each pair redeems 1 dUSDC, fee-free.')}</p><input aria-label={t('成对兑换数量','Pair redemption amount')} type="number" value={pairs} onChange={e=>setPairs(Number(e.target.value))} className="w-full p-3 border border-border rounded-lg"/><Button className="w-full mt-3" disabled={!(pairs>0)||pairs>Math.min(a.yes,a.no)} onClick={()=>act(v=>dlpRedeemPairs(v,id,pairs))}>{t('确认成对兑换','Redeem pairs')}</Button></details>}
+        {ticking && (
           <Button onClick={fastForward} variant="ghost" size="sm" className="w-full">
-            {zh ? "演示：快进到截止" : "Demo: skip to deadline"}
+            {zh ? "时间快进10分钟" : "Advance time by 10 minutes"}
           </Button>
         )}
-        <div className={`rounded-lg border p-3 text-[10px] leading-relaxed font-mono ${notice ? "border-accent/40 bg-accent/5 text-text" : "border-border text-text-muted"}`}>
-          {notice || (zh ? "这是本地机制模拟，不会发起链上交易。" : "This is a local mechanism simulation; it does not submit transactions.")}
+        <div role="status" aria-live="polite" className={`rounded-lg border p-3 text-[10px] leading-relaxed font-mono ${notice ? "border-accent/40 bg-accent/5 text-text" : "border-border text-text-muted"}`}>
+          {notice || (zh ? "这是本地机制模拟，不会发起链上交易。" : "Local demo only; no chain transactions.")}
         </div>
       </div>
 
       <div className="px-4 py-5 sm:p-6 md:w-2/3 bg-slate-50/40 md:bg-transparent relative flex flex-col font-mono md:rounded-r-2xl">
         <div className="hidden md:block mb-6 animate-fade-in border-b border-border pb-4">
           <h2 className="text-2xl font-bold text-text mb-3 tracking-wide font-display text-glow break-words leading-tight">
-            {zh ? "OCP 会成为币圈的重要玩家吗？" : "Will OCP become a major player in crypto?"}
+            {topic.title}
           </h2>
           <div className="mb-3 px-3 py-2 rounded-lg bg-accent/5 border border-accent/20">
             <p className="text-sm leading-6 text-text font-mono">
-              {zh ? "YES：会成为重要玩家。NO：不会成为重要玩家。INVALID：条件无法有效判断。" : "YES: becomes a major player. NO: does not become a major player. INVALID: the premise cannot be resolved."}
+              {topicRules}
             </p>
           </div>
           <div className="flex items-start justify-between gap-4">
@@ -726,7 +372,7 @@ export const Simulation: React.FC<Props> = ({
               </span>
             </div>
             <div className="w-72 max-w-full shrink-0 whitespace-nowrap text-right text-3xl font-bold text-text tabular-nums font-display tracking-normal text-glow">
-              {timeLeft > 0 ? `0h 0m ${timeLeft}s` : "—"}
+              {timeLeft > 0 ? `${Math.floor(timeLeft/3600)}h ${Math.floor(timeLeft/60)%60}m ${Math.floor(timeLeft)%60}s` : "—"}
             </div>
           </div>
         </div>
@@ -739,16 +385,11 @@ export const Simulation: React.FC<Props> = ({
         </div>
 
         <div className="space-y-3 sm:space-y-4 mb-5 sm:mb-8 animate-fade-in">
-          <div className="text-center text-xs font-bold uppercase tracking-widest mb-2 text-text-muted font-display">
-            {activeTab === "MARKET"
-              ? (zh ? "正在显示：市场流动性（交易赔率）" : "Showing: Market liquidity (trading odds)")
-              : (zh ? "正在显示：协议资本（结果权重）" : "Showing: Protocol capital (outcome weight)")}
-          </div>
-          {activeTab === "MARKET" ? (
-            <div className="space-y-4">
+          {activeTab === "MARKET" && (gen||s.phase==='FAILED') ? <div data-testid="genesis-price" className="space-y-4"><h3 className="text-xs font-bold">{t("Genesis gToken 价格","Genesis gToken price")}</h3><strong className="text-2xl text-accent">{genesisPrice(s.phase==='FAILED'?2*s.k*s.failedSupply:px.genesis)} <span className="text-xs">dUSDC／{t("枚","token")}</span></strong><GenesisPriceChart events={s.events} supply={s.phase==='FAILED'?s.failedSupply:s.S} k={s.k} zh={zh}/><div className="border border-border rounded-xl p-4 space-y-3 text-xs"><div className="flex justify-between"><strong>{t("双池毕业进度","Graduation progress")}</strong><span>3.6 / 0.6 ETH</span></div>{[['R',s.R,s.rTarget],['B',s.B,s.bTarget]].map(([label,v,target])=><div key={String(label)}><div className="flex justify-between mb-1"><span>{label}</span><strong>{num(Number(v))} / {num(Number(target))}</strong></div><div className="h-2 bg-gray-100 rounded overflow-hidden"><div className={label==='R'?'h-full bg-purple-500':'h-full bg-accent'} style={{width:`${Math.min(100,Number(v)/Number(target)*100)}%`}}/></div></div>)}</div><p className="text-[10px] text-text-muted">{s.phase==='FAILED'?t("筹资未达标，未开启正式市场。请领取清算款。","Funding failed; the market did not open. Claim your refund."):t("双池达标立即毕业，后面一笔卖出也可能触发。","Both pools trigger graduation; a later sell can be the trigger.")}</p></div> : activeTab === "MARKET" ? (
+            <div className="space-y-4" data-testid="formal-chart">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5 text-text-muted font-display">
-                  {zh ? "预测市场行情" : "Market odds"}
+                  {zh ? "市场行情" : "Market odds"}
                 </div>
                 <div className="h-6 bg-transparent border border-border rounded overflow-hidden flex">
                   <div className="h-full bg-success transition-all" style={{ width: `${yesPrice * 100}%` }} />
@@ -761,7 +402,7 @@ export const Simulation: React.FC<Props> = ({
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5 text-text-muted font-display">
-                  {zh ? "LMSR 未结算份额" : "Outstanding LMSR shares"}
+                  {zh ? "未结算份额" : "Outstanding shares"}
                 </div>
                 <div className="text-xs font-mono text-text-muted space-y-1">
                   <div>YES: <strong className="text-text">{formatAmount(marketShares.YES)} {zh ? "份" : "shares"}</strong></div>
@@ -770,7 +411,7 @@ export const Simulation: React.FC<Props> = ({
               </div>
             </div>
           ) : (
-            <>
+            <div data-testid="core-chart">
               {(["YES", "NO", "INVALID"] as VaultSide[]).map((side) => {
                 const pct = side === "YES" ? yesStakePct : side === "NO" ? noStakePct : invalidStakePct;
                 return (
@@ -785,11 +426,11 @@ export const Simulation: React.FC<Props> = ({
                   </div>
                 );
               })}
-            </>
+            </div>
           )}
         </div>
 
-        <div className="hidden md:grid grid-cols-2 gap-4 mb-6">
+        <div className={` ${gen?"hidden":"grid"} grid-cols-2 gap-4 mb-6`}>
           <div className="border border-border rounded-xl p-4">
             <div className="text-[10px] text-text-muted uppercase mb-2 font-bold font-display tracking-wider">
               {activeTab === "MARKET" ? (zh ? "市场总交易量" : "Market total volume") : (zh ? "总质押本金" : "Total principal")}
@@ -808,7 +449,7 @@ export const Simulation: React.FC<Props> = ({
           </div>
           <div className="border border-border rounded-xl p-4">
             <div className="text-[10px] text-text-muted uppercase mb-2 font-bold font-display tracking-wider">
-              {zh ? "Vault 累计手续费" : "Vault cumulative fees"}
+              {zh ? "市场输入Core的手续费" : "Market fees contributed to Core"}
             </div>
             <div className="text-sm text-text font-bold font-mono">
               {formatAmount(vaultFees, 4)} dUSDC
@@ -824,23 +465,22 @@ export const Simulation: React.FC<Props> = ({
           </div>
         </div>
 
+        {activeTab === "MARKET" && (
         <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto">
           <div className="flex justify-between gap-3">
-            <span>LMSR b / {zh ? "初始补贴" : "initial subsidy"}</span>
-            <strong className="text-text">{LIQUIDITY_PARAMETER} / {formatAmount(REQUIRED_SUBSIDY)} dUSDC</strong>
+            <span>{zh ? "做市风险准备金" : "Market-making risk reserve"}</span>
+            <strong className="text-text">{num(terminal?s.bBudget:s.B)} dUSDC</strong>
           </div>
           <div className="flex justify-between gap-3 mt-1.5">
-            <span>{zh ? "官方 0.2% / 未分配 Vault 手续费" : "Official 0.2% / unallocated Vault fees"}</span>
-            <strong className="text-text">{formatAmount(protocolLpFees + officialUnallocatedVaultFees, 4)} dUSDC</strong>
+            <span>{zh ? "LP代币 / B代币" : "LP tokens / B tokens"}</span>
+            <strong className="text-text">{num(a.lp,4)} / {num(a.z,4)}</strong>
           </div>
-          {userVaultSide && (
-            <div className="flex justify-between gap-3 mt-1.5">
-              <span>{zh ? "当前结果对应的我的条件手续费" : "My conditional fee for current outcome"}</span>
-              <strong className="text-text">{formatAmount(userConditionalFees[finalOutcome ?? provisionalOutcome], 4)} dUSDC</strong>
-            </div>
-          )}
+          {terminal&&lpBValuePanel}
+
         </div>
-      </div>
+        )}
+        {activeTab !== "MARKET" && userVaultSide && <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto"><div className="flex justify-between gap-3"><span>{t("预计 Core 奖励","Estimated Core reward")}</span><strong className="text-text">{formatAmount(userConditionalFees[finalOutcome ?? provisionalOutcome],4)} dUSDC</strong></div></div>}
+   <details className={box+' text-xs'} data-testid="demo-details"><summary className="cursor-pointer font-bold">{t('演示场景','Demo scenarios')}</summary><div className="mt-4 space-y-5"><div className="grid grid-cols-3 gap-3 text-center font-mono">{[['Genesis',s.TG],['Formal',s.TF],['Core',s.TC]].map(([label,v])=><div key={String(label)}>{label} {t('截止','closes')}<strong className="block mt-2">{clock(Number(v))}</strong></div>)}</div><p className="text-text-muted">{t('Formal与Core在毕业时同时开启，截止时间固定。','Formal and Core open together at graduation. Deadlines stay fixed.')}</p><details><summary className="cursor-pointer">{t('演示参数','Demo parameters')}</summary><label className="block my-3">{t('ETH固定快照','Fixed ETH snapshot')}<input aria-label="ETH snapshot" type="number" value={snapshot} onChange={e=>setSnapshot(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><label>{t('正式深度','Formal depth')}<input aria-label="Formal depth" type="number" value={depth} onChange={e=>setDepth(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><p className="text-text-muted mt-2">{t('仅在下次创建生效，非实时价格或生产参数。','Applies at next creation; illustrative parameters only.')}</p></details><details><summary className="cursor-pointer">{t('交易记录','Activity')}</summary><div className="mt-3 max-h-48 overflow-auto text-[11px] font-mono space-y-2">{[...s.events].reverse().filter(e=>!['CLAIM_FEES','CLAIM_CORE_OFFICIAL'].includes(e.kind)).map(e=><div key={e.id}>{clock(e.at)} · {({CREATE:t('创建市场','Created'),GENESIS_BUY:t('买入gToken','Bought gToken'),GENESIS_SELL:t('卖出gToken','Sold gToken'),GRADUATE:t('毕业','Graduated'),FORMAL_BUY:t('买入份额','Bought shares'),FORMAL_SELL:t('卖出份额','Sold shares'),CORE_STAKE:t('Core质押','Core stake'),FORMAL_CLOSE:t('市场交易截止','Trading closed'),SETTLE:t('结算','Settled'),FAIL:t('筹资未达标','Funding failed'),CLAIM_MARKET:t('领取市场结算款','Market payout'),CLAIM_CORE:t('领取Core结算款','Core payout'),BURN_LP:t('销毁LP并领取','LP redeemed'),BURN_B:t('销毁B并领取','B redeemed'),REDEEM_PAIRS:t('成对兑换','Pair redemption')} as Record<string,string>)[e.kind]??t('操作完成','Action completed')} {e.actor!==undefined?names[e.actor]:''} {e.amount!==undefined?`${num(e.amount,4)} dUSDC`:''}</div>)}</div></details></div></details>      </div>
     </div>
   );
 };
