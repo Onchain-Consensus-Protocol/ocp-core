@@ -6,7 +6,7 @@ import React, { useState, Component, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
 import { Shield, AlertTriangle } from "lucide-react";
-import { ExploreView } from "./components/ExploreView";
+import { StockMarketDirectory } from "./components/StockMarketDirectory";
 import { OCPMenu } from "./components/OCPMenu";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { WalletButton } from "./components/WalletButton";
@@ -43,7 +43,7 @@ function ExploreStandalone() {
       <nav className="sticky top-0 z-50 backdrop-blur-md bg-transparent border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <OCPMenu lang={lang} suffix="STAKE WAR" />
+            <OCPMenu lang={lang} suffix="MARKET" />
             <div className="flex items-center gap-4">
               <WalletButton
                 lang={lang}
@@ -62,20 +62,14 @@ function ExploreStandalone() {
       </nav>
       <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <ExploreView
-            lang={lang}
-            isWalletConnected={wallet.connected}
-            walletAddress={wallet.address}
-            signer={wallet.signer}
-            onConnectWallet={wallet.connectWallet}
-          />
+          <StockMarketDirectory lang={lang} />
         </div>
       </main>
       <footer className="py-6 border-t border-border bg-[#0b0c11]/60">
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
           <div className="flex items-center gap-2 opacity-60">
             <Shield className="w-5 h-5 text-accent" />
-            <span className="font-display font-bold text-text text-sm tracking-widest">OCP EXPLORER</span>
+            <span className="font-display font-bold text-text text-sm tracking-widest">OCP MARKET</span>
           </div>
           <span className="text-text-muted text-xs font-mono">{lang === "zh" ? "风险提示：请勿投入超过承受范围的资金" : "Do not invest more than you can afford to lose."}</span>
         </div>
