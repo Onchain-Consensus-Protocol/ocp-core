@@ -49,9 +49,10 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const stakes={YES:s.core.yes,NO:s.core.no,INVALID:s.core.invalid},totalStake=stakeTotal;
  const phase=s.phase==='CREATE'?'CREATE':terminal?'FINALIZED':s.now>=s.TC?'READY':'STAKING';
  const finalOutcome=s.result,vaultClaimed=a.coreClaimed,marketRedeemed=!hasClaim;
- const phaseLabel=phases[s.phase],phaseBadgeClass='border-accent/50 text-accent bg-accent/10';
+ const corePending=activeTab==='PROTOCOL'&&s.core.openedAt===null;
+ const phaseLabel=corePending?t(s.phase==='FAILED'?'Core未开启':'毕业后开启',s.phase==='FAILED'?'Core never opened':'Opens after graduation'):phases[s.phase],phaseBadgeClass='border-accent/50 text-accent bg-accent/10';
  const displayDeadline=activeTab==='PROTOCOL'?s.TC:(s.phase==='CREATE'||s.phase==='GENESIS'?s.TG:s.TF);
- const timeLeft=terminal?0:Math.max(0,displayDeadline-s.now);
+ const timeLeft=terminal||corePending?0:Math.max(0,displayDeadline-s.now);
  const yesPrice=px.probability?.[0]??(s.result==='YES'?1:s.result==='NO'?0:.5),noPrice=1-yesPrice;
  const yesStakePct=totalStake?stakes.YES/totalStake*100:0,noStakePct=totalStake?stakes.NO/totalStake*100:0,invalidStakePct=totalStake?stakes.INVALID/totalStake*100:0;
  const provisionalOutcome:Outcome=stakes.YES>totalStake/2?'YES':stakes.NO>totalStake/2?'NO':'INVALID';
@@ -59,8 +60,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const marketShares={YES:s.accounts.reduce((n,a)=>n+a.yes,0),NO:s.accounts.reduce((n,a)=>n+a.no,0)};
  const totalVolume=s.formalVolume??0,vaultFees=s.core.feeTotal,feeRoi=totalStake?vaultFees/totalStake*100:0;
  const formatAmount=num,sideTextColor=(side:Outcome)=>side==='YES'?'text-success':side==='NO'?'text-danger':'text-yellow-700';
- const primaryActionTitle=terminal?t('领取结算资金','Claim settlement'):activeTab==='MARKET'?(gen?t('交易gToken','Trade gToken'):t('交易','Trade')):t('选择方向并质押','Choose a side and stake');
- const primaryActionDescription=activeTab==='MARKET'?t('输入数量，查看成交报价与价格影响。','Enter an amount to preview execution and price impact.'):t('选择方向后只能同侧追加，资金锁定至结算。','Once selected, add only to the same side until settlement.');
+ const primaryActionTitle=corePending?t('Core未开启','Core not open'):terminal?t('领取结算资金','Claim settlement'):activeTab==='MARKET'?(gen?t('交易gToken','Trade gToken'):t('交易','Trade')):t('选择方向并质押','Choose a side and stake');
+ const primaryActionDescription=corePending?t('等待Genesis毕业。','Waiting for Genesis graduation.'):activeTab==='MARKET'?t('输入数量，查看成交报价与价格影响。','Enter an amount to preview execution and price impact.'):t('选择方向后只能同侧追加，资金锁定至结算。','Once selected, add only to the same side until settlement.');
  const MIN_STAKE=1;
  const stake=(side:Outcome)=>act(v=>dlpCoreStake(v,id,side,amount));
  const trade=(side:Side)=>execute(gen?'G':side);
@@ -158,7 +159,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
 
         <label className="flex justify-between items-center text-xs font-mono text-text-muted">{t("当前账户","Account")}<select aria-label={t("当前模拟账户","Demo account")} value={id} onChange={e=>{setId(Number(e.target.value));setNotice('')}} className="border border-border rounded-lg p-2 bg-white">{names.map((n,i)=><option key={n} value={i}>{n}</option>)}</select></label>
 
-        {phase === "STAKING" && activeTab === "PROTOCOL" && (
+        {corePending&&<div className={box+' text-sm text-text-muted'} data-testid="core-pending">{s.phase==='FAILED'?t('Genesis未毕业，Core未开启。','Genesis failed; Core did not open.'):t('Genesis毕业后，Core与正式市场同时开启。当前尚不能质押。','Core opens together with the market after Genesis graduates. Staking is not available yet.')}</div>}
+        {!corePending && phase === "STAKING" && activeTab === "PROTOCOL" && (
           <div className="space-y-4 animate-fade-in">
             <div className="bg-transparent border border-border rounded-xl p-4 mb-2 text-xs text-text-muted">
               <h5 className="font-bold text-text flex items-center gap-1.5 mb-2 font-display">
@@ -410,7 +412,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
                 </div>
               </div>
             </div>
-          ) : (
+          ) : corePending ? <div className="text-center py-10 text-text-muted">{t('毕业后开启 Core','Core opens after graduation')}</div> : (
             <div data-testid="core-chart">
               {(["YES", "NO", "INVALID"] as VaultSide[]).map((side) => {
                 const pct = side === "YES" ? yesStakePct : side === "NO" ? noStakePct : invalidStakePct;
