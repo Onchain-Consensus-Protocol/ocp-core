@@ -49,7 +49,7 @@ function App() {
 
             <div className="flex items-center gap-4">
               <a
-                href="/explore.html"
+                href="https://market.ocp-protocol.org"
                 className="inline-flex items-center gap-1.5 text-xs font-bold transition-all px-3 py-2 rounded-lg font-display text-accent border border-accent/50 hover:bg-accent/10 whitespace-nowrap"
               >
                 <Landmark className="w-3.5 h-3.5" />
@@ -85,13 +85,7 @@ function App() {
                   </ReactMarkdown>
                 </div>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                  <a
-                    href="/explore.html"
-                    className="inline-flex items-center justify-center h-10 px-4 rounded-lg border border-accent text-accent hover:bg-accent/10 transition-colors text-sm font-display font-bold"
-                  >
-                    <Landmark className="w-4 h-4 mr-2" />
-                    {t.hero_btn_vaults}
-                  </a>
+
                   <Button size="md" onClick={() => {
                     document.getElementById('sim-container')?.scrollIntoView({ behavior: 'smooth' });
                     if (!isWalletConnected) connectWallet();

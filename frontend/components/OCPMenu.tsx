@@ -14,7 +14,7 @@ import {
 import type { Language } from "../types";
 
 const PRIMARY_LINKS = [
-  { view: "simulation", zh: "Market", en: "Market", icon: Home },
+  { view: "simulation", zh: "首页", en: "Home", icon: Home },
   { view: "mechanism", zh: "机制", en: "Mechanism", icon: BookOpen },
 ] as const;
 
@@ -72,7 +72,7 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
             return (
               <a
                 key={link.view}
-                href={`/?view=${link.view}`}
+                href={`https://ocp-protocol.org/?view=${link.view}`}
                 role="menuitem"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
               >
@@ -82,7 +82,7 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
             );
           })}
           <a
-            href="/how.html"
+            href="https://ocp-protocol.org/how.html"
             role="menuitem"
             className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
           >
@@ -104,7 +104,7 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
                 return (
                   <a
                     key={link.view}
-                    href={`/?view=${link.view}`}
+                    href={`https://ocp-protocol.org/?view=${link.view}`}
                     role="menuitem"
                     className="flex items-center gap-3 rounded-md px-3 py-2 text-xs font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
                   >
