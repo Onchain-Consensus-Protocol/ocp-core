@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import {
   ArrowDown,
+  ArrowLeftRight,
   ArrowRight,
   BadgeDollarSign,
   Banknote,
@@ -22,152 +23,130 @@ import "./index.css";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { OCPMenu } from "./components/OCPMenu";
 import type { Language } from "./types";
+import {createDlpDemo,dlpCreate,dlpBuy,dlpSell} from './components/dlpDemoModel';
+import {genesisTokens,genesisPrice} from './components/genesisDisplay';
 
 const copy = {
   en: {
     navExplore: "Open markets",
     eyebrow: "CAPITAL CONSENSUS × CONTINUOUS PRICING",
-    title: "How OCP & Market Works",
+    title: "How OCP Core & Market Work",
     intro:
-      "One proposition creates two connected ledgers. OCP locks capital to determine the final outcome. The LMSR market lets traders price that outcome continuously before the deadline.",
-    notOracle: "OCP outputs capital confidence—not guaranteed objective truth.",
-    vault: "OCP Vault",
-    vaultDesc: "Participants lock capital on YES, NO, or INVALID. Capital cannot withdraw or switch sides before the fixed deadline.",
-    market: "LMSR Market",
-    marketDesc: "Traders buy and sell YES or NO shares instantly against a subsidized mathematical curve. No external LP is required.",
+      "Launch a topic at zero initial capital. Trade gToken during Genesis. When both funding targets are met, Genesis ends and the Market and OCP Core open together.",
+    notOracle: "This page explains the current simulation. No real funds or on-chain transactions are required.",
+    vault: "OCP Core",
+    vaultDesc: "Opens only after Genesis graduation. Stake on YES, NO or INVALID; your chosen side is locked until settlement. Core capital determines the final result.",
+    market: "Market",
+    marketDesc: "After graduation, buy and sell YES / NO shares. Trades change market prices; they do not directly change Core stakes or the final result.",
     shared: "Shared final outcome",
-    sharedDesc: "The Vault finalizes once. The Market reads that exact OnChain outcome and settles every outstanding share.",
+    sharedDesc: "Core finalizes one result: YES, NO or INVALID. Market shares and LP / B rights settle using that same result.",
     lifecycle: "One market lifecycle",
-    steps: [
-      ["Official creation", "The Factory atomically creates a Vault and Market, then locks the LMSR subsidy."],
-      ["Capital + trading", "Vault staking and Market trading remain open until the same fixed deadline."],
-      ["Fees accrue", "Every buy and sell charges 1.2% on actual USDC cash flow."],
-      ["Finalization", "Any address may trigger finalization after the deadline; the result cannot be changed."],
-      ["Claims", "Vault principal, fee rewards, PM shares, and official fees are claimed from separate accounting buckets."],
-    ],
+    steps: [["Launch a topic", "Define the question and YES / NO / INVALID criteria. The demo starts with zero creator capital and a fixed three-hour schedule."], ["Trade gToken", "Buy and sell on the Genesis curve. For a buy of 100 dUSDC, 94.5 buys gToken, 4.5 enters the B risk reserve and earns B tokens, and 1 is the creator fee. Sales use the same split on the curve gross amount."], ["Graduate in either direction", "Targets are R = 3.6 ETH equivalent and B = 0.6 ETH equivalent, converted at creation and fixed in dUSDC. Each buy or sell checks both targets; the triggering order executes in full, then graduation is immediate. Genesis gToken becomes LP rights."], ["Market + Core open", "Both open at graduation. In the demo Genesis closes at hour 1, Market trading at hour 2 and Core staking at hour 3, measured from creation. Early graduation opens trading sooner; it does not reset deadlines."], ["Trade and stake", "Market trades allocate 98% to share purchases / seller proceeds, 0.5% to LP, 0.5% to B and 1% to Core rewards. Core staking is separate; eligible stakes earn fees only as those fees occur."], ["Settle and claim", "Core determines the result. Claim winning shares, Core principal / rewards and LP / B settlement amounts. Redeeming LP and B burns those tokens. If Genesis fails, R is distributed by gToken holdings and B by B-token holdings; creator fees are not refunded."]],
     capitalLab: "Capital consensus lab",
-    capitalLabDesc: "Adjust each side. YES or NO must hold strictly more than 50% of all Vault principal.",
+    capitalLabDesc: "An illustrative Core snapshot: YES or NO must exceed 50% of all three sides combined. Otherwise the result is INVALID.",
     total: "Total capital",
     result: "Final result",
-    perUnit: "Vault payout per 1 staked",
-    allRefund: "All sides share the pool pro rata (normally a principal refund).",
-    marketLab: "LMSR price lab",
-    marketLabDesc: "Move the net YES share position. With b = 1,000, larger orders move the marginal price along the curve.",
+    perUnit: "Winning-side Core payout per unit",
+    allRefund: "For INVALID, each side receives its own staked principal back; rewards are accounted for separately.",
+    marketLab: "Market price example",
+    marketLabDesc: "Illustrative price curve, not a quote from an active market. Adjust the net share balance to see price impact.",
     netShares: "Net YES shares − NO shares",
     marginal: "Current marginal price",
     curveNote: "A trade executes along the curve, so its average price differs from the final marginal price.",
-    formula: "Core LMSR formulas",
-    maxLoss: "Maximum market-maker loss",
-    subsidy: "For b = 1,000, required initial subsidy ≈ 693.147183 USDC.",
-    feeTitle: "Every trade: 1.2% fee",
-    vaultFee: "1.0% → Vault fee ledger",
-    protocolFee: "0.2% → official initial-liquidity pool",
-    feeBasis: "Calculated on USDC actually paid or received—not on nominal share value.",
+    formula: "LP and B at settlement",
+    maxLoss: "B covers LP losses first",
+    subsidy: "Pool cash, accumulated LP fees and outcome inventory form LP net assets. B first covers any shortfall against the fixed LP basis, up to the available B reserve. LP receives net assets plus that cover; B holders receive the reserve left over. Neither is guaranteed a profit.",
+    feeTitle: "Market trades: 2% total allocation",
+    vaultFee: "1% → eligible Core rewards",
+    protocolFee: "0.5% → LP · 0.5% → B reserve · no fixed creator or protocol cut",
+    feeBasis: "Buy 100 dUSDC: 98 buys shares. Sell for a curve gross amount of 100: receive 98. The remaining 2 is split as above; the pool pays the full gross amount on a sale.",
     outcomes: "What happens at settlement",
-    yesResult: "YES > 50% of all Vault capital",
-    noResult: "NO > 50% of all Vault capital",
+    yesResult: "YES exceeds 50% of all Core principal",
+    noResult: "NO exceeds 50% of all Core principal",
     invalidResult: "Neither YES nor NO exceeds 50%",
-    vaultSettlement: "Vault",
-    pmSettlement: "Prediction Market",
-    feeSettlement: "1% fee ledger",
-    yesVault: "YES stakers share the entire Vault pool.",
-    noVault: "NO stakers share the entire Vault pool.",
-    invalidVault: "YES, NO, and INVALID participants share the pool pro rata.",
-    yesPm: "YES share = 1 USDC · NO share = 0",
-    noPm: "NO share = 1 USDC · YES share = 0",
-    invalidPm: "YES share = 0.5 USDC · NO share = 0.5 USDC",
-    yesFee: "Only the time-weighted YES ledger is paid.",
-    noFee: "Only the time-weighted NO ledger is paid.",
-    invalidFee: "YES + NO stakers share the combined time-weighted ledger. INVALID stakes receive no PM fees.",
+    vaultSettlement: "OCP Core",
+    pmSettlement: "Market shares",
+    feeSettlement: "Core rewards (1%)",
+    yesVault: "YES stakers share the entire Core principal pool. Other sides lose their principal.",
+    noVault: "NO stakers share the entire Core principal pool. Other sides lose their principal.",
+    invalidVault: "Each account receives its own Core principal back.",
+    yesPm: "YES pays 1 dUSDC per share; NO pays 0.",
+    noPm: "NO pays 1 dUSDC per share; YES pays 0.",
+    invalidPm: "YES and NO each pay 0.5 dUSDC per share.",
+    yesFee: "Pays the YES-eligible rewards accrued when fees occurred; late staking earns no past fees.",
+    noFee: "Pays the NO-eligible rewards accrued when fees occurred; late staking earns no past fees.",
+    invalidFee: "Pays the INVALID-conditional ledger to eligible YES / NO stakes. INVALID stakes receive no market-fee rewards.",
     separation: "Two roles, two risks",
-    staker: "Vault staker",
-    stakerDesc: "Commits capital to determine the outcome. A losing binary side—including INVALID when YES/NO wins—can lose its principal.",
-    trader: "PM trader",
+    staker: "Core staker",
+    stakerDesc: "Back an outcome with principal, locked until settlement without withdrawals or switching sides. Winners share losing-side principal and fees contributed by the market in proportion to their eligible stakes.",
+    trader: "Market trader",
     traderDesc: "Takes a priced YES/NO position. Shares can be sold before the deadline or redeemed after settlement.",
     coupling: "The same wallet may be both.",
-    couplingDesc: "PM positions and Vault stakes are separate ledgers, but the Vault result settles the PM. Capital can therefore influence the outcome of a position it holds.",
+    couplingDesc: "Market holdings and Core stakes are separate. Holding LP or B does not automatically earn Core rewards; staking in Core does not automatically grant LP or B.",
     boundaries: "Important boundaries",
-    boundariesList: [
-      "The deadline is fixed; there is no extension or challenge phase.",
-      "OCP is capital consensus, not an external evidence oracle.",
-      "LMSR guarantees continuous quotes, not zero price impact.",
-      "Buy and sell both charge 1.2%; a full round trip pays fees twice.",
-      "INVALID is a risky veto position: successful INVALID normally refunds principal; failed INVALID loses to the binary winner.",
-    ],
-    cta: "See it live OnChain",
-    ctaDesc: "Open Stake War to inspect Vault capital, LMSR prices, fees, positions, and settlement state.",
+    boundariesList: ["The current release is a local simulation, not a deployed version of these economic rules. Market creation on the directory page is temporarily disabled.", "Core opens only after graduation. A failed Genesis never opens Market trading or Core staking.", "Genesis has a single gToken curve: R = kS², P = 2kS. Price starts at zero with zero supply; buying and selling use curve integration.", "LP remains locked until settlement in the current demo. LP / B secondary trading is not offered. Their conditional payout estimates are not executable sale prices.", "B earns 0.5% of Market trading amounts, but absorbs LP losses first. B fees do not mint new B tokens; remaining reserves can grow or be exhausted.", "At Genesis failure, fixed snapshot budgets and denominators determine refunds. Claim order does not change the per-token payout; paid creator fees are not refunded.", "Core measures capital consensus. Its outcome is not a guarantee of independently verified facts."],
+    cta: "Try the simulation",
+    ctaDesc: "Write a topic, trade through Genesis, and explore Market trading, Core staking and conditional LP / B payouts.",
   },
   zh: {
     navExplore: "打开市场",
     eyebrow: "资本共识 × 连续定价",
-    title: "OCP 与预测市场如何协作",
-    intro: "一个命题对应两套相连的账本：OCP 用锁定资本决定最终结果；LMSR 预测市场在截止前持续为这个结果定价。",
-    notOracle: "OCP 输出的是资本置信度，不保证等于客观事实。",
-    vault: "OCP Vault",
-    vaultDesc: "参与者把资本锁定在 YES、NO 或 INVALID。固定截止前不能撤回，也不能换边。",
-    market: "LMSR 预测市场",
-    marketDesc: "交易者直接沿数学曲线买卖 YES 或 NO 份额，无需外部 LP，即时获得链上报价。",
+    title: "OCP Core 与市场如何协作",
+    intro: "零初始本金发射话题，在 Genesis 买卖 gToken。双池达标即毕业，正式市场与 OCP Core 同时开启，最后按 Core 结果结算。",
+    notOracle: "本页说明当前模拟规则，不需要真实资金，不发起链上交易。",
+    vault: "OCP Core",
+    vaultDesc: "Genesis 毕业后才开启。选择 YES、NO 或 INVALID 质押，选定后只能同侧追加，资金锁定至结算；Core 质押资本决定最终结果。",
+    market: "市场",
+    marketDesc: "毕业后买卖 YES／NO 份额。交易影响市场价格，不会直接改变 Core 质押或最终结果。",
     shared: "共享同一个最终结果",
-    sharedDesc: "Vault 只终局一次；Market 读取这个链上结果，并据此结算全部未兑付份额。",
+    sharedDesc: "Core 产生 YES、NO 或 INVALID 结果；市场份额及 LP／B 权益使用同一结果结算。",
     lifecycle: "一个市场的生命周期",
-    steps: [
-      ["官方创建", "Factory 原子创建 Vault 与 Market，同时锁定 LMSR 初始补贴。"],
-      ["资本与交易", "Vault 质押和 Market 交易开放到同一个固定截止时间。"],
-      ["手续费累计", "每次买入和卖出均按实际 USDC 现金流收取1.2%。"],
-      ["终局", "截止后任何地址都可触发，结果一旦写入便不可更改。"],
-      ["分别领取", "Vault 本金、手续费奖励、PM 份额与官方费用使用独立资金桶领取。"],
-    ],
+    steps: [["发射话题", "填写话题内容，定义 YES／NO／INVALID 判定条件。创建者无需初始本金；模拟采用从创建时起固定三小时的时间表。"], ["买卖 gToken", "Genesis 按曲线买卖。买入 100 dUSDC，94.5 买 gToken，4.5 计入 B 做市风险准备金并获得 B 代币，1 为创建者手续费。卖出按曲线毛额采用相同比例。"], ["买卖都可触发毕业", "R 目标为 3.6 ETH 等值，B 目标为 0.6 ETH 等值，创建时快照换算后固定。每笔买卖完成后检查双池，达标立即毕业。触发订单完整成交；gToken 转为 LP 权益。"], ["市场与 Core 同时开启", "仅毕业后开放。模拟中 Genesis 在创建后第1小时截止，市场第2小时截止，Core 第3小时截止。提前毕业就提前开放，但不重置截止时间。"], ["交易与质押", "正式买卖的98%用于购买份额／卖家实收，0.5%归LP，0.5%进入B，1%归Core奖励。Core质押独立记账，只分参与期间符合条件的新增费用。"], ["结算并领取", "按Core结果领取份额赔付、Core本金及奖励，以及LP／B结算款。领取LP、B需销毁对应代币。未毕业则R按gToken份额、B按B代币份额清算，已付创建者手续费不退。"]],
     capitalLab: "资本共识实验",
-    capitalLabDesc: "调整三边资本。YES 或 NO 必须严格超过 Vault 全部本金的50%。",
+    capitalLabDesc: "这是一个 Core 资本快照示例：YES 或 NO 必须严格超过三个方向全部质押的50%，否则为 INVALID。",
     total: "总资本",
     result: "最终结果",
-    perUnit: "每质押1单位的 Vault 兑付",
-    allRefund: "所有方向按本金比例分享资金池，正常情况下等于退回本金。",
-    marketLab: "LMSR 价格实验",
-    marketLabDesc: "调整 YES 净份额。这里 b=1,000；订单越大，沿曲线推动边际价格越明显。",
+    perUnit: "Core胜方每单位本金兑付",
+    allRefund: "INVALID 时各账户领取自己的质押本金，费用奖励独立计算。",
+    marketLab: "市场价格示例",
+    marketLabDesc: "调整净份额，观察交易带来的价格影响。这里只是曲线示例，不是某个真实市场的可成交报价。",
     netShares: "YES 净份额 − NO 净份额",
     marginal: "当前边际价格",
     curveNote: "交易沿曲线成交，因此平均成交价不会等于交易后的最终边际价格。",
-    formula: "LMSR 核心公式",
-    maxLoss: "做市部分最大亏损",
-    subsidy: "当 b=1,000 时，需要锁定的初始补贴约为693.147183 USDC。",
-    feeTitle: "每笔交易：1.2%手续费",
-    vaultFee: "1.0% → Vault 手续费账本",
-    protocolFee: "0.2% → 官方初始流动性池",
-    feeBasis: "按用户实际支付或收到的 USDC 计算，不按份额名义价值计算。",
+    formula: "LP 与 B 如何结算",
+    maxLoss: "B 优先补偿 LP 做市亏损",
+    subsidy: "池内现金、累计LP费用及YES／NO库存的结算价值形成LP净资产。低于固定LP本金基准时，B按实际余额优先补损。LP领取净资产加补损；B持有人分配补损后的剩余准备金，两者都不保证盈利。",
+    feeTitle: "正式市场：费用合计2%",
+    vaultFee: "1% → Core合格质押者奖励",
+    protocolFee: "0.5% → LP · 0.5% → B准备金 · 创建者及协议固定分成均为0",
+    feeBasis: "买入100 dUSDC，98用于购买份额；卖出曲线毛额100，98到账，其余2按上述比例分配。卖出时交易池支付完整毛额，不是只扣98。",
     outcomes: "三种终局分别发生什么",
-    yesResult: "YES > Vault 全部资本的50%",
-    noResult: "NO > Vault 全部资本的50%",
-    invalidResult: "YES 与 NO 都未超过50%",
-    vaultSettlement: "Vault",
-    pmSettlement: "预测市场",
-    feeSettlement: "1%手续费账",
-    yesVault: "YES 质押者瓜分整个 Vault 资金池。",
-    noVault: "NO 质押者瓜分整个 Vault 资金池。",
-    invalidVault: "YES、NO、INVALID 全部按本金比例分享资金池。",
-    yesPm: "YES 每份=1 USDC · NO 每份=0",
-    noPm: "NO 每份=1 USDC · YES 每份=0",
-    invalidPm: "YES 每份=0.5 USDC · NO 每份=0.5 USDC",
-    yesFee: "只兑现按在场时间累计的 YES 手续费账。",
-    noFee: "只兑现按在场时间累计的 NO 手续费账。",
-    invalidFee: "YES 与 NO 质押者共享合并的时间加权手续费账；INVALID 质押不获得 PM 手续费。",
+    yesResult: "YES严格超过Core全部质押本金的50%",
+    noResult: "NO严格超过Core全部质押本金的50%",
+    invalidResult: "YES与NO均未严格超过50%",
+    vaultSettlement: "OCP Core",
+    pmSettlement: "市场份额",
+    feeSettlement: "Core奖励（1%）",
+    yesVault: "YES质押者按比例分享Core全部质押本金，其他方向损失本金。",
+    noVault: "NO质押者按比例分享Core全部质押本金，其他方向损失本金。",
+    invalidVault: "各账户领取自己的Core质押本金。",
+    yesPm: "YES每份兑付1 dUSDC，NO为0。",
+    noPm: "NO每份兑付1 dUSDC，YES为0。",
+    invalidPm: "YES与NO每份各兑付0.5 dUSDC。",
+    yesFee: "领取费用发生时累计的YES条件奖励；晚质押不分过去的费用。",
+    noFee: "领取费用发生时累计的NO条件奖励；晚质押不分过去的费用。",
+    invalidFee: "按INVALID条件账向合格YES／NO质押者分配；INVALID质押不获得市场费用奖励。",
     separation: "两个角色，两套风险",
-    staker: "Vault 质押者",
-    stakerDesc: "用资本决定终局。二元结果下，失败方向会损失本金；YES/NO 胜出时 INVALID 也属于失败方。",
-    trader: "PM 交易者",
+    staker: "Core质押者",
+    stakerDesc: "用本金支持一个结果，结算前不能撤回或换边。赢方按比例分享输方本金及市场输入的手续费。",
+    trader: "市场交易者",
     traderDesc: "持有按价格买入的 YES/NO 份额；截止前可以卖出，终局后可以兑付。",
     coupling: "同一个钱包可以同时扮演两种角色。",
-    couplingDesc: "PM 仓位与 Vault 质押是两套账，但 Vault 结果负责结算 PM，因此资本可以影响自己持有仓位的最终结果。",
+    couplingDesc: "市场持仓与Core质押独立记账。持有LP或B不会自动获得Core奖励；质押Core也不会自动获得LP或B。",
     boundaries: "必须理解的边界",
-    boundariesList: [
-      "截止时间固定，没有延期或挑战期。",
-      "OCP 是资本共识，不是外部证据 Oracle。",
-      "LMSR 保证持续报价，不保证零价格影响。",
-      "买入和卖出都收1.2%；完整进出会支付两次手续费。",
-      "INVALID 是有风险的否决方向：INVALID 成功通常只退本金，失败则本金归二元胜方。",
-    ],
-    cta: "查看真实链上市场",
-    ctaDesc: "进入 Stake War，查看 Vault 资本、LMSR 价格、手续费、个人仓位与结算状态。",
+    boundariesList: ["当前发布的是模拟演示，不代表这些经济规则已经部署为实盘合约；Market目录的创建入口暂未开放。", "Core只在Genesis毕业后开启；未毕业清算不会开启正式交易或Core质押。", "Genesis采用单一gToken二次曲线：R = kS²，P = 2kS。零供应时价格为零，实际买卖按曲线积分成交。", "当前模拟中LP持有至结算，不提供中途撤走或LP／B二级交易。不同结果下的预计领取金额不是可直接卖出的价格。", "B获得正式交易额的0.5%收入，但优先承担LP做市亏损。新增费用不增发B代币；剩余准备金可能增加，也可能耗尽。", "未毕业清算使用失败时固定的预算与总份额，先领后领不改变每份兑付金额；创建者手续费不退。", "Core体现资本共识，不保证结果经过外部事实验证。"],
+    cta: "体验模拟演示",
+    ctaDesc: "填写话题，从Genesis买卖开始，体验正式交易、Core质押与LP／B在不同结果下的预计领取金额。",
   },
 } as const;
 
@@ -269,8 +248,28 @@ function LmsrLab({ lang }: { lang: Language }) {
   );
 }
 
+function GenesisLab({lang}:{lang:Language}) {
+  const zh=lang==='zh';
+  const initial=()=>dlpCreate(createDlpDemo({Q:2000,b:150,TC:10800,creatorAccount:-1,protocolAccount:-1}));
+  const [state,setState]=useState(initial),[amount,setAmount]=useState(100),[message,setMessage]=useState('');
+  const active=state.phase==='GENESIS',account=state.accounts[0];
+  const fmt=(n:number)=>n.toLocaleString('en-US',{maximumFractionDigits:2});
+  const transact=(buy:boolean)=>{try{setState(buy?dlpBuy(state,0,amount):dlpSell(state,0,account.g/2));setMessage('')}catch{setMessage(zh?'请检查金额、余额或持仓。':'Check amount, balance and holdings.')}};
+  return <div className="rounded-2xl border border-border bg-white p-5 sm:p-6" data-testid="genesis-lab">
+    <div className="flex justify-between items-center gap-3"><strong>{zh?'买卖 gToken，观察价格与毕业进度':'Trade gToken and watch graduation progress'}</strong><button type="button" onClick={()=>{setState(initial());setMessage('')}} className="text-xs underline text-accent">{zh?'重置':'Reset'}</button></div>
+    <div className="grid grid-cols-2 gap-4 my-5"><div><p className="text-xs text-text-muted">{zh?'gToken价格':'gToken price'}</p><strong className="block mt-2">{genesisPrice(2*state.k*state.S)} dUSDC</strong></div><div><p className="text-xs text-text-muted">{zh?'我的gToken':'My gToken'}</p><strong className="block mt-2">{fmt(genesisTokens(account.g))}</strong></div></div>
+    <label className="block text-xs text-text-muted">{zh?'买入金额（dUSDC）':'Buy amount (dUSDC)'}<input aria-label={zh?'Genesis买入金额':'Genesis buy amount'} type="number" min="0.01" step="1" disabled={!active} value={amount} onChange={e=>setAmount(Number(e.target.value))} className="mt-2 w-full border border-border rounded-lg p-3 text-text"/></label>
+    <div className="flex gap-3 my-3"><button type="button" disabled={!active||!Number.isFinite(amount)||amount<=0||amount>account.wallet} onClick={()=>transact(true)} className="flex-1 border border-success/40 text-success rounded-lg p-3 text-sm font-bold disabled:opacity-40">{zh?'买入gToken':'Buy gToken'}</button><button type="button" disabled={!active||account.g<=0} onClick={()=>transact(false)} className="flex-1 border border-danger/40 text-danger rounded-lg p-3 text-sm font-bold disabled:opacity-40">{zh?'卖出一半':'Sell half'}</button></div>
+    <div className="text-xs text-text-muted mb-5">{zh?'可用余额':'Available balance'}: {fmt(account.wallet)} dUSDC</div>
+    {([['R',state.R,state.rTarget],['B',state.B,state.bTarget]] as const).map(([name,value,target])=><div key={name} className="mt-3"><div className="flex justify-between text-xs mb-2"><strong>{name}</strong><span>{fmt(value)} / {fmt(target)} dUSDC</span></div><div className="h-3 bg-slate-100 rounded-full overflow-hidden"><div className={name==='R'?'h-full bg-purple-500':'h-full bg-orange-500'} style={{width:`${Math.min(100,value/target*100)}%`}}/></div></div>)}
+    <p className="mt-4 text-xs leading-6 text-text-muted">{active?(zh?'买入推动价格上涨；卖出使价格下降并继续增加B。R与B同时达标即毕业，买卖都可能触发。':'Buys raise the price. Sales lower it and still add to B. Either direction can trigger graduation when both targets are met.'):(zh?'已毕业：Genesis停止交易，Formal与Core同时开启。点击重置重新体验。':'Graduated: Genesis closes; Formal and Core open together. Reset to try again.')}</p>
+    <details className="mt-3 text-xs text-text-muted"><summary className="cursor-pointer">{zh?'费用说明':'Cost details'}</summary><p className="mt-2 leading-6">{zh?'买入100：94.5买gToken，4.5计入B并获得B份额，1为创建者手续费。卖出毛额100：94.5到账，4.5计入B，1为创建者手续费。':'Buy 100: 94.5 buys gToken, 4.5 enters B and earns B shares, and 1 pays the creator. Sell gross 100: receive 94.5, B receives 4.5 and the creator receives 1.'}</p></details>
+    {message&&<p role="alert" className="text-danger text-xs mt-2">{message}</p>}
+  </div>;
+}
+
 function HowPage() {
-  const [lang, setLang] = useState<Language>("en");
+  const [lang, setLang] = useState<Language>(() => new URLSearchParams(window.location.search).get("lang") === "zh" ? "zh" : "en");
   const t = copy[lang];
   const outcomeCards = useMemo(() => [
     { result: "YES", condition: t.yesResult, color: "border-success/35", text: "text-success", vault: t.yesVault, pm: t.yesPm, fee: t.yesFee, icon: CheckCircle2 },
@@ -306,26 +305,20 @@ function HowPage() {
         </section>
 
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="grid items-stretch gap-4 lg:grid-cols-[1fr_auto_1fr]">
-            <div className="rounded-2xl border border-accent/30 bg-white p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent"><Scale className="h-5 w-5" /></div>
-              <h2 className="mt-5 font-display text-lg font-bold">{t.vault}</h2><p className="mt-3 text-sm leading-6 text-text-muted">{t.vaultDesc}</p>
-            </div>
-            <div className="flex items-center justify-center text-accent"><ArrowRight className="hidden h-6 w-6 lg:block" /><ArrowDown className="h-6 w-6 lg:hidden" /></div>
-            <div className="rounded-2xl border border-accent-2/30 bg-white p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-accent-2"><TrendingUp className="h-5 w-5" /></div>
-              <h2 className="mt-5 font-display text-lg font-bold">{t.market}</h2><p className="mt-3 text-sm leading-6 text-text-muted">{t.marketDesc}</p>
-            </div>
+          <div className="grid items-stretch gap-4 lg:grid-cols-3" data-testid="mechanism-modules">
+            {[
+              {title:'Genesis',icon:TrendingUp,zh:['启动与价格发现','市场的初始启动阶段，参与者在这里买卖 gToken，进行价格发现。','通过早期投机交易实现话题冷启动、价格发现和做市资本积累，并筛选有真实市场需求的话题进入 Formal Market。','话题创建后开始；毕业或启动阶段到期后结束。'],en:['Launch and price discovery','The initial market launch phase, where participants trade gToken for price discovery.','Early speculative trading bootstraps topics, enables price discovery and accumulates market-making capital, filtering topics with real market demand into the Formal Market.','Starts at topic creation; ends at graduation or the Genesis deadline.']},
+              {title:'OCP Core',icon:Scale,zh:['资本共识与结果确定','独立于市场交易的质押模块，参与者选择 YES、NO 或 INVALID，用本金支持一个结果。','按质押资本规则确定最终结果，供 Formal 及 LP／B 结算使用。合格质押者还可分配正式交易输入 Core 的费用。','Genesis 毕业后开启，与 Formal 同时开始；模拟中创建后第3小时截止。'],en:['Capital consensus and final outcome','A staking module separate from trading. Participants commit principal to YES, NO or INVALID.','Determines the final outcome under the capital-staking rules, used to settle Formal and LP / B rights. Eligible stakers can also earn fees contributed by market trades.','Opens with Formal only after Genesis graduation; closes at hour 3 from creation in the demo.']},
+              {title:'Formal',icon:ArrowLeftRight,zh:['正式市场与份额交易','毕业后的正式交易市场，买卖的是 YES／NO 结果份额。','让参与者表达预期并交易持仓，买卖形成市场报价；最终按 Core 结果兑付。市场价格不会直接决定 Core 结果。','Genesis 毕业后开启，与 Core 同时开始；模拟中创建后第2小时停止交易。'],en:['Market trading and outcome shares','The post-graduation market, where participants buy and sell YES / NO outcome shares.','Lets participants trade their expectations and positions. Orders form market prices; shares pay out using the final Core result. Market prices do not directly determine that result.','Opens with Core only after Genesis graduation; trading closes at hour 2 from creation in the demo.']}
+            ].map(module=>{const text=lang==='zh'?module.zh:module.en;const Icon=module.icon;return <article key={module.title} className="rounded-2xl border border-border bg-white p-6"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent"><Icon className="h-5 w-5"/></div><h2 className="mt-5 font-display text-lg font-bold">{module.title}</h2><p className="mt-1 text-xs font-bold text-accent">{text[0]}</p><dl className="mt-5 space-y-4 text-sm leading-6"><div><dt className="font-bold">{lang==='zh'?'是什么':'What it is'}</dt><dd className="mt-1 text-text-muted">{text[1]}</dd></div><div><dt className="font-bold">{lang==='zh'?'起什么作用':'What it does'}</dt><dd className="mt-1 text-text-muted">{text[2]}</dd></div><div><dt className="font-bold">{lang==='zh'?'什么时候开启':'When it opens'}</dt><dd className="mt-1 text-text-muted">{text[3]}</dd></div></dl></article>})}
           </div>
-          <div className="mx-auto mt-5 max-w-2xl rounded-2xl border border-border bg-slate-900 p-5 text-center text-white">
-            <GitBranch className="mx-auto h-5 w-5 text-orange-400" /><h3 className="mt-2 font-display text-sm font-bold">{t.shared}</h3><p className="mt-2 text-xs leading-5 text-slate-300">{t.sharedDesc}</p>
-          </div>
+          <div className="mx-auto mt-5 max-w-3xl rounded-2xl border border-border bg-slate-900 p-5 text-center text-white"><GitBranch className="mx-auto h-5 w-5 text-orange-400"/><h3 className="mt-2 font-display text-sm font-bold">{lang==='zh'?'Genesis 启动 → 毕业后 Core 与 Formal 同时开启':'Genesis launch → Core and Formal open together at graduation'}</h3><p className="mt-2 text-xs leading-6 text-slate-300">{lang==='zh'?'Core 决定结果，Formal 提供交易。Formal 截止后，Core 继续运行至自己的截止时间，再按最终结果结算；Genesis 未毕业则两者都不开启。':'Core determines the outcome; Formal enables trading. Core continues after Formal trading closes, until its own deadline. Settlement follows the final outcome. Neither opens if Genesis fails.'}</p></div>
         </section>
 
         <section className="border-y border-border bg-white/55">
           <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
             <SectionTitle eyebrow="01 / FLOW" title={t.lifecycle} />
-            <div className="grid gap-3 md:grid-cols-5">
+            <div className="grid gap-3 md:grid-cols-3">
               {t.steps.map(([title, description], index) => (
                 <div key={title} className="relative rounded-xl border border-border bg-white p-4">
                   <div className="text-[10px] font-bold text-accent">0{index + 1}</div>
@@ -337,27 +330,15 @@ function HowPage() {
           </div>
         </section>
 
-        <section className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8">
-          <div><SectionTitle eyebrow="02 / OCP VAULT" title={t.capitalLab} /><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.capitalLabDesc}</p><CapitalLab lang={lang} /></div>
-          <div><SectionTitle eyebrow="03 / LMSR" title={t.marketLab} /><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.marketLabDesc}</p><LmsrLab lang={lang} /></div>
-        </section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6" id="genesis-guide"><SectionTitle eyebrow="02 / GENESIS" title={lang==='zh'?'启动与价格发现实验':'Launch and price discovery lab'}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{lang==='zh'?'试着买入和卖出，观察gToken价格及双池毕业进度。这是独立实验，不使用真实资金。':'Try buying and selling to see gToken prices and graduation progress. This standalone lab uses no real funds.'}</p><GenesisLab lang={lang}/></section>
 
-        <section className="border-y border-border bg-slate-950 text-white">
-          <div className="mx-auto grid max-w-7xl gap-5 px-4 py-14 sm:px-6 md:grid-cols-2 lg:px-8">
-            <div className="rounded-2xl border border-slate-700 p-6">
-              <CircleDollarSign className="h-6 w-6 text-orange-400" /><h2 className="mt-4 font-display text-lg font-bold">{t.formula}</h2>
-              <div className="mt-5 font-mono text-sm text-slate-200">{t.maxLoss} = b · ln(2)</div><p className="mt-3 text-xs leading-6 text-slate-400">{t.subsidy}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-700 p-6">
-              <BadgeDollarSign className="h-6 w-6 text-orange-400" /><h2 className="mt-4 font-display text-lg font-bold">{t.feeTitle}</h2>
-              <div className="mt-5 space-y-2 text-sm"><div className="text-emerald-400">{t.vaultFee}</div><div className="text-purple-300">{t.protocolFee}</div></div>
-              <p className="mt-3 text-xs leading-6 text-slate-400">{t.feeBasis}</p>
-            </div>
-          </div>
-        </section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="03 / OCP CORE" title={t.capitalLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.capitalLabDesc}</p><CapitalLab lang={lang}/></section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="04 / FORMAL" title={t.marketLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.marketLabDesc}</p><LmsrLab lang={lang}/></section>
+
+
 
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <SectionTitle eyebrow="04 / SETTLEMENT" title={t.outcomes} />
+          <SectionTitle eyebrow="05 / SETTLEMENT" title={t.outcomes} />
           <div className="grid gap-4 lg:grid-cols-3">
             {outcomeCards.map((card) => {
               const Icon = card.icon;
@@ -378,25 +359,18 @@ function HowPage() {
 
         <section className="border-y border-border bg-white/55">
           <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-            <SectionTitle eyebrow="05 / ROLES" title={t.separation} />
+            <SectionTitle eyebrow="06 / ROLES" title={t.separation} />
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-border bg-white p-6"><Users className="h-6 w-6 text-accent" /><h3 className="mt-4 font-display font-bold">{t.staker}</h3><p className="mt-3 text-sm leading-6 text-text-muted">{t.stakerDesc}</p></div>
               <div className="rounded-2xl border border-border bg-white p-6"><Banknote className="h-6 w-6 text-accent-2" /><h3 className="mt-4 font-display font-bold">{t.trader}</h3><p className="mt-3 text-sm leading-6 text-text-muted">{t.traderDesc}</p></div>
             </div>
-            <div className="mt-4 rounded-2xl border border-accent/30 bg-orange-50 p-6"><h3 className="font-display text-sm font-bold text-accent">{t.coupling}</h3><p className="mt-2 text-sm leading-6 text-text-muted">{t.couplingDesc}</p></div>
           </div>
         </section>
 
         <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
-          <div className="rounded-3xl border border-border bg-white p-6 sm:p-9">
-            <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-accent" /><h2 className="font-display text-xl font-bold">{t.boundaries}</h2></div>
-            <div className="mt-6 grid gap-3 md:grid-cols-2">
-              {t.boundariesList.map((item) => <div key={item} className="flex gap-3 rounded-xl bg-slate-50 p-4 text-xs leading-5 text-text-muted"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />{item}</div>)}
-            </div>
-          </div>
           <div className="mt-8 rounded-3xl bg-accent px-6 py-9 text-center text-white">
             <h2 className="font-display text-xl font-bold">{t.cta}</h2><p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-orange-100">{t.ctaDesc}</p>
-            <a href="/explore.html" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-xs font-bold text-accent transition-transform hover:scale-[1.02]">{t.navExplore}<ArrowRight className="h-4 w-4" /></a>
+            <a href={`/?lang=${lang}#sim-container`} className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-xs font-bold text-accent transition-transform hover:scale-[1.02]">{t.cta}<ArrowRight className="h-4 w-4" /></a>
           </div>
         </section>
       </main>
