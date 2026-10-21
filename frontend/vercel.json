@@ -2,16 +2,19 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/",
+      "src": "^/$",
       "has": [
         {
           "type": "host",
           "value": "market.ocp-protocol.org"
         }
       ],
-      "destination": "/explore.html"
+      "dest": "/explore.html"
+    },
+    {
+      "handle": "filesystem"
     }
   ]
 }
