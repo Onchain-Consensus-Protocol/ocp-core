@@ -13,7 +13,7 @@ export interface DlpEvent { id: number; at: number; kind: string; actor?: number
 export interface DlpLiquidityReference { lpSupply:number; basis:number; b:number; cash:number; lpFees:number; inventory:[number,number] }
 export interface DlpAddQuote { lp:number; money:number; cash:number; lpFee:number; yes:number; no:number; basis:number; b:number; restart:boolean }
 export interface DlpState {
-  phase: DlpPhase; now: number; TG: number; TF: number; TC: number; Q: number; k: number;
+  initialCapital?:number; phase: DlpPhase; now: number; TG: number; TF: number; TC: number; Q: number; k: number;
   rTarget: number; bTarget: number; R: number; B: number; S: number; M0: number; redeemedPairs: number;
   collateral: number; cash: number; lpFees: number; lpFeesEarned:number; formalVolume:number; creatorFees: number; protocolFees: number;
   basis: number; b: number; lpSupply: number; inventory: [number, number]; liquidityClosed: boolean; restartLiquidity:DlpLiquidityReference|null;
@@ -357,7 +357,7 @@ export function dlpAccounting(s: DlpState) {
   const wallets = sum(s.accounts.map(a => a.wallet));
   const reserves = s.R + s.B + s.collateral + s.cash + s.lpFees + s.creatorFees + s.protocolFees
     + s.core.cash + s.core.fees + s.coreOfficialBudget + s.lpBudget + s.bBudget + s.outcomeBudget + s.failedBudget + s.coreBudget;
-  return { wallets, reserves, total: wallets + reserves, initialTotal: 30000, error: wallets + reserves - 30000 };
+  return { wallets, reserves, total: wallets + reserves, initialTotal: s.initialCapital ?? 30000, error: wallets + reserves - (s.initialCapital ?? 30000) };
 }
 export function dlpAssertLedger(s: DlpState) {
   const a = dlpAccounting(s);

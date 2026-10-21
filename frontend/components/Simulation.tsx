@@ -1,3 +1,4 @@
+import {STOCK_DEMO_ASSETS,createStockDemo,routeStockDemo} from './stockDemoRouting';
 import React,{useEffect,useState} from 'react';
 import {ArrowLeftRight,ShieldAlert,LayoutDashboard,Zap} from 'lucide-react';
 import {Button} from './Button';
@@ -12,8 +13,11 @@ const box='rounded-xl border border-border p-4';
 const small='rounded-lg border border-border px-3 py-2 text-xs hover:bg-accent/5 disabled:opacity-40';
 const feeRecipients={creatorAccount:-1,protocolAccount:-1};
 export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,connectWallet})=>{
- const zh=lang==='zh',t=(cn:string,en:string)=>zh?cn:en;
- const [s,setS]=useState<DlpState>(()=>createDlpDemo(feeRecipients));
+ const zh=lang==='zh';
+ const [assetIndex,setAssetIndex]=useState(0),[useStable,setUseStable]=useState(true),[stableWallets,setStableWallets]=useState([5000,5000,5000]);
+ const asset=STOCK_DEMO_ASSETS[assetIndex];
+ const t=(cn:string,en:string)=>(zh?cn:en).replaceAll('dUSDC',asset.symbol);
+ const [s,setS]=useState<DlpState>(()=>createStockDemo(STOCK_DEMO_ASSETS[0].price));
  const [topic,setTopic]=useState({title:'',YES:'',NO:'',INVALID:''});
  const topicRules=`YES：${topic.YES} · NO：${topic.NO} · INVALID：${topic.INVALID}`;
  const [id,setId]=useState(0),[tab,setTab]=useState<'MARKET'|'PROTOCOL'>('MARKET'),[mode,setMode]=useState<'BUY'|'SELL'>('BUY');
@@ -29,16 +33,19 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const genesisCost=s.events.filter(e=>e.actor===id).reduce((v,e)=>{if(e.kind==='GENESIS_BUY')return {qty:v.qty+(e.quantity??0),cost:v.cost+(e.amount??0)*.955};if(e.kind==='GENESIS_SELL'){const fraction=v.qty>0?Math.max(0,1-(e.quantity??0)/v.qty):0;return {qty:Math.max(0,v.qty-(e.quantity??0)),cost:v.cost*fraction}}return v},{qty:0,cost:0});
  const genesisPnl=(a.g>0&&gen?dlpQuoteSell(s,a.g).net:0)-genesisCost.cost;
  const lpBEstimates=(['YES','NO','INVALID'] as Outcome[]).map(outcome=>{const inventory=outcome==='YES'?s.inventory[0]:outcome==='NO'?s.inventory[1]:(s.inventory[0]+s.inventory[1])/2;const nav=s.cash+s.lpFees+inventory;const cover=Math.min(s.B,Math.max(s.basis-nav,0));const totalB=s.accounts.reduce((v,x)=>v+x.z,0);return {outcome,lp:s.lpSupply>0?(nav+cover)*a.lp/s.lpSupply:0,B:totalB>0?(s.B-cover)*a.z/totalB:0}});
- const lpBValuePanel=s.phase==='SETTLED'?<div className="mt-2 text-[10px]"><span>{t("可领取金额","Claimable")}</span><div>LP {num(preview.lp,4)} · B {num(preview.B,4)} dUSDC</div></div>:['FORMAL','WAIT_CORE'].includes(s.phase)?<details className="mt-2 text-[10px]"><summary className="cursor-pointer">{t("LP／B 预计领取金额","Estimated LP / B payouts")}</summary><table className="w-full mt-2 text-right"><thead><tr><th className="text-left">{t("最终结果","Outcome")}</th><th>LP</th><th>B</th></tr></thead><tbody>{lpBEstimates.map(v=><tr key={v.outcome}><td className="text-left">{v.outcome}</td><td>{num(v.lp,4)}</td><td>{num(v.B,4)}</td></tr>)}</tbody></table><p className="mt-1">{t("单位 dUSDC。按当前资金状态估算，不含未来交易及费用；以最终结算为准。","In dUSDC. Current-state estimates exclude future trading and fees; final settlement determines payouts.")}</p></details>:null;
+ const lpBValuePanel=s.phase==='SETTLED'?<div className="mt-2 text-[10px]"><span>{t("可领取金额","Claimable")}</span><div>LP {num(preview.lp,4)} · B {num(preview.B,4)} {asset.symbol}</div></div>:['FORMAL','WAIT_CORE'].includes(s.phase)?<details className="mt-2 text-[10px]"><summary className="cursor-pointer">{t("LP／B 预计领取金额","Estimated LP / B payouts")}</summary><table className="w-full mt-2 text-right"><thead><tr><th className="text-left">{t("最终结果","Outcome")}</th><th>LP</th><th>B</th></tr></thead><tbody>{lpBEstimates.map(v=><tr key={v.outcome}><td className="text-left">{v.outcome}</td><td>{num(v.lp,4)}</td><td>{num(v.B,4)}</td></tr>)}</tbody></table><p className="mt-1">{t("单位 dUSDC。按当前资金状态估算，不含未来交易及费用；以最终结算为准。","In dUSDC. Current-state estimates exclude future trading and fees; final settlement determines payouts.")}</p></details>:null;
  const hasClaim=(s.phase==='FAILED'?a.g+a.z:a.lp+a.z+a.yes+a.no)>0;
  const errors:Record<string,string>={HOLDINGS:t('持仓不足，请检查数量。','Check holdings and amount.'),BALANCE:t('余额不足。','Insufficient balance.'),CLAIM:t('当前没有可领取权益。','No claim available.'),SIDE_LOCKED:t('Core方向已锁定，只能同侧追加。','Core side is locked.'),AMOUNT:t('请输入有效的正数。','Enter a positive amount.'),INVENTORY:t('可用结果库存不足，请减少买入。','Reduce the buy; inventory is limited.'),CORE_CLOSED:t('Core尚未开启或已经截止。','Core is not open.'),CASH:t('当前报价无法执行。','Quote cannot be executed.'),PHASE:t('当前阶段不可执行。','Unavailable in this phase.')};
- const act=(fn:(s:DlpState)=>DlpState,msg=t('操作成功。','Done.'))=>{try{setS(fn(s));setNotice(msg);return true}catch(e){setNotice(errors[e instanceof Error?e.message:'']??t('请检查金额、持仓和阶段。','Check amount, holdings and stage.'));return false}};
- useEffect(()=>setBalance(a.wallet),[a.wallet,setBalance]);
+ const act=(fn:(s:DlpState)=>DlpState,msg=t('操作成功。','Done.'))=>{try{const routed=routeStockDemo(s,stableWallets,id,asset.price,useStable&&s.phase!=='CREATE',fn);setS(routed.state);setStableWallets(routed.stable);setNotice(msg+(Math.abs(routed.deltaStable)>1e-8?' '+t('稳定币兑换：','Stablecoin swap: ')+num(routed.deltaStable,2)+' dUSDC':''));return true}catch(e){setNotice(errors[e instanceof Error?e.message:'']??t('请检查金额、持仓和阶段。','Check amount, holdings and stage.'));return false}};
+ useEffect(()=>setBalance(a.wallet*asset.price+stableWallets[id]),[a.wallet,asset.price,stableWallets,id,setBalance]);
  useEffect(()=>{if(!running||!ticking)return;const timer=window.setInterval(()=>setS(v=>dlpAdvanceTime(v,Math.min(v.TC,v.now+1))),1000);return()=>window.clearInterval(timer)},[running,ticking]);
  useEffect(()=>{if(!ticking)setRunning(false)},[ticking]);
- const reset=()=>{try{const config={...feeRecipients,Q:snapshot,b:depth,TC:10800};setS(createDlpDemo(config));setRunning(false);setNotice('');setId(0);setTab('MARKET');setMode('BUY');setAmount(10)}catch{setNotice(t('请检查创建参数。','Check creation parameters.'))}};
- const quote=(side:Side|'G'):DlpTradeQuote|null=>{try{if(!(amount>0)||!Number.isFinite(amount))return null;if(gen){if(mode==='BUY'&&amount>a.wallet||mode==='SELL'&&genesisShares(amount)>a.g)return null;return mode==='BUY'?dlpQuoteBuy(s,amount):dlpQuoteSell(s,genesisShares(amount))}if(!formal||side==='G')return null;if(mode==='BUY'){if(amount>a.wallet)return null;return dlpQuoteFormalBuy(s,side,amount)}if(amount>(side==='YES'?a.yes:a.no))return null;return dlpQuoteFormalSell(s,side,amount)}catch{return null}};
- const execute=(side:Side|'G')=>act(v=>gen?(mode==='BUY'?dlpBuy(v,id,amount):dlpSell(v,id,genesisShares(amount))):mode==='BUY'?dlpFormalBuy(v,id,side as Side,amount):dlpFormalSell(v,id,side as Side,amount),t('交易完成。','Trade completed.'));
+ const reset=()=>{try{const config={...feeRecipients,Q:snapshot,b:depth,TC:10800};setS(createStockDemo(asset.price,snapshot,depth));setStableWallets([5000,5000,5000]);setRunning(false);setNotice('');setId(0);setTab('MARKET');setMode('BUY');setAmount(10)}catch{setNotice(t('请检查创建参数。','Check creation parameters.'))}};
+ const paymentAmount=useStable?amount/asset.price:amount;
+ const spendable=useStable?stableWallets[id]/asset.price:a.wallet;
+ const quote=(side:Side|'G'):DlpTradeQuote|null=>{try{if(!(amount>0)||!Number.isFinite(amount))return null;if(gen){if(mode==='BUY'&&paymentAmount>spendable||mode==='SELL'&&genesisShares(amount)>a.g)return null;return mode==='BUY'?dlpQuoteBuy(s,paymentAmount):dlpQuoteSell(s,genesisShares(amount))}if(!formal||side==='G')return null;if(mode==='BUY'){const q=dlpQuoteFormalBuy(s,side,amount);if(q.gross>spendable)return null;return q}if(amount>(side==='YES'?a.yes:a.no))return null;return dlpQuoteFormalSell(s,side,amount)}catch{return null}};
+ const execute=(side:Side|'G')=>act(v=>gen?(mode==='BUY'?dlpBuy(v,id,paymentAmount):dlpSell(v,id,genesisShares(amount))):mode==='BUY'?dlpFormalBuy(v,id,side as Side,amount):dlpFormalSell(v,id,side as Side,amount),t('交易完成。','Trade completed.'));
+ const routePanel=<div className={box+' space-y-2 text-xs'} data-testid="stock-route-panel"><strong>{asset.symbol} {t('股票代币底池','stock-token pool')}</strong><label className="flex justify-between items-center gap-2">{t('支付／收款资产','Pay / receive')}<select aria-label="Payment asset" value={useStable?'STABLE':'STOCK'} onChange={e=>setUseStable(e.target.value==='STABLE')} className="border border-border rounded p-2 bg-white"><option value="STABLE">dUSDC</option><option value="STOCK">{asset.symbol}</option></select></label><div>{num(a.wallet,6)} {asset.symbol} · {num(stableWallets[id])} dUSDC</div><p className="text-text-muted">{t('固定演示价：1','Fixed demo rate: 1')} {asset.symbol} = {asset.price} dUSDC</p><p className="text-text-muted">{t('仅模拟兑换，零兑换费、零滑点；不代表真实行情、资产可用性或兑换流动性。','Mock swaps only: zero swap fee/slippage; not live prices, asset availability or executable liquidity.')}</p>{useStable&&<p>{gen&&mode==='BUY'||tab==='PROTOCOL'?`${num(amount)} dUSDC → ${num(paymentAmount,6)} ${asset.symbol}`:t('按股票数量报价；卖出／领取净款兑换为稳定币。','Quotes use stock units; sale / claim proceeds convert to stablecoin.')}</p>}</div>;
  const Row=({label,value}:{label:string,value:React.ReactNode})=><div className="flex justify-between gap-3 py-1"><span className="text-text-muted">{label}</span><strong className="tabular-nums text-right break-words">{value}</strong></div>;
  const quotes=(gen?['G']:['YES','NO']) as (Side|'G')[];
  const stakeTotal=s.core.yes+s.core.no+s.core.invalid;
@@ -62,8 +69,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const formatAmount=num,sideTextColor=(side:Outcome)=>side==='YES'?'text-success':side==='NO'?'text-danger':'text-yellow-700';
  const primaryActionTitle=corePending?t('Core未开启','Core not open'):terminal?t('领取结算资金','Claim settlement'):activeTab==='MARKET'?(gen?t('交易gToken','Trade gToken'):t('交易','Trade')):t('选择方向并质押','Choose a side and stake');
  const primaryActionDescription=corePending?t('等待Genesis毕业。','Waiting for Genesis graduation.'):activeTab==='MARKET'?t('输入数量，查看成交报价与价格影响。','Enter an amount to preview execution and price impact.'):t('选择方向后只能同侧追加，资金锁定至结算。','Once selected, add only to the same side until settlement.');
- const MIN_STAKE=1;
- const stake=(side:Outcome)=>act(v=>dlpCoreStake(v,id,side,amount));
+ const MIN_STAKE=0.01;
+ const stake=(side:Outcome)=>{if(paymentAmount<MIN_STAKE){setNotice(t('低于最小质押数量。','Below minimum stake.'));return false}return act(v=>dlpCoreStake(v,id,side,paymentAmount))};
  const trade=(side:Side)=>execute(gen?'G':side);
  const fastForward=()=>act(v=>dlpAdvanceTime(v,Math.min(v.TC,v.now+600)));
  const finalize=()=>act(dlpFinalize);
@@ -79,9 +86,9 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
   const before=side==='YES'?yesPrice:noPrice;
   const endDifference=(s.basis-s.inventory[0])-(s.basis-s.inventory[1])+(side==='YES'?1:-1)*(mode==='BUY'?1:-1)*(q?.quantity??0);
   const endYes=1/(1+Math.exp(-endDifference/s.b));const impact=gen?0:Math.abs((side==='YES'?endYes:1-endYes)-before)*100;
-  return <div className="rounded-lg border border-border bg-white/60 px-2.5 py-2 text-[10px] font-mono"><div className={`mb-1.5 font-bold ${sideTextColor(side)}`}>{gen?'Genesis':side}</div><div className="space-y-1 text-text-muted"><Row label={t('平均成交价','Avg. price')} value={q?(gen?num(cash/tokens,10):num((mode==='BUY'?q.net:q.gross)/q.quantity,4)):'—'}/><Row label={gen?t('获得／卖出代币','Tokens'):t('价格影响','Price impact')} value={q?(gen?num(tokens):`${num(impact)}%`):'—'}/><Row label={t('手续费','Fee')} value={q?num(fee,4):'—'}/>{gen&&<Row label={t('做市风险准备金（4.5%）','Market-making risk reserve (4.5%)')} value={q?num(q.contribution,4):'—'}/>}<div className="border-t border-border pt-1"><Row label={mode==='BUY'?t('预计支付','Est. payment'):t('预计到账','Est. receipt')} value={q?num(cash):'—'}/></div><Row label={mode==='BUY'?t('最大支付（滑点上限1%）','Max payment (1% slippage)'):t('最低到账（滑点上限1%）','Min receipt (1% slippage)')} value={q?num(cash*(mode==='BUY'?1.01:.99)):'—'}/>{gen&&q?.wouldGraduate&&<p className="text-accent mt-2">{t('本笔触发毕业，持仓转为LP；权益估值可能低于成本。','This trade graduates into LP; value may be below cost.')}</p>}</div></div>
+  return <div className="rounded-lg border border-border bg-white/60 px-2.5 py-2 text-[10px] font-mono"><div className={`mb-1.5 font-bold ${sideTextColor(side)}`}>{gen?'Genesis':side}</div><div className="space-y-1 text-text-muted"><Row label={t('平均成交价','Avg. price')} value={q?(gen?num(cash/tokens,10):num((mode==='BUY'?q.net:q.gross)/q.quantity,4)):'—'}/><Row label={gen?t('获得／卖出代币','Tokens'):t('价格影响','Price impact')} value={q?(gen?num(tokens):`${num(impact)}%`):'—'}/><Row label={t('手续费','Fee')} value={q?num(fee,4):'—'}/>{gen&&<Row label={t('做市风险准备金（4.5%）','Market-making risk reserve (4.5%)')} value={q?num(q.contribution,4):'—'}/>}<div className="border-t border-border pt-1"><Row label={mode==='BUY'?t('预计支付','Est. payment'):t('预计到账','Est. receipt')} value={q?`${num(cash,6)} ${asset.symbol}${useStable?' ≈ '+num(cash*asset.price)+' dUSDC':''}`:'—'}/></div><Row label={mode==='BUY'?t('最大支付（滑点上限1%）','Max payment (1% slippage)'):t('最低到账（滑点上限1%）','Min receipt (1% slippage)')} value={q?`${num(cash*(mode==='BUY'?1.01:.99),6)} ${asset.symbol}${useStable?' ≈ '+num(cash*(mode==='BUY'?1.01:.99)*asset.price)+' dUSDC':''}`:'—'}/>{gen&&q?.wouldGraduate&&<p className="text-accent mt-2">{t('本笔触发毕业，持仓转为LP；权益估值可能低于成本。','This trade graduates into LP; value may be below cost.')}</p>}</div></div>
  };
-  if(s.phase==='CREATE')return <div className="max-w-xl mx-auto bg-white/80 border border-border rounded-2xl p-6 sm:p-8" data-testid="launch-market-card"><h2 className="text-xl font-display font-bold mb-5">{t('0成本发射你的市场','Launch your market at zero cost')}</h2><form className="space-y-4" onSubmit={e=>{e.preventDefault();if(!Object.values(topic).every(v=>v.trim()))return;if(act(()=>dlpCreate(createDlpDemo({...feeRecipients,Q:snapshot,b:depth,TC:10800})),t('已发射，Genesis倒计时开始。','Launched; Genesis countdown started.'))){setTopic(v=>({title:v.title.trim(),YES:v.YES.trim(),NO:v.NO.trim(),INVALID:v.INVALID.trim()}));setRunning(true);setTab('MARKET')}}}><label className="block text-sm">{t('话题内容','Market question')}<textarea required maxLength={300} rows={2} value={topic.title} onChange={e=>setTopic(v=>({...v,title:e.target.value}))} placeholder={t('输入你想发射的市场话题','Enter your market question')} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white"/></label>{(['YES','NO','INVALID'] as const).map(side=><label key={side} className="block text-sm">{side} {t('判定条件','resolution criteria')}<textarea required maxLength={1000} rows={2} value={topic[side]} onChange={e=>setTopic(v=>({...v,[side]:e.target.value}))} placeholder={t(side==='INVALID'?'什么情况下无法有效判定？':'什么情况下判定为 '+side+'？','When should the result be '+side+'?')} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white"/></label>)}<p className="text-xs text-text-muted">{t('Genesis 1小时 · 市场 2小时 · Core 3小时截止','Genesis closes at 1h · Market at 2h · Core at 3h')}</p><Button type="submit" className="w-full" disabled={!Object.values(topic).every(v=>v.trim())}>{t('发射市场，开始模拟','Launch market and start demo')}</Button><p className="text-xs text-text-muted">{t('本地模拟演示，不会发起链上交易。','Local simulation; no on-chain transactions.')}</p></form></div>;
+  if(s.phase==='CREATE')return <div className="max-w-xl mx-auto bg-white/80 border border-border rounded-2xl p-6 sm:p-8" data-testid="launch-market-card"><h2 className="text-xl font-display font-bold mb-5">{t('0成本发射你的市场','Launch your market at zero cost')}</h2><form className="space-y-4" onSubmit={e=>{e.preventDefault();if(!Object.values(topic).every(v=>v.trim()))return;if(act(()=>dlpCreate(createStockDemo(asset.price,snapshot,depth)),t('已发射，Genesis倒计时开始。','Launched; Genesis countdown started.'))){setTopic(v=>({title:v.title.trim(),YES:v.YES.trim(),NO:v.NO.trim(),INVALID:v.INVALID.trim()}));setRunning(true);setTab('MARKET')}}}><label className="block text-sm">{t('底池股票代币','Pool stock token')}<select aria-label="Pool stock token" value={assetIndex} onChange={e=>{const i=Number(e.target.value);setAssetIndex(i);setS(createStockDemo(STOCK_DEMO_ASSETS[i].price));setStableWallets([5000,5000,5000])}} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white">{STOCK_DEMO_ASSETS.map((v,i)=><option key={v.symbol} value={i}>{zh?v.name:v.en} · {v.symbol}</option>)}</select></label><p className="text-xs text-text-muted">{t('Robinhood Chain 模拟 · 全部为演示资产及固定价格；SpaceX仅为模拟占位，不代表真实代币已可用。','Robinhood Chain simulation · All assets and prices are illustrative; SpaceX is a mock placeholder, not a claim of token availability.')}</p><label className="block text-sm">{t('话题内容','Market question')}<textarea required maxLength={300} rows={2} value={topic.title} onChange={e=>setTopic(v=>({...v,title:e.target.value}))} placeholder={t('输入你想发射的市场话题','Enter your market question')} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white"/></label>{(['YES','NO','INVALID'] as const).map(side=><label key={side} className="block text-sm">{side} {t('判定条件','resolution criteria')}<textarea required maxLength={1000} rows={2} value={topic[side]} onChange={e=>setTopic(v=>({...v,[side]:e.target.value}))} placeholder={t(side==='INVALID'?'什么情况下无法有效判定？':'什么情况下判定为 '+side+'？','When should the result be '+side+'?')} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white"/></label>)}<p className="text-xs text-text-muted">{t('Genesis 1小时 · 市场 2小时 · Core 3小时截止','Genesis closes at 1h · Market at 2h · Core at 3h')}</p><Button type="submit" className="w-full" disabled={!Object.values(topic).every(v=>v.trim())}>{t('发射市场，开始模拟','Launch market and start demo')}</Button><p className="text-xs text-text-muted">{t('本地模拟演示，不会发起链上交易。','Local simulation; no on-chain transactions.')}</p></form></div>;
   return (
     <div data-testid="homepage-lifecycle" className="vault-shell bg-white/80 border-y sm:border border-border sm:rounded-2xl shadow-sm sm:shadow-2xl flex flex-col md:flex-row max-w-6xl mx-auto md:min-h-[600px] overflow-hidden backdrop-blur-xl relative">
       <div className="absolute top-10 right-10 w-72 sm:w-96 h-72 sm:h-96 bg-accent/5 rounded-full blur-[100px] pointer-events-none" />
@@ -159,6 +166,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
 
         <label className="flex justify-between items-center text-xs font-mono text-text-muted">{t("当前账户","Account")}<select aria-label={t("当前模拟账户","Demo account")} value={id} onChange={e=>{setId(Number(e.target.value));setNotice('')}} className="border border-border rounded-lg p-2 bg-white">{names.map((n,i)=><option key={n} value={i}>{n}</option>)}</select></label>
 
+        {routePanel}
         {corePending&&<div className={box+' text-sm text-text-muted'} data-testid="core-pending">{s.phase==='FAILED'?t('Genesis未毕业，Core未开启。','Genesis failed; Core did not open.'):t('Genesis毕业后，Core与正式市场同时开启。当前尚不能质押。','Core opens together with the market after Genesis graduates. Staking is not available yet.')}</div>}
         {!corePending && phase === "STAKING" && activeTab === "PROTOCOL" && (
           <div className="space-y-4 animate-fade-in">
@@ -173,7 +181,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
             </div>
             <div className="text-xs font-mono text-text-muted">
               {zh ? "可用余额" : "Available balance"}:{" "}
-              <strong className="text-text">{formatAmount(balance)} dUSDC</strong>
+              <strong className="text-text">{num(useStable?stableWallets[id]:balance,6)} {useStable?'dUSDC':asset.symbol}</strong>
             </div>
             <div className="bg-transparent border border-border rounded-xl p-3 text-xs font-mono text-text-muted">
               <div className="text-[10px] font-bold uppercase tracking-widest mb-2 text-text-muted font-display">
@@ -183,19 +191,19 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
                 <div key={side} className="flex justify-between mt-1">
                   <span className={sideTextColor(side)}>{side}</span>
                   <strong className="text-text">
-                    {formatAmount(userVaultSide === side ? userStake : 0)} dUSDC
+                    {formatAmount(userVaultSide === side ? userStake : 0)} {asset.symbol}
                   </strong>
                 </div>
               ))}
             </div>
             <label className="block">
               <span className="block text-xs font-bold text-text-muted uppercase tracking-widest mb-2 font-display">
-                {zh ? "质押金额" : "Stake amount"}{" "}
-                <span className="font-mono normal-case">({zh ? "最小" : "Min"} {MIN_STAKE} dUSDC)</span>
+                {zh ? '质押金额' : 'Stake amount'} ({useStable?'dUSDC':asset.symbol}){" "}
+                <span className="font-mono normal-case">({zh ? "最小" : "Min"} {MIN_STAKE} {asset.symbol})</span>
               </span>
               <input
                 type="number"
-                min="1"
+                min={useStable?MIN_STAKE*asset.price:MIN_STAKE}
                 step="0.01"
                 value={amount}
                 aria-label={t("Core质押金额","Core stake amount")} onChange={(event) => setAmount(Number(event.target.value))}
@@ -244,7 +252,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
                 </button>
               </div>
               <label className="flex justify-between text-xs font-bold text-text-muted uppercase tracking-wider mb-2 font-display">
-                <span>{gen&&mode==="BUY"?t("金额（dUSDC）","Amount (dUSDC)"):t("份额","Shares")}</span>
+                <span>{gen&&mode==="BUY"?(useStable?'金额（dUSDC）':t('金额（dUSDC）','Amount (dUSDC)')):t("份额","Shares")}</span>
                 <span className="text-[10px] text-accent font-mono">{gen?t("手续费 1%","Fee 1%"):t("手续费 2%","Fee 2%")}</span>
               </label>
               <div className="flex items-stretch gap-2 mb-3">
@@ -278,10 +286,10 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
               </div>
               </div>
               <div className="space-y-1 text-[10px] text-text-muted mb-3 font-mono" data-testid="my-trade-holdings">
-                <div className="flex justify-between gap-2"><span>{t("可用余额","Available balance")}</span><strong className="text-text">{formatAmount(balance)} dUSDC</strong></div>
+                <div className="flex justify-between gap-2"><span>{t("可用余额","Available balance")}</span><strong className="text-text">{num(useStable?stableWallets[id]:balance,6)} {useStable?'dUSDC':asset.symbol}</strong></div>
                 <div className="flex justify-between gap-2"><span>{gen?t("我的gToken","My gToken"):t("我的份额","My shares")}</span><strong className="text-text">{gen?num(genesisTokens(a.g)):<>YES {formatAmount(userShares.YES)} · NO {formatAmount(userShares.NO)}</>}</strong></div>
                 {!gen&&<><div className="flex justify-between gap-2"><span>{t("我的LP份额","My LP shares")}</span><strong className="text-text">{num(a.lp,4)}</strong></div><div className="flex justify-between gap-2"><span>{t("我的B份额","My B shares")}</span><strong className="text-text">{num(a.z,4)}</strong></div>{lpBValuePanel}</>}
-                {gen&&<div className="flex justify-between gap-2" title={t("gToken当前全部卖出净额减剩余持仓成本；不含B权益及已实现盈亏。","Net sale value less remaining cost; excludes B rights and realized P/L.")}><span>{t("盈亏","P/L")}</span><strong className={genesisPnl>=0?"text-success":"text-danger"}>{genesisPnl>0?"+":""}{num(genesisPnl,2)} dUSDC</strong></div>}
+                {gen&&<div className="flex justify-between gap-2" title={t("gToken当前全部卖出净额减剩余持仓成本；不含B权益及已实现盈亏。","Net sale value less remaining cost; excludes B rights and realized P/L.")}><span>{t("盈亏","P/L")}</span><strong className={genesisPnl>=0?"text-success":"text-danger"}>{genesisPnl>0?"+":""}{num(genesisPnl,2)} {asset.symbol}</strong></div>}
               </div>
               <div className="text-[10px] text-text-muted my-2 px-1 font-mono">
                 {gen?t("按曲线积分成交；买卖都可能触发毕业。","Integrated curve pricing; buys or sells may trigger graduation."):t("两个方向均显示当前报价。","Both sides show current quotes.")}
@@ -323,15 +331,15 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
               </div>
               <div className="flex justify-between">
                 <span>{zh ? "Vault 本金与手续费" : "Vault principal + fees"}</span>
-                <strong className="text-text">{formatAmount(vaultPayout)} dUSDC</strong>
+                <strong className="text-text">{formatAmount(vaultPayout)} {asset.symbol}</strong>
               </div>
               <div className="flex justify-between mt-1">
                 <span>{zh ? "其中 PM 手续费" : "Includes PM fees"}</span>
-                <strong className="text-text">{formatAmount(selectedFeePayout, 4)} dUSDC</strong>
+                <strong className="text-text">{formatAmount(selectedFeePayout, 4)} {asset.symbol}</strong>
               </div>
               <div className="flex justify-between mt-1">
                 <span>{zh ? "市场／LP／B结算" : "Market / LP / B payout"}</span>
-                <strong className="text-text">{formatAmount(marketPayout)} dUSDC</strong>
+                <strong className="text-text">{formatAmount(marketPayout)} {asset.symbol}</strong>
               </div>
             </div>
             <Button onClick={withdrawVault} disabled={vaultClaimed||s.phase!=="SETTLED"} className="w-full">
@@ -387,7 +395,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
         </div>
 
         <div className="space-y-3 sm:space-y-4 mb-5 sm:mb-8 animate-fade-in">
-          {activeTab === "MARKET" && (gen||s.phase==='FAILED') ? <div data-testid="genesis-price" className="space-y-4"><h3 className="text-xs font-bold">{t("Genesis gToken 价格","Genesis gToken price")}</h3><strong className="text-2xl text-accent">{genesisPrice(s.phase==='FAILED'?2*s.k*s.failedSupply:px.genesis)} <span className="text-xs">dUSDC／{t("枚","token")}</span></strong><GenesisPriceChart events={s.events} supply={s.phase==='FAILED'?s.failedSupply:s.S} k={s.k} zh={zh}/><div className="border border-border rounded-xl p-4 space-y-3 text-xs"><div className="flex justify-between"><strong>{t("双池毕业进度","Graduation progress")}</strong><span>3.6 / 0.6 ETH</span></div>{[['R',s.R,s.rTarget],['B',s.B,s.bTarget]].map(([label,v,target])=><div key={String(label)}><div className="flex justify-between mb-1"><span>{label}</span><strong>{num(Number(v))} / {num(Number(target))}</strong></div><div className="h-2 bg-gray-100 rounded overflow-hidden"><div className={label==='R'?'h-full bg-purple-500':'h-full bg-accent'} style={{width:`${Math.min(100,Number(v)/Number(target)*100)}%`}}/></div></div>)}</div><p className="text-[10px] text-text-muted">{s.phase==='FAILED'?t("筹资未达标，未开启正式市场。请领取清算款。","Funding failed; the market did not open. Claim your refund."):t("双池达标立即毕业，后面一笔卖出也可能触发。","Both pools trigger graduation; a later sell can be the trigger.")}</p></div> : activeTab === "MARKET" ? (
+          {activeTab === "MARKET" && (gen||s.phase==='FAILED') ? <div data-testid="genesis-price" className="space-y-4"><h3 className="text-xs font-bold">{t("Genesis gToken 价格","Genesis gToken price")}</h3><strong className="text-2xl text-accent">{genesisPrice(s.phase==='FAILED'?2*s.k*s.failedSupply:px.genesis)} <span className="text-xs">{asset.symbol}／{t("枚","token")}</span></strong><GenesisPriceChart events={s.events} supply={s.phase==='FAILED'?s.failedSupply:s.S} k={s.k} zh={zh} unit={asset.symbol}/><div className="border border-border rounded-xl p-4 space-y-3 text-xs"><div className="flex justify-between"><strong>{t("双池毕业进度","Graduation progress")}</strong><span>3.6 / 0.6 ETH</span></div>{[['R',s.R,s.rTarget],['B',s.B,s.bTarget]].map(([label,v,target])=><div key={String(label)}><div className="flex justify-between mb-1"><span>{label}</span><strong>{num(Number(v),4)} / {num(Number(target),4)} {asset.symbol}</strong></div><div className="h-2 bg-gray-100 rounded overflow-hidden"><div className={label==='R'?'h-full bg-purple-500':'h-full bg-accent'} style={{width:`${Math.min(100,Number(v)/Number(target)*100)}%`}}/></div></div>)}</div><p className="text-[10px] text-text-muted">{s.phase==='FAILED'?t("筹资未达标，未开启正式市场。请领取清算款。","Funding failed; the market did not open. Claim your refund."):t("双池达标立即毕业，后面一笔卖出也可能触发。","Both pools trigger graduation; a later sell can be the trigger.")}</p></div> : activeTab === "MARKET" ? (
             <div className="space-y-4" data-testid="formal-chart">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5 text-text-muted font-display">
@@ -420,7 +428,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
                   <div key={side}>
                     <div className="flex justify-between text-xs mb-1.5 font-bold font-mono">
                       <span className={sideTextColor(side)}>{side} {pct.toFixed(1)}%</span>
-                      <span className="text-text-muted">{formatAmount(stakes[side])} dUSDC</span>
+                      <span className="text-text-muted">{formatAmount(stakes[side])} {asset.symbol}</span>
                     </div>
                     <div className="h-6 bg-transparent border border-border rounded overflow-hidden">
                       <div className={`h-full transition-all ${side === "YES" ? "bg-success" : side === "NO" ? "bg-danger" : "bg-yellow-500/90"}`} style={{ width: `${pct}%` }} />
@@ -438,7 +446,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
               {activeTab === "MARKET" ? (zh ? "市场总交易量" : "Market total volume") : (zh ? "总质押本金" : "Total principal")}
             </div>
             <div className="text-sm text-text font-bold font-mono">
-              {formatAmount(activeTab === "MARKET" ? totalVolume : totalStake)} dUSDC
+              {formatAmount(activeTab === "MARKET" ? totalVolume : totalStake)} {asset.symbol}
             </div>
           </div>
           <div className={`border rounded-xl p-4 ${phase === "FINALIZED" ? "border-success/30 bg-success/5" : "border-border"}`}>
@@ -454,7 +462,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
               {zh ? "市场输入Core的手续费" : "Market fees contributed to Core"}
             </div>
             <div className="text-sm text-text font-bold font-mono">
-              {formatAmount(vaultFees, 4)} dUSDC
+              {formatAmount(vaultFees, 4)} {asset.symbol}
             </div>
           </div>
           <div className="border border-accent/30 bg-accent/5 rounded-xl p-4">
@@ -471,7 +479,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
         <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto">
           <div className="flex justify-between gap-3">
             <span>{zh ? "做市风险准备金" : "Market-making risk reserve"}</span>
-            <strong className="text-text">{num(terminal?s.bBudget:s.B)} dUSDC</strong>
+            <strong className="text-text">{num(terminal?s.bBudget:s.B)} {asset.symbol}</strong>
           </div>
           <div className="flex justify-between gap-3 mt-1.5">
             <span>{zh ? "LP代币 / B代币" : "LP tokens / B tokens"}</span>
@@ -481,8 +489,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
 
         </div>
         )}
-        {activeTab !== "MARKET" && userVaultSide && <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto"><div className="flex justify-between gap-3"><span>{t("预计 Core 奖励","Estimated Core reward")}</span><strong className="text-text">{formatAmount(userConditionalFees[finalOutcome ?? provisionalOutcome],4)} dUSDC</strong></div></div>}
-   <details className={box+' text-xs'} data-testid="demo-details"><summary className="cursor-pointer font-bold">{t('演示场景','Demo scenarios')}</summary><div className="mt-4 space-y-5"><div className="grid grid-cols-3 gap-3 text-center font-mono">{[['Genesis',s.TG],['Formal',s.TF],['Core',s.TC]].map(([label,v])=><div key={String(label)}>{label} {t('截止','closes')}<strong className="block mt-2">{clock(Number(v))}</strong></div>)}</div><p className="text-text-muted">{t('Formal与Core在毕业时同时开启，截止时间固定。','Formal and Core open together at graduation. Deadlines stay fixed.')}</p><details><summary className="cursor-pointer">{t('演示参数','Demo parameters')}</summary><label className="block my-3">{t('ETH固定快照','Fixed ETH snapshot')}<input aria-label="ETH snapshot" type="number" value={snapshot} onChange={e=>setSnapshot(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><label>{t('正式深度','Formal depth')}<input aria-label="Formal depth" type="number" value={depth} onChange={e=>setDepth(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><p className="text-text-muted mt-2">{t('仅在下次创建生效，非实时价格或生产参数。','Applies at next creation; illustrative parameters only.')}</p></details><details><summary className="cursor-pointer">{t('交易记录','Activity')}</summary><div className="mt-3 max-h-48 overflow-auto text-[11px] font-mono space-y-2">{[...s.events].reverse().filter(e=>!['CLAIM_FEES','CLAIM_CORE_OFFICIAL'].includes(e.kind)).map(e=><div key={e.id}>{clock(e.at)} · {({CREATE:t('创建市场','Created'),GENESIS_BUY:t('买入gToken','Bought gToken'),GENESIS_SELL:t('卖出gToken','Sold gToken'),GRADUATE:t('毕业','Graduated'),FORMAL_BUY:t('买入份额','Bought shares'),FORMAL_SELL:t('卖出份额','Sold shares'),CORE_STAKE:t('Core质押','Core stake'),FORMAL_CLOSE:t('市场交易截止','Trading closed'),SETTLE:t('结算','Settled'),FAIL:t('筹资未达标','Funding failed'),CLAIM_MARKET:t('领取市场结算款','Market payout'),CLAIM_CORE:t('领取Core结算款','Core payout'),BURN_LP:t('销毁LP并领取','LP redeemed'),BURN_B:t('销毁B并领取','B redeemed'),REDEEM_PAIRS:t('成对兑换','Pair redemption')} as Record<string,string>)[e.kind]??t('操作完成','Action completed')} {e.actor!==undefined?names[e.actor]:''} {e.amount!==undefined?`${num(e.amount,4)} dUSDC`:''}</div>)}</div></details></div></details>      </div>
+        {activeTab !== "MARKET" && userVaultSide && <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto"><div className="flex justify-between gap-3"><span>{t("预计 Core 奖励","Estimated Core reward")}</span><strong className="text-text">{formatAmount(userConditionalFees[finalOutcome ?? provisionalOutcome],4)} {asset.symbol}</strong></div></div>}
+   <details className={box+' text-xs'} data-testid="demo-details"><summary className="cursor-pointer font-bold">{t('演示场景','Demo scenarios')}</summary><div className="mt-4 space-y-5"><div className="grid grid-cols-3 gap-3 text-center font-mono">{[['Genesis',s.TG],['Formal',s.TF],['Core',s.TC]].map(([label,v])=><div key={String(label)}>{label} {t('截止','closes')}<strong className="block mt-2">{clock(Number(v))}</strong></div>)}</div><p className="text-text-muted">{t('Formal与Core在毕业时同时开启，截止时间固定。','Formal and Core open together at graduation. Deadlines stay fixed.')}</p><details><summary className="cursor-pointer">{t('演示参数','Demo parameters')}</summary><label className="block my-3">{t('ETH固定快照','Fixed ETH snapshot')}<input aria-label="ETH snapshot" type="number" value={snapshot} onChange={e=>setSnapshot(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><label>{t('正式深度','Formal depth')}<input aria-label="Formal depth" type="number" value={depth} onChange={e=>setDepth(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><p className="text-text-muted mt-2">{t('仅在下次创建生效，非实时价格或生产参数。','Applies at next creation; illustrative parameters only.')}</p></details><details><summary className="cursor-pointer">{t('交易记录','Activity')}</summary><div className="mt-3 max-h-48 overflow-auto text-[11px] font-mono space-y-2">{[...s.events].reverse().filter(e=>!['CLAIM_FEES','CLAIM_CORE_OFFICIAL'].includes(e.kind)).map(e=><div key={e.id}>{clock(e.at)} · {({CREATE:t('创建市场','Created'),GENESIS_BUY:t('买入gToken','Bought gToken'),GENESIS_SELL:t('卖出gToken','Sold gToken'),GRADUATE:t('毕业','Graduated'),FORMAL_BUY:t('买入份额','Bought shares'),FORMAL_SELL:t('卖出份额','Sold shares'),CORE_STAKE:t('Core质押','Core stake'),FORMAL_CLOSE:t('市场交易截止','Trading closed'),SETTLE:t('结算','Settled'),FAIL:t('筹资未达标','Funding failed'),CLAIM_MARKET:t('领取市场结算款','Market payout'),CLAIM_CORE:t('领取Core结算款','Core payout'),BURN_LP:t('销毁LP并领取','LP redeemed'),BURN_B:t('销毁B并领取','B redeemed'),REDEEM_PAIRS:t('成对兑换','Pair redemption')} as Record<string,string>)[e.kind]??t('操作完成','Action completed')} {e.actor!==undefined?names[e.actor]:''} {e.amount!==undefined?`${num(e.amount,4)} ${asset.symbol}`:''}</div>)}</div></details></div></details>      </div>
     </div>
   );
 };
