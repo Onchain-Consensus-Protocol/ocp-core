@@ -88,7 +88,7 @@ export function StockMarketDirectory({ lang }: { lang: "zh" | "en" }) {
 
   return <div className="max-w-7xl mx-auto">
     <section className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-slate-50 p-6 sm:p-10 mb-6">
-      <div className="text-xs tracking-widest font-bold text-accent mb-3">OCP MARKET · {config.chainId === 8453 ? "Base" : `Chain ${config.chainId}`}</div>
+      <div className="text-xs tracking-widest font-bold text-accent mb-3">OCP MARKET</div>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
         <div><h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">{zh ? "围绕你关注的股票发起话题，参与交易。" : "Ticker. Topic. Trade."}</h1>
           <p className="text-sm text-slate-500 mt-4 max-w-xl leading-relaxed">{zh ? "Pump式价格发现 + 可见毕业进度 + 毕业后转入有真实结果赔付的话题市场。" : "Pump-style price discovery + visible graduation progress + a topic market with outcome-based payouts after graduation."}</p></div>
