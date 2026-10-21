@@ -239,10 +239,10 @@ function LmsrLab({ lang }: { lang: Language }) {
         className="mt-7 w-full accent-orange-600"
       />
       <div className="mt-2 flex justify-between text-[10px] text-text-muted"><span>NO</span><span>50 / 50</span><span>YES</span></div>
-      <div className="mt-6 rounded-xl border border-border bg-white/70 p-4 font-mono text-xs leading-6">
+      <details className="mt-6 rounded-xl border border-border bg-white/70 p-4 text-xs leading-6"><summary className="cursor-pointer text-text-muted">{lang==='zh'?'查看定价公式':'Pricing formulas'}</summary><div className="mt-3 font-mono">
         <div>C(q) = b · ln(e<sup>qᵧ/b</sup> + e<sup>qₙ/b</sup>)</div>
         <div>p(YES) = e<sup>qᵧ/b</sup> / (e<sup>qᵧ/b</sup> + e<sup>qₙ/b</sup>)</div>
-      </div>
+      </div></details>
       <p className="mt-4 text-xs leading-5 text-text-muted">{t.curveNote}</p>
     </div>
   );
@@ -304,41 +304,20 @@ function HowPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="grid items-stretch gap-4 lg:grid-cols-3" data-testid="mechanism-modules">
-            {[
-              {title:'Genesis',icon:TrendingUp,zh:['启动与价格发现','市场的初始启动阶段，参与者在这里买卖 gToken，进行价格发现。','通过早期投机交易实现话题冷启动、价格发现和做市资本积累，并筛选有真实市场需求的话题进入 Formal Market。','话题创建后开始；毕业或启动阶段到期后结束。'],en:['Launch and price discovery','The initial market launch phase, where participants trade gToken for price discovery.','Early speculative trading bootstraps topics, enables price discovery and accumulates market-making capital, filtering topics with real market demand into the Formal Market.','Starts at topic creation; ends at graduation or the Genesis deadline.']},
-              {title:'OCP Core',icon:Scale,zh:['资本共识与结果确定','独立于市场交易的质押模块，参与者选择 YES、NO 或 INVALID，用本金支持一个结果。','按质押资本规则确定最终结果，供 Formal 及 LP／B 结算使用。合格质押者还可分配正式交易输入 Core 的费用。','Genesis 毕业后开启，与 Formal 同时开始；模拟中创建后第3小时截止。'],en:['Capital consensus and final outcome','A staking module separate from trading. Participants commit principal to YES, NO or INVALID.','Determines the final outcome under the capital-staking rules, used to settle Formal and LP / B rights. Eligible stakers can also earn fees contributed by market trades.','Opens with Formal only after Genesis graduation; closes at hour 3 from creation in the demo.']},
-              {title:'Formal',icon:ArrowLeftRight,zh:['正式市场与份额交易','毕业后的正式交易市场，买卖的是 YES／NO 结果份额。','让参与者表达预期并交易持仓，买卖形成市场报价；最终按 Core 结果兑付。市场价格不会直接决定 Core 结果。','Genesis 毕业后开启，与 Core 同时开始；模拟中创建后第2小时停止交易。'],en:['Market trading and outcome shares','The post-graduation market, where participants buy and sell YES / NO outcome shares.','Lets participants trade their expectations and positions. Orders form market prices; shares pay out using the final Core result. Market prices do not directly determine that result.','Opens with Core only after Genesis graduation; trading closes at hour 2 from creation in the demo.']}
-            ].map(module=>{const text=lang==='zh'?module.zh:module.en;const Icon=module.icon;return <article key={module.title} className="rounded-2xl border border-border bg-white p-6"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent"><Icon className="h-5 w-5"/></div><h2 className="mt-5 font-display text-lg font-bold">{module.title}</h2><p className="mt-1 text-xs font-bold text-accent">{text[0]}</p><dl className="mt-5 space-y-4 text-sm leading-6"><div><dt className="font-bold">{lang==='zh'?'是什么':'What it is'}</dt><dd className="mt-1 text-text-muted">{text[1]}</dd></div><div><dt className="font-bold">{lang==='zh'?'起什么作用':'What it does'}</dt><dd className="mt-1 text-text-muted">{text[2]}</dd></div><div><dt className="font-bold">{lang==='zh'?'什么时候开启':'When it opens'}</dt><dd className="mt-1 text-text-muted">{text[3]}</dd></div></dl></article>})}
-          </div>
-          <div className="mx-auto mt-5 max-w-3xl rounded-2xl border border-border bg-slate-900 p-5 text-center text-white"><GitBranch className="mx-auto h-5 w-5 text-orange-400"/><h3 className="mt-2 font-display text-sm font-bold">{lang==='zh'?'Genesis 启动 → 毕业后 Core 与 Formal 同时开启':'Genesis launch → Core and Formal open together at graduation'}</h3><p className="mt-2 text-xs leading-6 text-slate-300">{lang==='zh'?'Core 决定结果，Formal 提供交易。Formal 截止后，Core 继续运行至自己的截止时间，再按最终结果结算；Genesis 未毕业则两者都不开启。':'Core determines the outcome; Formal enables trading. Core continues after Formal trading closes, until its own deadline. Settlement follows the final outcome. Neither opens if Genesis fails.'}</p></div>
+        <section className="mx-auto max-w-3xl px-4 pt-10 pb-2 sm:px-6">
+          <div className="rounded-2xl border border-border bg-white p-5 text-center text-sm font-bold leading-8">{lang==='zh'?'发射话题 → Genesis → 毕业 → 市场交易与 Core 质押 → 结算':'Launch → Genesis → Graduation → Market trading & Core staking → Settlement'}</div>
+          <p className="mt-3 text-center text-xs leading-6 text-text-muted">{lang==='zh'?'填写话题及 YES／NO／INVALID 条件即可发射，创建者无需初始本金。以下为模拟演示，不使用真实资金。':'Define a topic and YES / NO / INVALID criteria to launch with no creator principal. The examples below are simulations with no real funds.'}</p>
         </section>
 
-        <section className="border-y border-border bg-white/55">
-          <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-            <SectionTitle eyebrow="01 / FLOW" title={t.lifecycle} />
-            <div className="grid gap-3 md:grid-cols-3">
-              {t.steps.map(([title, description], index) => (
-                <div key={title} className="relative rounded-xl border border-border bg-white p-4">
-                  <div className="text-[10px] font-bold text-accent">0{index + 1}</div>
-                  <h3 className="mt-3 font-display text-xs font-bold">{title}</h3>
-                  <p className="mt-2 text-[11px] leading-5 text-text-muted">{description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6" id="genesis-guide"><SectionTitle eyebrow="01 / GENESIS" title={lang==='zh'?'Genesis · 启动与价格发现':'Genesis · Launch and price discovery'}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{lang==='zh'?'通过早期投机交易实现话题冷启动、价格发现和做市资本积累，并筛选有真实市场需求的话题进入 Formal Market。采用二次储备曲线：买入推高价格，卖出降低价格，实际成交按曲线积分计算。':'Early trading bootstraps topics, discovers prices and builds market-making capital, filtering demand into the Formal Market. A quadratic reserve curve raises prices on buys and lowers them on sales; orders execute along the curve.'}</p><details className="mb-5 text-xs text-text-muted"><summary className="cursor-pointer">{lang==='zh'?'价格曲线与毕业条件':'Price curve and graduation rules'}</summary><p className="mt-3 leading-7">{lang==='zh'?'R = kS²，边际价格 P = 2kS。R 是真实储备，S 是内部计量供应量，k 是固定曲线参数；展示面额为每个内部份额 1,000 万枚 gToken，页面单价相应除以 1,000 万。零供应时价格为零。R 达到 3.6 ETH 等值、B 达到 0.6 ETH 等值时毕业，目标按创建时价格快照固定；买卖均可触发。':'R = kS²; marginal price P = 2kS. R is real reserve, S is internal supply and k is fixed. Each internal unit displays as 10 million gToken, with the displayed price divided accordingly. Price starts at zero supply. Graduation requires R ≥ 3.6 ETH equivalent and B ≥ 0.6 ETH equivalent, fixed at creation; buys or sales can trigger it.'}</p></details><GenesisLab lang={lang}/><div className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6" id="graduation-guide"><h3 className="font-display text-xl font-bold mb-3">{lang==='zh'?'毕业转换':'Graduation conversion'}</h3><p className="text-sm leading-7 text-text">{lang==='zh'?'gToken → 正式LMSR二元市场的 LP 代币':'gToken → LP tokens in the formal LMSR binary market'}</p><p className="mt-2 text-sm leading-7 text-text-muted">{lang==='zh'?'按你持有的 gToken 占总供应量的比例，转换为 LP 代币，代表正式市场流动性池的份额，享有做市资产及 LP 费用的相应权益。':'Your share of the total gToken supply converts into LP tokens, representing proportional rights to the Formal Market liquidity pool’s assets and LP fees.'}</p><p className="mt-2 text-sm leading-7 text-text-muted">{lang==='zh'?'B 代币独立保留，代表做市风险准备金权益。gToken 不直接转换为 YES／NO 份额。':'B tokens remain separate rights to the market-making risk reserve. gToken does not convert directly into YES / NO shares.'}</p></div></section>
 
-        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6" id="genesis-guide"><SectionTitle eyebrow="02 / GENESIS" title={lang==='zh'?'启动与价格发现实验':'Launch and price discovery lab'}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{lang==='zh'?'试着买入和卖出，观察gToken价格及双池毕业进度。这是独立实验，不使用真实资金。':'Try buying and selling to see gToken prices and graduation progress. This standalone lab uses no real funds.'}</p><GenesisLab lang={lang}/></section>
-
-        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="03 / OCP CORE" title={t.capitalLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.capitalLabDesc}</p><CapitalLab lang={lang}/></section>
-        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="04 / FORMAL" title={t.marketLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.marketLabDesc}</p><LmsrLab lang={lang}/></section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="02 / FORMAL" title={t.marketLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.marketLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'毕业后与 Core 同时开启。买卖 YES／NO 份额，截止前可卖出，最终按 Core 结果兑付。交易费用合计 2%：LP 0.5%、B 0.5%、Core 1%。模拟中创建后第2小时停止交易。':'Opens with Core at graduation. Trade YES / NO shares until the trading deadline; settlement follows Core. Trading fees total 2%: LP 0.5%, B 0.5%, Core 1%. Trading closes at hour 2 from creation in the demo.'}</p><LmsrLab lang={lang}/></section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="03 / OCP CORE" title={t.capitalLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.capitalLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'用本金支持一个结果，结算前不能撤回或换边。赢方按比例分享输方本金及参与期间符合条件的市场费用。毕业后开启；模拟中创建后第3小时截止，比市场交易晚1小时。':'Commit principal to an outcome; stakes cannot be withdrawn or switched before settlement. Winners share losing principal and eligible market fees accrued while participating. Opens at graduation and closes at hour 3 from creation, one hour after trading closes in the demo.'}</p><CapitalLab lang={lang}/></section>
 
 
 
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <SectionTitle eyebrow="05 / SETTLEMENT" title={t.outcomes} />
+          <SectionTitle eyebrow="04 / SETTLEMENT" title={t.outcomes} />
           <div className="grid gap-4 lg:grid-cols-3">
             {outcomeCards.map((card) => {
               const Icon = card.icon;
@@ -354,17 +333,11 @@ function HowPage() {
                 </div>
               );
             })}
+          </div>          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-white p-5"><h3 className="font-bold text-sm">{lang==='zh'?'LP 与 B':'LP and B'}</h3><p className="mt-3 text-sm leading-7 text-text-muted">{lang==='zh'?'LP 分享做市资产及 LP 费用，B 准备金优先补偿 LP 做市亏损。结算后，LP 领取对应资产及补偿，B 按份额领取补损后的剩余准备金。领取时销毁对应代币，两者均可能盈利或亏损。':'LP shares market-making assets and LP fees. B absorbs LP losses first. At settlement LP receives its assets and loss coverage; B holders share the remaining reserve. Claims burn the corresponding tokens. Both can gain or lose value.'}</p></div>
+            <div className="rounded-2xl border border-border bg-white p-5"><h3 className="font-bold text-sm">{lang==='zh'?'如果 Genesis 未毕业':'If Genesis does not graduate'}</h3><p className="mt-3 text-sm leading-7 text-text-muted">{lang==='zh'?'模拟中创建后第1小时仍未达标，则进入失败清算，市场与 Core 均不开启。R 按 gToken 份额领取，B 按 B 代币份额领取，销毁对应权益；已支付的创建者费用不退。':'If targets are not met by hour 1 from creation in the demo, Genesis enters failure settlement. Neither Market nor Core opens. R is claimed by gToken share and B by B-token share, burning the corresponding rights. Creator fees already paid are not refunded.'}</p></div>
           </div>
-        </section>
 
-        <section className="border-y border-border bg-white/55">
-          <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-            <SectionTitle eyebrow="06 / ROLES" title={t.separation} />
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-white p-6"><Users className="h-6 w-6 text-accent" /><h3 className="mt-4 font-display font-bold">{t.staker}</h3><p className="mt-3 text-sm leading-6 text-text-muted">{t.stakerDesc}</p></div>
-              <div className="rounded-2xl border border-border bg-white p-6"><Banknote className="h-6 w-6 text-accent-2" /><h3 className="mt-4 font-display font-bold">{t.trader}</h3><p className="mt-3 text-sm leading-6 text-text-muted">{t.traderDesc}</p></div>
-            </div>
-          </div>
         </section>
 
         <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
