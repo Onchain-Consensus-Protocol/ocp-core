@@ -93,8 +93,7 @@ export function StockMarketDirectory({ lang }: { lang: "zh" | "en" }) {
     <section className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-slate-50 p-6 sm:p-10 mb-6">
       <div className="text-xs tracking-widest font-bold text-accent mb-3">OCP MARKET</div>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-        <div><h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">{zh ? "围绕你关注的股票发起话题，参与交易。" : "Ticker. Topic. Trade."}</h1>
-          <p className="text-sm text-slate-500 mt-4 max-w-xl leading-relaxed">{zh ? "Pump式价格发现 + 可见毕业进度 + 毕业后转入有真实结果赔付的话题市场。" : "Pump-style price discovery + visible graduation progress + a topic market with outcome-based payouts after graduation."}</p></div>
+        <div><h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">Every stock has a story. Trade &amp; Pump it.</h1></div>
         <button type="button" disabled aria-disabled="true" title={zh ? "暂未开放" : "Coming soon"} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 text-white px-5 py-3 text-sm font-bold shrink-0 opacity-50 cursor-not-allowed"><Plus size={16}/>{zh ? "创建市场" : "Create Market"}</button>
       </div>
       <div className="flex gap-6 mt-8 text-sm"><span><strong>{stocks.length}</strong> {zh ? "抵押资产" : "assets"}</span><span><strong>{topics.filter(row => row.phase === "genesis").length}</strong> Genesis</span><span><strong>{topics.filter(row => row.phase === "formal").length}</strong> {zh ? "正式市场" : "live markets"}</span></div>
