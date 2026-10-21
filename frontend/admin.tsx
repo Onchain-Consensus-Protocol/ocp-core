@@ -1520,4 +1520,4 @@ function AdminPage() {
 }
 
 const root = typeof document === "undefined" ? null : document.getElementById("root");
-if (root) ReactDOM.createRoot(root).render(<React.StrictMode><AdminPage /></React.StrictMode>);
+if (root) ReactDOM.createRoot(root).render(<React.StrictMode>{config.factoryAddress && config.rpcUrl ? <AdminPage /> : <div className="max-w-xl mx-auto p-10 text-center"><h1>链上市场暂未开放 / On-chain markets are not available</h1><p className="mt-4">历史市场入口已停用。 / Legacy market access has been retired.</p><a href="/" className="block mt-4">返回模拟演示 / Back to the demo</a></div>}</React.StrictMode>);

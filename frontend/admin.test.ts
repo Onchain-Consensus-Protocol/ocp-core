@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { keccak256 } from "ethers";
+vi.mock("./config", async (original) => { const mod = await original<typeof import("./config")>(); return {...mod, config:{...mod.config, factoryAddress:"0x1111111111111111111111111111111111111111"}}; });
 import {
   ADMIN_FACTORY,
   blockscoutTransactionMatchesIntent,

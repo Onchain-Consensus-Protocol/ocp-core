@@ -32,6 +32,7 @@ export const WalletButton: React.FC<Props> = ({
   const t = (zh: string, en: string) => (lang === "zh" ? zh : en);
   const shortAddr = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "";
   const networkLabel = chainId ? (NETWORK_LABELS[chainId] ?? `Chain ${chainId}`) : "";
+  if (!targetChainId) return null;
 
   if (connected && onTargetNetwork) {
     return (

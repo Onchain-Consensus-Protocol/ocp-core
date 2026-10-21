@@ -1,34 +1,17 @@
-/**
- * 前端配置：API 与网络
- * 构建时从环境变量读取，未设置时使用 Base Mainnet 默认值
- */
-const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
-
-/** Base Mainnet 当前唯一支持的 V5 Factory 与原生 USDC */
-const DEFAULT_FACTORY_ADDRESS = "0x97B33092848a38Bb1abCAD3FEf0c72e2e3B8bBf0";
-const DEFAULT_DEPOSIT_TOKEN_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
+/** 当前仅发布模拟演示；历史部署与构建环境变量不再启用链上入口。 */
 export const config = {
-  /** ocp-api 根地址，如 https://your-api.vercel.app */
-  apiBase: env?.VITE_API_BASE ?? "",
-  /** 官方 Vault 工厂地址（用于读取已创建的 Vault） */
-  factoryAddress: env?.VITE_FACTORY_ADDRESS ?? DEFAULT_FACTORY_ADDRESS,
-  /** 默认质押代币地址 */
-  depositTokenAddress: env?.VITE_DEPOSIT_TOKEN_ADDRESS ?? DEFAULT_DEPOSIT_TOKEN_ADDRESS,
-  /** Vault 与 LMSR 市场由同一个官方 Factory 原子创建并登记 */
-  marketFactoryAddress:
-    env?.VITE_MARKET_FACTORY_ADDRESS
-    ?? env?.VITE_FACTORY_ADDRESS
-    ?? DEFAULT_FACTORY_ADDRESS,
-  /** 链 ID: Base Mainnet 8453 */
-  chainId: parseInt(env?.VITE_CHAIN_ID ?? "8453", 10),
-  /** RPC URL，用于钱包与合约读取 */
-  rpcUrl: env?.VITE_RPC_URL ?? "https://base-rpc.publicnode.com",
-  /** 区块浏览器 */
-  explorer: env?.VITE_EXPLORER ?? "https://basescan.org",
-  /** V5 Factory 原子创建 Vault + LMSR Market；仅可显式设为 false 关闭 */
-  marketEnabled: env?.VITE_MARKET_ENABLED !== "false",
+  apiBase: "",
+  factoryAddress: "",
+  depositTokenAddress: "",
+  marketFactoryAddress: "",
+  chainId: 0,
+  rpcUrl: "",
+  explorer: "",
+  marketEnabled: false,
+  isLocalDev: false,
+  chainName: "",
+  nativeCurrencyName: "",
+  nativeCurrencySymbol: "",
 };
 
 export const VAULT_ABI = [

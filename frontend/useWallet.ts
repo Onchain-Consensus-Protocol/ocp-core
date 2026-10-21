@@ -82,6 +82,7 @@ export function useWallet() {
 
   // 1) 自动连接：页面加载时若已授权过账户，则静默恢复
   useEffect(() => {
+    if (!targetChainId) return;
     const eth = getEthereum();
     if (!eth) return;
     (async () => {
@@ -102,6 +103,7 @@ export function useWallet() {
 
   // 2) 监听账户与网络变化
   useEffect(() => {
+    if (!targetChainId) return;
     const eth = getEthereum();
     if (!eth?.on) return;
 
@@ -131,6 +133,7 @@ export function useWallet() {
 
   // 3) 主动连接：请求账户 + 必要时切换/添加 Base 主网
   const connectWallet = useCallback(async () => {
+    if (!targetChainId) return;
     const eth = getEthereum();
     if (!eth) {
       // 没装钱包：打开 MetaMask 下载页

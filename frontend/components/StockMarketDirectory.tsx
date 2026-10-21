@@ -28,6 +28,9 @@ export function StockMarketDirectory({ lang }: { lang: "zh" | "en" }) {
   const [chainNow, setChainNow] = useState(0);
 
   async function load() {
+    if (!config.rpcUrl || !config.factoryAddress) {
+      setStocks([]); setTopics([]); setLoading(false); setError(""); return;
+    }
     setLoading(true); setError("");
     try {
       const rpc = new JsonRpcProvider(config.rpcUrl);
