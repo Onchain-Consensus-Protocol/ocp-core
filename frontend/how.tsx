@@ -305,7 +305,7 @@ function HowPage() {
         </section>
 
         <section className="mx-auto max-w-3xl px-4 pt-10 pb-2 sm:px-6">
-          <div className="rounded-2xl border border-border bg-white p-5 text-center text-sm font-bold leading-8">{lang==='zh'?'发射话题 → Genesis → 毕业 → 市场交易与 Core 质押 → 结算':'Launch → Genesis → Graduation → Market trading & Core staking → Settlement'}</div>
+          <div className="rounded-2xl border border-border bg-white p-5 text-center text-sm font-bold leading-8">{lang==='zh'?'发射话题 → Genesis → 毕业 → LMSR二元市场交易与 Core 质押 → 结算':'Launch → Genesis → Graduation → LMSR binary market trading & Core staking → Settlement'}</div>
           <p className="mt-3 text-center text-xs leading-6 text-text-muted">{lang==='zh'?'填写话题及 YES／NO／INVALID 条件即可发射，创建者无需初始本金。以下为模拟演示，不使用真实资金。':'Define a topic and YES / NO / INVALID criteria to launch with no creator principal. The examples below are simulations with no real funds.'}</p>
         </section>
 
