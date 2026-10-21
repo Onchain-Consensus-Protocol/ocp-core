@@ -19,7 +19,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const t=(cn:string,en:string)=>(zh?cn:en).replaceAll('dUSDC',asset.symbol);
  const [s,setS]=useState<DlpState>(()=>createStockDemo(STOCK_DEMO_ASSETS[0].price));
  const [topic,setTopic]=useState({title:'',YES:'',NO:'',INVALID:''});
- const topicRules=`YES：${topic.YES} · NO：${topic.NO} · INVALID：${topic.INVALID}`;
+ const topicRules=<div className="space-y-2">{(['YES','NO','INVALID'] as const).map(side=><div key={side} className="flex items-start gap-2"><strong className="shrink-0">{side}:</strong><span className="min-w-0 whitespace-pre-wrap break-words">{topic[side]}</span></div>)}</div>;
  const [id,setId]=useState(0),[tab,setTab]=useState<'MARKET'|'PROTOCOL'>('MARKET'),[mode,setMode]=useState<'BUY'|'SELL'>('BUY');
  const [amount,setAmount]=useState(10),[running,setRunning]=useState(false),[notice,setNotice]=useState('');
  const [snapshot,setSnapshot]=useState(2000),[depth,setDepth]=useState(150);
