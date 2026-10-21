@@ -14,7 +14,7 @@ import {
 import type { Language } from "../types";
 
 const PRIMARY_LINKS = [
-  { view: "simulation", zh: "开始体验", en: "Start Playing", icon: Home },
+  { view: "simulation", zh: "Market", en: "Market", icon: Home },
   { view: "mechanism", zh: "机制", en: "Mechanism", icon: BookOpen },
 ] as const;
 
