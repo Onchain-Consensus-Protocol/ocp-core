@@ -16,5 +16,10 @@
     {
       "handle": "filesystem"
     }
-  ]
+  ],
+  "functions": {
+    "api/paper.ts": {
+      "includeFiles": "server/paper/schema.sql"
+    }
+  }
 }

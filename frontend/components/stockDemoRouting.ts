@@ -1,4 +1,4 @@
-import {createDlpDemo,dlpAccounting,dlpAssertLedger,type DlpState} from './dlpDemoModel';
+import {createDlpDemo,dlpAccounting,dlpAssertLedger,type DlpState,type DlpConfig} from './dlpDemoModel.js';
 export const STOCK_DEMO_ASSETS=[
  {symbol:'TSLA',name:'特斯拉',en:'Tesla',price:250},
  {symbol:'NVDA',name:'英伟达',en:'NVIDIA',price:150},
@@ -6,9 +6,9 @@ export const STOCK_DEMO_ASSETS=[
  {symbol:'SPACEX',name:'SpaceX',en:'SpaceX',price:100},
  {symbol:'GOOG',name:'谷歌',en:'Google',price:180},
 ] as const;
-export function createStockDemo(price:number,Q=2000,b=150) {
+export function createStockDemo(price:number,Q=2000,b=150,deadlines:Pick<DlpConfig,"TC">={}) {
  if(!Number.isFinite(price)||price<=0)throw new Error('PRICE');
- const s=createDlpDemo({Q:Q/price,k:1/price,b:b/price,TC:10800,creatorAccount:-1,protocolAccount:-1});
+ const s=createDlpDemo({Q:Q/price,k:1/price,b:b/price,...deadlines,creatorAccount:-1,protocolAccount:-1});
  s.accounts.forEach(a=>a.wallet=5000/price);
  s.initialCapital=15000/price;
  dlpAssertLedger(s);return s;

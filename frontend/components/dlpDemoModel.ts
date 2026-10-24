@@ -3,7 +3,7 @@ export type Side = "YES" | "NO";
 export type Outcome = Side | "INVALID";
 export type DlpPhase = "CREATE" | "GENESIS" | "FORMAL" | "WAIT_CORE" | "FAILED" | "SETTLED";
 export type DlpScenario = "GENESIS" | "BUY_GRADUATE" | "SELL_READY" | "SELL_GRADUATE" | "FAILURE";
-export interface DlpConfig { Q?: number; k?: number; b?: number; TC?: number; creatorAccount?: number; protocolAccount?: number }
+export interface DlpConfig { depthPolicy?: "GRADUATION_CAPITAL"; Q?: number; k?: number; b?: number; TF?: number; TC?: number; TT?: number; creatorAccount?: number; protocolAccount?: number }
 export interface DlpAccount {
   name: string; wallet: number; g: number; lp: number; z: number; yes: number; no: number;
   coreSide: Outcome | null; coreStake: number; coreRewards: [number, number, number]; claimed: boolean; coreClaimed: boolean; paid: number; received: number;
@@ -13,7 +13,7 @@ export interface DlpEvent { id: number; at: number; kind: string; actor?: number
 export interface DlpLiquidityReference { lpSupply:number; basis:number; b:number; cash:number; lpFees:number; inventory:[number,number] }
 export interface DlpAddQuote { lp:number; money:number; cash:number; lpFee:number; yes:number; no:number; basis:number; b:number; restart:boolean }
 export interface DlpState {
-  initialCapital?:number; phase: DlpPhase; now: number; TG: number; TF: number; TC: number; Q: number; k: number;
+  initialCapital?:number; phase: DlpPhase; now: number; TG: number; TF: number; TC: number; TT: number; Q: number; k: number;
   rTarget: number; bTarget: number; R: number; B: number; S: number; M0: number; redeemedPairs: number;
   collateral: number; cash: number; lpFees: number; lpFeesEarned:number; formalVolume:number; creatorFees: number; protocolFees: number;
   basis: number; b: number; lpSupply: number; inventory: [number, number]; liquidityClosed: boolean; restartLiquidity:DlpLiquidityReference|null;
@@ -21,7 +21,7 @@ export interface DlpState {
   result: Outcome | null; cover: number; lpBudget: number; bBudget: number; outcomeBudget: number;
   lpClaimSupply:number; bClaimSupply:number; lpBudgetInitial:number; bBudgetInitial:number; failedSupply:number; failedBudgetInitial:number;
   failedBudget: number; coreBudget: number; coreOfficialBudget: number; payouts: DlpPayout[] | null; corePayouts: number[];
-  events: DlpEvent[]; config: { creatorAccount: number; protocolAccount: number };
+  events: DlpEvent[]; config: { creatorAccount: number; protocolAccount: number; depthPolicy?: "GRADUATION_CAPITAL" };
 }
 export interface DlpTradeQuote {
   quantity: number; gross: number; net: number; R: number; B: number; lpFee: number;
@@ -78,6 +78,8 @@ function accrueCoreFee(s: DlpState, amount: number) {
 function graduate(s: DlpState, id: number, kind: string) {
   // 不用epsilon补足门槛，也不截断本笔订单。
   if (!(s.R >= s.rTarget && s.B >= s.bTarget)) return;
+  // 多人模拟按毕业时真实入池资本确定曲线深度；不创造资金、不增加结果份额。
+  if(s.config.depthPolicy === "GRADUATION_CAPITAL") s.b=s.R;
   s.phase = "FORMAL"; s.M0 = s.R; s.collateral = s.R; s.basis = s.R; s.R = 0;
   s.inventory = [s.M0, s.M0]; s.lpSupply = s.S;
   s.accounts.forEach(a => { a.lp = a.g; a.g = 0; });
@@ -86,12 +88,12 @@ function graduate(s: DlpState, id: number, kind: string) {
 }
 
 export function createDlpDemo(config: DlpConfig = {}): DlpState {
-  const Q = config.Q ?? 2000, k = config.k ?? 1, b = config.b ?? 150, TC = config.TC ?? 10800;
-  if (![Q, k, b].every(positive) || !Number.isFinite(TC) || TC <= 7200) throw new Error("CONFIG");
+  const Q = config.Q ?? 2000, k = config.k ?? 1, b = config.b ?? 150, TG = 10800, TC = config.TC ?? 21600, TF = TC - 3600, TT = TC;
+  if (![Q, k, b].every(positive) || ![TF, TC, TT].every(Number.isSafeInteger) || !(TG < TF) || (config.TF !== undefined && config.TF !== TF) || (config.TT !== undefined && config.TT !== TT)) throw new Error("CONFIG");
   // -1表示演示账户以外的独立费用收款桶；不向账户1/2/3赋予收款角色。
   const creatorAccount = config.creatorAccount ?? 1, protocolAccount = config.protocolAccount ?? 2;
   if (![creatorAccount, protocolAccount].every(x => Number.isInteger(x) && x >= -1 && x < 3)) throw new Error("ACCOUNT");
-  return { phase: "CREATE", now: 0, TG: TC - 7200, TF: TC - 3600, TC, Q, k,
+  return { phase: "CREATE", now: 0, TG, TF, TC, TT, Q, k,
     rTarget: 3.6 * Q, bTarget: .6 * Q, R: 0, B: 0, S: 0, M0: 0, redeemedPairs: 0, collateral: 0,
     cash: 0, lpFees: 0, lpFeesEarned:0,formalVolume:0, creatorFees: 0, protocolFees: 0, basis: 0, b, lpSupply: 0,
     inventory: [0, 0], liquidityClosed: false, restartLiquidity:null,
@@ -100,7 +102,7 @@ export function createDlpDemo(config: DlpConfig = {}): DlpState {
     core: { openedAt: null, yes: 0, no: 0, invalid: 0, cash: 0, fees: 0, feeTotal: 0, officialRewards: [0, 0, 0], result: null }, result: null, cover: 0,
     lpBudget: 0, bBudget: 0, outcomeBudget: 0, lpClaimSupply:0,bClaimSupply:0,lpBudgetInitial:0,bBudgetInitial:0,failedSupply:0,failedBudgetInitial:0,
     failedBudget: 0, coreBudget: 0, coreOfficialBudget: 0,
-    payouts: null, corePayouts: [], events: [], config: { creatorAccount, protocolAccount } };
+    payouts: null, corePayouts: [], events: [], config: { creatorAccount, protocolAccount, ...(config.depthPolicy?{depthPolicy:config.depthPolicy}:{}) } };
 }
 export function dlpCreate(state: DlpState): DlpState {
   if (state.phase !== "CREATE") throw new Error("PHASE");

@@ -98,7 +98,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     let s = dlpBuy(active(), 0, 100);
     s = dlpSell(s, 0, s.accounts[0].g);
     s = dlpBuy(s, 1, 10);
-    s = dlpAdvanceTime(s, 3600);
+    s = dlpAdvanceTime(s, s.TG);
     expect(s.phase).toBe("FAILED");
     rejectsUnchanged(s, () => dlpBuy(s, 0, 1));
     s = dlpClaim(s, 0);
@@ -119,11 +119,11 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
       ledger(s);
       rejectsUnchanged(s, () => dlpClaim(s, 0));
       rejectsUnchanged(s, () => dlpClaimCore(s, 2));
-      s = dlpAdvanceTime(s, 7200);
+      s = dlpAdvanceTime(s, s.TF);
       rejectsUnchanged(s, () => dlpFormalBuy(s, 0, "YES", 1));
       rejectsUnchanged(s, () => dlpFormalSell(s, 0, "YES", 1));
       rejectsUnchanged(s, () => dlpClaimCore(s, 2));
-      s = dlpAdvanceTime(s, 10800);
+      s = dlpAdvanceTime(s, s.TC);
       rejectsUnchanged(s, () => dlpCoreStake(s, 2, "YES", 1));
       s = dlpFinalize(s);
       expect(s.phase).toBe("SETTLED");
@@ -153,7 +153,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     for (const id of [0, 1, 2]) rejectsUnchanged(s, () => dlpExitLP(s, id, s.accounts[id].lp));
     s = dlpTransferLP(s, 0, 1, s.accounts[0].lp);
     expect(s.collateral).toBe(collateral);
-    s = dlpFinalize(dlpAdvanceTime(s, 10800));
+    s = dlpFinalize(dlpAdvanceTime(s, s.TC));
     for (const id of [0, 1, 2]) { s = dlpClaim(s, id); ledger(s); }
     const wallet = s.accounts[0].wallet;
     s = dlpClaimCore(s, 0);
@@ -187,7 +187,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     const withoutFees = Math.max(s.basis - s.cash - s.inventory[0], 0);
     expect(expectedLoss).toBeGreaterThan(0);
     expect(withoutFees - expectedLoss).toBeCloseTo(s.lpFees, 7);
-    s = dlpFinalize(dlpAdvanceTime(s, 10800));
+    s = dlpFinalize(dlpAdvanceTime(s, s.TC));
     expect(s.cover).toBeCloseTo(Math.min(B, expectedLoss), 7);
     expect(s.bBudget + s.cover).toBeCloseTo(B, 7);
     expect(s.inventory).toEqual([0, 0]);
@@ -203,7 +203,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     const originalB = s.B;
     const nav = s.cash + s.lpFees + s.inventory[0];
     expect(s.basis - nav).toBeGreaterThan(originalB);
-    s = dlpFinalize(dlpAdvanceTime(s, 10800));
+    s = dlpFinalize(dlpAdvanceTime(s, s.TC));
     expect(s.cover).toBeCloseTo(originalB, 9);
     expect(s.bBudget).toBeCloseTo(0, 9);
     expect(s.lpBudget).toBeLessThan(s.basis);
@@ -219,7 +219,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     s = dlpTransferB(s, 0, 1, s.accounts[0].z * .9);
     s = dlpCoreStake(s, 2, "YES", 1);
     const B = s.B, loss = Math.max(s.basis - s.cash - s.lpFees - s.inventory[0], 0);
-    s = dlpFinalize(dlpAdvanceTime(s, 10800));
+    s = dlpFinalize(dlpAdvanceTime(s, s.TC));
     expect(s.cover).toBeCloseTo(Math.min(B, loss), 8);
     expect(s.bBudget).toBeCloseTo(B - Math.min(B, loss), 8);
     ledger(s);
@@ -238,7 +238,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     rejectsUnchanged(s, () => dlpClaimFees(s, "CREATOR", 0));
     s = dlpClaimFees(s, "CREATOR", 1);
     rejectsUnchanged(s, () => dlpClaimFees(s, "CREATOR", 1));
-    s = dlpFinalize(dlpAdvanceTime(s, 10800));
+    s = dlpFinalize(dlpAdvanceTime(s, s.TC));
     expect(s.cover).toBeCloseTo(0, 8);
     expect(s.lpBudget).toBeGreaterThan(M);
     ledger(s);
@@ -249,7 +249,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     s = dlpCoreStake(s, 0, "YES", 40);
     s = dlpCoreStake(s, 1, "NO", 35);
     s = dlpCoreStake(s, 2, "INVALID", 25);
-    s = dlpFinalize(dlpAdvanceTime(s, 10800));
+    s = dlpFinalize(dlpAdvanceTime(s, s.TC));
     expect(s.result).toBe("INVALID");
     expect(s.corePayouts).toEqual([40, 35, 25]);
     for (const id of [0, 1, 2]) { s = dlpClaimCore(s, id); ledger(s); }
@@ -260,7 +260,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     s = dlpCoreStake(s, 0, "YES", 60);
     s = dlpCoreStake(s, 1, "NO", 15);
     s = dlpCoreStake(s, 2, "INVALID", 25);
-    s = dlpFinalize(dlpAdvanceTime(s, 10800));
+    s = dlpFinalize(dlpAdvanceTime(s, s.TC));
     expect(s.result).toBe("YES");
     expect(s.corePayouts).toEqual([100, 0, 0]);
     for (const id of [0, 1, 2]) { s = dlpClaimCore(s, id); ledger(s); }
@@ -271,7 +271,7 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
     s = dlpCoreStake(s, 0, "NO", 200);
     s = dlpCoreStake(s, 1, "NO", 100);
     s = dlpCoreStake(s, 2, "YES", 100);
-    s = dlpFinalize(dlpAdvanceTime(s, 10800));
+    s = dlpFinalize(dlpAdvanceTime(s, s.TC));
     expect(s.result).toBe("NO");
     expect(s.corePayouts[0]).toBeCloseTo(400 * 2 / 3, 8);
     expect(s.corePayouts[1]).toBeCloseTo(400 / 3, 8);
@@ -281,19 +281,19 @@ describe("DLP homepage: independent full lifecycle and settlement", () => {
 
   it("keeps Core and trading deadlines distinct and refunds tied Core stakes", () => {
     let s = graduated();
-    s = dlpAdvanceTime(s, 3600);
+    s = dlpAdvanceTime(s, s.TG);
     expect(s.phase).toBe("FORMAL");
     rejectsUnchanged(s, () => dlpBuy(s, 0, 1));
     s = dlpFormalBuy(s, 0, "YES", 1);
-    s = dlpAdvanceTime(s, 7200);
+    s = dlpAdvanceTime(s, s.TF);
     expect(s.phase).toBe("WAIT_CORE");
     s = dlpCoreStake(s, 0, "YES", 100);
     s = dlpCoreStake(s, 1, "NO", 100);
     rejectsUnchanged(s, () => dlpCoreStake(s, 0, "NO", 1));
     rejectsUnchanged(s, () => dlpFinalize(s));
-    s = dlpAdvanceTime(s, 10799);
+    s = dlpAdvanceTime(s, s.TC-1);
     rejectsUnchanged(s, () => dlpFinalize(s));
-    s = dlpAdvanceTime(s, 10800);
+    s = dlpAdvanceTime(s, s.TC);
     rejectsUnchanged(s, () => dlpCoreStake(s, 2, "YES", 1));
     s = dlpFinalize(s);
     expect(s.result).toBe("INVALID");

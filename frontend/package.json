@@ -10,15 +10,19 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@clerk/backend": "^3.26.1",
+    "@clerk/react": "^6.18.0",
     "@vercel/og": "^1.0.0",
     "ethers": "^6.13.1",
     "lucide-react": "^0.563.0",
+    "pg": "^8.23.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@types/pg": "^8.23.1",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",

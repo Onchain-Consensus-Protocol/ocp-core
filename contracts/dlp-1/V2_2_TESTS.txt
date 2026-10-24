@@ -1,0 +1,273 @@
+Compiling 4 files with Solc 0.8.20
+Solc 0.8.20 finished in 52.40s
+Compiler run successful!
+
+Ran 3 tests for test/DLPAdversarial.t.sol:DLPAdversarialTest
+[PASS] testFeeOnTransferIsRejectedWithFullRollback() (gas: 102966)
+[PASS] testReentrantPayoutCannotExitOrClaimTwice() (gas: 420195)
+[PASS] testReentrantReceiveRejectedButOuterBuyValid() (gas: 533136)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 8.58ms (1.96ms CPU time)
+
+Ran 2 tests for test/DLPLiquidityAdd.t.sol:DLPLiquidityAddTest
+[PASS] testAllBottomLiquidityAPIsLockedBeforeAndAfterGraduation() (gas: 727742)
+[PASS] testTransferAllLPDoesNotWithdrawUnderlyingOrEnableRestart() (gas: 702824)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 9.29ms (2.61ms CPU time)
+
+Ran 9 tests for test/DLPRightsSecurity.t.sol:DLPRightsSecurityTest
+[PASS] testExhaustedBStillBurnsZeroPayoutRights() (gas: 7376723)
+[PASS] testGenesisFailureBBurnRollbackAndNoLP() (gas: 427366)
+[PASS] testLPApprovalCannotSpendBAndDoesNotGrantClaimForOwner() (gas: 852107)
+[PASS] testMaterializeReplayCannotMintOrStealEscrow() (gas: 763192)
+[PASS] testOnlyMarketCanMintOrBurnEitherRightsToken() (gas: 765497)
+[PASS] testPartialBClaimsKeepFixedDenominatorAndTransferRight() (gas: 806865)
+[PASS] testUSDCFailureRollsBackLPBurnAndBudget() (gas: 824861)
+[PASS] testUnmaterializedRightsCannotInflateFirstLPClaim() (gas: 835916)
+[PASS] testZeroQuantityClaimsRejectedAndBurnNotReusable() (gas: 799934)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 9.71ms (3.08ms CPU time)
+
+Ran 8 tests for test/DLPBoundary.t.sol:DLPBoundaryTest
+[PASS] testBCompensatesNetOfRetainedLPFees() (gas: 992124)
+[PASS] testBFirstThenLPLossWhenReserveExhausted() (gas: 7302523)
+[PASS] testExactCoreCutoffDoesNotMeanOracleFinal() (gas: 706300)
+[PASS] testFeeRecipientMayCoincide() (gas: 6875810)
+[PASS] testGenesisTransferDisabledEvenAtDeadline() (gas: 281558)
+[PASS] testInvalidDoesNotConsumeB() (gas: 961318)
+[PASS] testNoLPClaimsBeforeFinalResult() (gas: 619654)
+[PASS] testOversizedSellDoesNotGraduateAtIntermediatePoint() (gas: 411173)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 10.89ms (3.61ms CPU time)
+
+Ran 7 tests for test/DLPFeeSafety.t.sol:DLPFeeSafetyTest
+[PASS] testCoreFailureRollsBackNewBFeesAndAllFunds() (gas: 886452)
+[PASS] testCoverUsesNetLPFeesOnceAndOnlyThenSplitsBResidual() (gas: 999376)
+[PASS] testFormalBuyThreeIndependentFeesAndNoBTokenDilution() (gas: 950999)
+[PASS] testFormalSellDeductsGrossExactlyAndAllocatesDistinctFees() (gas: 1005923)
+[PASS] testGenesisBuyCreatorOnePercentProtocolZeroAndDust() (gas: 393895)
+[PASS] testGenesisSellFullGrossReserveAndCreatorFee() (gas: 358407)
+[PASS] testTransferredBReceivesFormalIncomeWithoutCreatorDoubleClaim() (gas: 980488)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 11.10ms (4.39ms CPU time)
+
+Ran 9 tests for test/DLPFactory.t.sol:DLPFactoryTest
+[PASS] testCarrierRuntimeAndCodeStoreSizes() (gas: 56726)
+[PASS] testCarriersOnlyAllowFactory() (gas: 23635)
+[PASS] testCoreCannotStakeUntilGraduationThenOpensAtomically() (gas: 11483016)
+[PASS] testInvalidPriceDoesNotRegisterOrDeployMarket() (gas: 24710)
+[PASS] testMetadataMaximumAccepted() (gas: 11137898)
+[PASS] testRejectInvalidMetadataBeforeDeployment() (gas: 57233)
+[PASS] testRejectMismatchedFactoryCarriers() (gas: 83159)
+[PASS] testSnapshotIsFixedPerMarket() (gas: 21253479)
+[PASS] testZeroPrincipalAtomicCreateAndMetadata() (gas: 10692962)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 11.13ms (2.81ms CPU time)
+
+Ran 1 test for test/DLPNumeric.t.sol:DLPNumericTest
+[PASS] testHighPrecisionReferenceGrid() (gas: 108546)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 199.33µs (151.08µs CPU time)
+
+Ran 9 tests for test/DLPPriceSnapshot.t.sol:DLPPriceSnapshotTest
+[PASS] testConvertsUsdToUsdcAndAccountsForDepeg() (gas: 52251)
+[PASS] testHeartbeatBoundaryAndIndependentStaleness() (gas: 63570)
+[PASS] testMixedDecimalsNormalize() (gas: 916164)
+[PASS] testRejectsFutureAndZeroAndInvertedTimes() (gas: 39231)
+[PASS] testRejectsIncompleteRounds() (gas: 34163)
+[PASS] testRejectsMissingCodeDecimalsAndZeroHeartbeat() (gas: 379752)
+[PASS] testRejectsNonpositiveAnswersOnEitherFeed() (gas: 48275)
+[PASS] testRejectsNormalizationOverflow() (gas: 30017)
+[PASS] testRejectsPriceOutsideMarketBounds() (gas: 57286)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 385.67µs (277.50µs CPU time)
+
+Ran 1 test for test/DLPCodeStoreReadback.t.sol:DLPCodeStoreReadbackTest
+[PASS] testCreationCodeReadbackExactLengthStopAndHash() (gas: 6723496)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.12ms (817.83µs CPU time)
+
+Ran 3 tests for test/DLPFullFlow.t.sol:DLPFullFlowTest
+[PASS] testFactoryToClaimInvalid() (gas: 2277376)
+[PASS] testFactoryToClaimNo() (gas: 2270475)
+[PASS] testFactoryToClaimYes() (gas: 2285976)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 12.37ms (4.32ms CPU time)
+
+Ran 2 tests for test/DLPStockPriceSnapshot.t.sol:DLPStockPriceSnapshotTest
+[PASS] testRejectsBadDataAndSequencerRecovery() (gas: 1280674)
+[PASS] testStockNativeUnitConversionAndImmutableSnapshotInputs() (gas: 7299487)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.06ms (950.79µs CPU time)
+
+Ran 7 tests for test/DLPV3Exchange.t.sol:DLPV3ExchangeTest
+[PASS] testBothDirectionsExactDeltaAndApprovalCleared() (gas: 199528)
+[PASS] testDexFailureAtomicAndConstructorRejectsSameAsset() (gas: 182611)
+[PASS] testDonatedDustCannotBeSwept() (gas: 142577)
+[PASS] testLyingOutputAndPartialConsumptionRejected() (gas: 229950)
+[PASS] testMinimumOutputFailureRestoresInput() (gas: 114154)
+[PASS] testReentryFailsWhileSwapSucceeds() (gas: 247866)
+[PASS] testWrongPairExpiredAndSameAssetRejected() (gas: 474301)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 1.23ms (871.75µs CPU time)
+
+Ran 3 tests for test/DLPEconomicExamples.t.sol:DLPEconomicExamplesTest
+[PASS] testClaimAllTransferFailureRollsBackAllRightsAndBudgets() (gas: 1034492)
+[PASS] testCreatorSelfTradeRecoversFeesAndBWithNearZeroNetLoss() (gas: 377419)
+[PASS] testFinalPureBuyerPays1000ForAbout522InitialLPPlusB() (gas: 1016675)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 2.04ms (1.11ms CPU time)
+
+Ran 7 tests for test/DLPStockIntegration.t.sol:DLPStockIntegrationTest
+[PASS] testCannotBypassSideLockOrClaimOthersWithSuffix() (gas: 1101531)
+[PASS] testCoreRouterStakeDoesNotInheritOldFeesAndCannotSwitchDirectly() (gas: 1723435)
+[PASS] testFullFormalCoreAndBurnClaimsThroughStableRoute() (gas: 2241641)
+[PASS] testNativeCollateralCanBuyAndClaimViaRouter() (gas: 482182)
+[PASS] testOutputSwapFailureRollsBackBurnAndAllowsNativeClaim() (gas: 609533)
+[PASS] testRealFactoryRegistrationForwarderAndUnits() (gas: 32733)
+[PASS] testStableBuysAndSalesKeepRightsOnUserAndPreserveDust() (gas: 542650)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 7.37ms (5.02ms CPU time)
+
+Ran 24 tests for test/DLPMarket.t.sol:DLPMarketTest
+[PASS] testBuyGraduationDoesNotCapActualFunds() (gas: 703843)
+[PASS] testBuySplitAndSquareQuote() (gas: 375786)
+[PASS] testCoreOpenFailureRollsBackUSDC() (gas: 724675)
+[PASS] testDonationDoesNotAffectThresholdOrClaimBudget() (gas: 301058)
+[PASS] testFeesWithdrawOnlyAccruedNotReserve() (gas: 937416)
+[PASS] testFormalBuyThenSellFees() (gas: 974088)
+[PASS] testFormalCutoffCoreKeepsOpen() (gas: 719610)
+[PASS] testFormalMaxPriceProtectsWallet() (gas: 721437)
+[PASS] testFormalOversellAndInventoryProtection() (gas: 623480)
+[PASS] testFullRoundtripAndSellerContribution() (gas: 353928)
+[PASS] testGenesisAtExactDeadlineFails() (gas: 88526)
+[PASS] testIntentAndSlippageRollback() (gas: 171303)
+[PASS] testLPTransferPausedDoesNotTransferContribution() (gas: 785056)
+[PASS] testNoGenesisAfterGraduation() (gas: 613717)
+[PASS] testNoPendingCoreCanSettle() (gas: 708005)
+[PASS] testOutcomeTransferDisabledAndOriginalHolderKeepsPayout() (gas: 988594)
+[PASS] testRepeatedClaimsAndFinalizeRejected() (gas: 1006636)
+[PASS] testSellGraduationFromLegalPath() (gas: 747170)
+[PASS] testSettlementInvalid() (gas: 1111420)
+[PASS] testSettlementNo() (gas: 1125593)
+[PASS] testSettlementYes() (gas: 1110093)
+[PASS] testThreeDeadlinesAndCoreOpenOnGraduation() (gas: 711187)
+[PASS] testUnGraduatedCurrentSplitAndTwoSeparateRights() (gas: 599661)
+[PASS] testZeroSupplyFailureNoDivisionByZero() (gas: 417070)
+Suite result: ok. 24 passed; 0 failed; 0 skipped; finished in 19.20ms (10.52ms CPU time)
+
+Ran 8 tests for test/DLPMath.t.sol:DLPMathTest
+[PASS] testCostOverflowReverts() (gas: 10071)
+[PASS] testExtremeDifferenceAndAbsoluteCoordinates() (gas: 261)
+[PASS] testFuzzCostMonotonicWithinNumericalTolerance(uint96,uint96,uint96,uint96) (runs: 256, μ: 13432, ~: 19581)
+[PASS] testFuzzSymmetryTranslationAndBounds(uint128,uint128,uint128,uint128) (runs: 256, μ: 19837, ~: 8287)
+[PASS] testIntegerSqrtEdges() (gas: 549)
+[PASS] testReferenceCosts() (gas: 17010)
+[PASS] testReferenceProbabilities() (gas: 3893)
+[PASS] testRejectZeroDepth() (gas: 9776)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 15.04ms (24.35ms CPU time)
+
+Ran 12 tests for test/DLPRealCore.t.sol:DLPRealCoreTest
+[PASS] testAdapterCannotBindTwiceOrForgeOutcome() (gas: 24251)
+[PASS] testAdapterFactoryCannotEnableLegacyEarlyTermination() (gas: 1071292)
+[PASS] testDemoParityLockedTokensBurn() (gas: 13728380)
+[PASS] testRealCoreAdapterRejectsUnboundFeeCaller() (gas: 649243)
+[PASS] testRealCoreFailureNeverOpensStaking() (gas: 477849)
+[PASS] testRealCoreFeeConditionalHistoricalSnapshotsAndInvalid() (gas: 2160199)
+[PASS] testRealCoreInvalidOutcome() (gas: 1050871)
+[PASS] testRealCoreLockedBeforeGraduationAndOpenAfter() (gas: 941647)
+[PASS] testRealCoreNoOutcome() (gas: 1063632)
+[PASS] testRealCoreNoSideFeeFinalAndNoBackfill() (gas: 1638267)
+[PASS] testRealCoreNoStakeFeeFallsBackWithoutLateBackfill() (gas: 1583991)
+[PASS] testRealCoreOneHourAfterFormalAndYesFinal() (gas: 1535215)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 793.81ms (7.91ms CPU time)
+
+Ran 8 tests for test/DLPMerge.t.sol:DLPMergeTest
+[PASS] testCoreFeeRejectAtomicallyRollsBackSell() (gas: 1344510)
+[PASS] testFuzzFullHoldingSellCapacityAndCashAfterPair(uint96,uint8) (runs: 256, μ: 1641388, ~: 1641326)
+[PASS] testFuzzTradesLPBTransfersPartialBurnAllClaims(uint256,uint8) (runs: 256, μ: 3034799, ~: 3041091)
+[PASS] testLockedPoolActualBuyThenFullHoldingSellYesAndNo() (gas: 1416706)
+[PASS] testOnlyYesHoldingCanSellWithoutPersonalNo() (gas: 1145702)
+[PASS] testPairWaitCoreAndTerminalRejection() (gas: 1408793)
+[PASS] testPairsRedeemedThenAllRemainingHoldingsSell() (gas: 1419969)
+[PASS] testThreeOutcomeBudgetsAndAllClaimsAfterPairAndSells() (gas: 2271640)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 790.85ms (1.05s CPU time)
+
+Ran 7 tests for test/DLPStockCollateral.t.sol:DLPStockCollateralTest
+[PASS] testEquivalentWholeTokenCurveAcrossDecimals() (gas: 97328386)
+[PASS] testForwardedOwnershipAndRouterPayout() (gas: 6992939)
+[PASS] testQuoteBoundsAcrossPrecisions() (gas: 87479249)
+[PASS] testStock18FailureAndFullRefundRights() (gas: 6995021)
+[PASS] testStock18GraduationFormalAndSettlement() (gas: 7459529)
+[PASS] testUnsupportedCollateralDecimalsRejected() (gas: 929171)
+[PASS] testUntrustedSuffixCannotImpersonate() (gas: 6965777)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 794.69ms (9.02ms CPU time)
+
+Ran 8 tests for test/DLPIntegrationV20.t.sol:DLPIntegrationV20Test
+[PASS] testClaimAllBeforeTerminalOrWithoutRightsReverts() (gas: 820157)
+[PASS] testPreviewAndUnifiedClaimsInvalid() (gas: 1818521)
+[PASS] testPreviewAndUnifiedClaimsNo() (gas: 1911163)
+[PASS] testPreviewAndUnifiedClaimsYes() (gas: 1928235)
+[PASS] testUnifiedFailureClaimBurnsBAndGWithFrozenBudget() (gas: 582128)
+[PASS] testUnifiedFinalizeAfterBothAlreadyFinalized() (gas: 1758645)
+[PASS] testUnifiedFinalizeAfterVaultFirstAndRepeatedCall() (gas: 1729065)
+[PASS] testUnifiedFinalizeBeforeGraduationAndBeforeDeadlineReverts() (gas: 646969)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 909.99ms (6.72ms CPU time)
+
+Ran 8 tests for test/DLPFeesV19.t.sol:DLPFeesV19Test
+[PASS] testCoreFeeFailureRollsBackFormalBAccrualAndLPFee() (gas: 958378)
+[PASS] testFormalBuyExactSplitAndNoNewBToken() (gas: 962601)
+[PASS] testFormalReserveIncreasesActualFirstLossCover() (gas: 7304233)
+[PASS] testFormalSellExactSplitAndNoCreatorOrProtocolRevenue() (gas: 971390)
+[PASS] testFuzzFormalBuySellAllBucketsConserved(uint96) (runs: 256, μ: 1084075, ~: 1084167)
+[PASS] testGenesisCreatorGetsEntireOnePercentOnBuyAndSell() (gas: 359843)
+[PASS] testProtocolNeverAccruesAndCreatorStopsAfterGenesis() (gas: 956083)
+[PASS] testTransferredGenesisBReceivesFormalRevenueWithoutNewWeight() (gas: 1015287)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 900.48ms (901.46ms CPU time)
+
+Ran 13 tests for test/DLPAssetRouter.t.sol:DLPAssetRouterTest
+[PASS] testAnotherCallerCannotSpendUsersRights() (gas: 207242)
+[PASS] testBusinessRevertRollsBackSwap() (gas: 183675)
+[PASS] testClaimConvertsToStablecoinAndCannotBeRepeated() (gas: 297161)
+[PASS] testCoreClaimSlippageRestoresClaimRight() (gas: 361062)
+[PASS] testCoreStakeAndClaimRetainRealAccountIdentity() (gas: 318299)
+[PASS] testDirectCollateralAndStableRouteHaveEquivalentRights() (gas: 259972)
+[PASS] testExactShareBuyReturnsUnusedCollateralToUser() (gas: 201256)
+[PASS] testExchangeCannotReenterRouter() (gas: 380167)
+[PASS] testOldDonationsCannotBeSweptByNextUser() (gas: 223357)
+[PASS] testOutputSlippageRollsBackBurnAndFunds() (gas: 252548)
+[PASS] testRejectsLyingExchangeByBalanceDelta() (gas: 147181)
+[PASS] testRejectsUnknownMarketAssetExpiredAndBadCoreSide() (gas: 643253)
+[PASS] testStablecoinBuyCreditsOnlyUserAndClearsApprovals() (gas: 201704)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 910.03ms (4.49ms CPU time)
+
+Ran 2 tests for test/DLPStatefulInvariant.t.sol:DLPStatefulInvariantTest
+[PASS] invariantMarketSolventAndRightsConserved() (runs: 128, calls: 8192, reverts: 0)
+
+╭--------------------+-------------+-------+---------+----------╮
+| Contract           | Selector    | Calls | Reverts | Discards |
++===============================================================+
+| DLPStatefulHandler | advance     | 1190  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | claims      | 1098  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | formalTrade | 1173  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | genesisBuy  | 1168  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | genesisSell | 1189  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | rights      | 1238  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | stake       | 1136  | 0       | 0        |
+╰--------------------+-------------+-------+---------+----------╯
+
+[PASS] invariantUSDCNeverCreatedOrLostAcrossEscrows() (runs: 128, calls: 8192, reverts: 0)
+
+╭--------------------+-------------+-------+---------+----------╮
+| Contract           | Selector    | Calls | Reverts | Discards |
++===============================================================+
+| DLPStatefulHandler | advance     | 1190  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | claims      | 1098  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | formalTrade | 1173  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | genesisBuy  | 1168  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | genesisSell | 1189  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | rights      | 1238  | 0       | 0        |
+|--------------------+-------------+-------+---------+----------|
+| DLPStatefulHandler | stake       | 1136  | 0       | 0        |
+╰--------------------+-------------+-------+---------+----------╯
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.41s (1.95s CPU time)
+
+Ran 23 test suites in 1.43s (6.63s CPU time): 161 tests passed, 0 failed, 0 skipped (161 total tests)
