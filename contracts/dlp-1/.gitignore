@@ -4,3 +4,11 @@ broadcast/
 DEPLOYMENT_REHEARSAL/
 .env*
 !.env.example
+
+# Local development reports and generated validation output
+*_ZH.md
+*_TESTS.txt
+*_BUILD.txt
+*CODE_SIZES.json
+MANIFEST.json
+ROBINHOOD_VERIFIED_V3_PATHS.json

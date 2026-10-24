@@ -1,8 +1,6 @@
-# OCP Market frontend and paper-trading server
+# OCP Market
 
-Current public application: [market.ocp-protocol.org](https://market.ocp-protocol.org/). The main OCP domain hosts protocol information; the Market hostname rewrites `/` to `explore.html`. Homepage simulation links now lead to this same multiplayer market, using the shared `Simulation` interaction component.
-
-**This is a virtual-money application.** No real stock trades, deposits, withdrawals or DEX swaps are executed. Account balances are held in PostgreSQL, not onchain. See [current project status](../docs/CURRENT_STATUS.md).
+React/Vite frontend and PostgreSQL-backed multiplayer paper-trading server. All balances and trades in the public application are simulated.
 
 ## Local setup
 
@@ -12,20 +10,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Set your own `VITE_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `DATABASE_URL` and `PAPER_ALLOWED_ORIGINS`. The exact local origin must match the dev server URL and authentication configuration. Server secrets must never have a `VITE_` prefix. Environment examples contain placeholders, not deployable production configuration.
+Configure your own `VITE_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `DATABASE_URL` and `PAPER_ALLOWED_ORIGINS`. Allowed origins must match the local URL. Never expose server credentials through `VITE_` variables or commit real environment files.
 
-Clerk handles email verification. Google buttons are currently hidden while OAuth branding verification remains unresolved. Each authenticated Clerk subject receives 100,000 virtual USD once. That rule is per account, not proof that each person has only one account.
-
-Public application information (`public/about.html`) and privacy policy (`public/privacy.html`) are static HTML, require no sign-in and do not depend on Clerk or the database.
-
-## Current simulation rules
-
-- Genesis buys: 94.5% purchases gToken, 4.5% contributes to B, 1% creator fee; sells apply the same split to curve gross proceeds.
-- Graduation requires both R and B targets. gToken converts into LP rights; B remains separate.
-- Formal trading fees total 2%: Core 1%, LP 0.5%, B 0.5%.
-- Only the final Core cutoff is configured. Genesis ends at creation + 3h; Formal ends one hour before Core; topic cutoff equals Core. Core must be later than creation + 4h. Default cutoffs are 3h / 5h / 6h.
-- Market and Core open only after graduation. Time progression does not reset fixed deadlines.
-- Stock prices and stablecoin conversions are illustrative fixed-price simulation inputs. They are not real exchange quotes.
+Clerk provides email-verification login. Each authenticated account receives100,000 virtual USD once. Public application information and privacy pages are available without login.
 
 ## Checks
 
@@ -35,10 +22,8 @@ npx tsc --noEmit
 npm run build
 ```
 
-PostgreSQL integration tests require `PAPER_TEST_DATABASE_URL` pointing to a disposable test database. They never fall back to the production `DATABASE_URL`. Without that variable, eight database tests are skipped, not passed. Do not load production credentials into a test run.
+Real PostgreSQL integration tests run only when `PAPER_TEST_DATABASE_URL` points to a disposable test database. Without it, those tests are skipped. Never use a production database for tests.
 
-[Server implementation notes](PAPER_MULTIPLAYER.md) describe transactions, request replay and trust boundaries. Public competitions still need production rate limits, account-abuse controls and end-to-end database concurrency validation.
+## Hosting
 
-## Historical routes
-
-The repository retains older admin, vault and permissionless UI experiments for reference. They are not the current multiplayer entry point, and older Base deployments, wallet/X flows, fee splits and independent-deadline instructions must not be used as current configuration. The current chain candidate lives in `../contracts/dlp-1/`; source publication is not deployment approval.
+Deploy `frontend/` as a Vite project. Build with `npm run build` and publish `dist/`; the server API is `api/paper.ts`. The included Vercel configuration serves `explore.html` at the Market hostname root. Set authentication and database variables in the hosting environment.

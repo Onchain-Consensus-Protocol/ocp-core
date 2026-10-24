@@ -13,3 +13,8 @@ keeper-state.json
 .DS_Store
 .vercel
 .env*
+
+# Internal development notes remain local
+/docs/CURRENT_STATUS.md
+/docs/design/dlp-1/
+/frontend/PAPER_MULTIPLAYER.md
