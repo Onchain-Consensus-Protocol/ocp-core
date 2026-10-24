@@ -18,7 +18,7 @@ See [frontend setup](frontend/README.md) for authentication and database configu
 
 ## Contracts
 
-The current implementation is in `contracts/topic-market/` and includes its dependencies. Older contracts and routes are retained as historical experiments.
+The contract implementation is in `contracts/topic-market/` and includes its own dependencies.
 
 ```sh
 cd contracts/topic-market
