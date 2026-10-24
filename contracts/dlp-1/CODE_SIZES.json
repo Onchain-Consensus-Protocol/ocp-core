@@ -1,0 +1,67 @@
+[
+  {
+    "contract": "DLPMarket",
+    "runtime_bytes": 24382,
+    "initcode_bytes": 30084
+  },
+  {
+    "contract": "VaultCoreAdapter",
+    "runtime_bytes": 5149,
+    "initcode_bytes": 21271
+  },
+  {
+    "contract": "DLPFactory",
+    "runtime_bytes": 5417,
+    "initcode_bytes": 6646
+  },
+  {
+    "contract": "DLPMarketDeployer",
+    "runtime_bytes": 1490,
+    "initcode_bytes": 32806
+  },
+  {
+    "contract": "DLPCoreDeployer",
+    "runtime_bytes": 22167,
+    "initcode_bytes": 22370
+  },
+  {
+    "contract": "DLPPriceSnapshot",
+    "runtime_bytes": 1758,
+    "initcode_bytes": 2605
+  },
+  {
+    "contract": "DLPRightsToken",
+    "runtime_bytes": 2204,
+    "initcode_bytes": 3159
+  },
+  {
+    "contract": "OCPVault",
+    "runtime_bytes": 14867,
+    "initcode_bytes": 15607
+  },
+  {
+    "contract": "DLPStockFactory",
+    "runtime_bytes": 6022,
+    "initcode_bytes": 7901
+  },
+  {
+    "contract": "DLPStockPriceSnapshot",
+    "runtime_bytes": 2205,
+    "initcode_bytes": 3377
+  },
+  {
+    "contract": "DLPAssetRouter",
+    "runtime_bytes": 6455,
+    "initcode_bytes": 7120
+  },
+  {
+    "contract": "DLPV3Exchange",
+    "runtime_bytes": 3533,
+    "initcode_bytes": 4052
+  },
+  {
+    "contract": "DLPV3Router02Exchange",
+    "runtime_bytes": 3532,
+    "initcode_bytes": 4051
+  }
+]

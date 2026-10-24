@@ -1,0 +1,11 @@
+Compiling 2 files with Solc 0.8.20
+Solc 0.8.20 finished in 33.13s
+Compiler run successful!
+2026-10-21T05:36:26.861482Z  WARN evm::traces: failed to flush signature cache err=failed to create file "/Users/chen/.foundry/cache/signatures": Operation not permitted (os error 1)
+note[unused-import]: unused imports should be removed
+ --> script/DeployDLP.s.sol:5:9
+  |
+5 | import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
+  |         ^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import

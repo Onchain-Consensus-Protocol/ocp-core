@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import {DLPBase} from "./DLPBase.sol";
+import {DLPRightsToken} from "../src/DLPRightsToken.sol";
+
+contract DLPLiquidityAddTest is DLPBase {
+    function testAllBottomLiquidityAPIsLockedBeforeAndAfterGraduation() public {
+        vm.expectRevert("LP_LOCKED"); market.quoteAddLP(1);
+        vm.expectRevert("LP_LOCKED"); market.quoteExit(1);
+        _graduate();
+        uint256 col=market.collateralCash(); uint256 supply=market.yesSupply();
+        uint256 depth=market.bWad(); uint256 basis=market.poolBasisWad();
+        vm.expectRevert("LP_LOCKED"); market.quoteAddLP(1);
+        vm.expectRevert("LP_LOCKED"); market.quoteExit(1);
+        vm.prank(alice); vm.expectRevert("LP_LOCKED"); market.addLP(1,0,0,0,type(uint64).max);
+        uint256 held=market.shares(alice);
+        vm.prank(alice); vm.expectRevert("LP_LOCKED"); market.exitLP(held,0,0,0);
+        assertEq(market.collateralCash(),col); assertEq(market.yesSupply(),supply);
+        assertEq(market.bWad(),depth); assertEq(market.poolBasisWad(),basis); _accounting();
+    }
+    function testTransferAllLPDoesNotWithdrawUnderlyingOrEnableRestart() public {
+        _graduate(); market.materializeLP(alice);
+        DLPRightsToken rights=market.lpToken();
+        uint256 lp=rights.balanceOf(alice); uint256 col=market.collateralCash();
+        vm.prank(alice); rights.transfer(dave,lp);
+        assertEq(market.lpToken().balanceOf(alice),0); assertEq(market.lpToken().balanceOf(dave),lp);
+        assertEq(market.liquiditySupply(),lp); assertFalse(market.liquidityClosed());
+        assertEq(market.collateralCash(),col); assertEq(market.yes(dave)+market.no(dave),0);
+        vm.prank(dave); vm.expectRevert("LP_LOCKED"); market.exitLP(lp,0,0,0);
+        vm.warp(market.formalCutoff()); market.closeExpired();
+        vm.expectRevert("LP_LOCKED"); market.quoteAddLP(lp);
+        _accounting();
+    }
+}

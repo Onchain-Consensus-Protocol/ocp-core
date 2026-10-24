@@ -69,7 +69,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
 }) => {
   const t = lang === "zh"
     ? {
-      title: "探索 Stake War",
+      title: "Market",
       subtitle: "查找并参与链上共识金库与预测市场",
       connect: "连接钱包",
       loading: "加载中…",
@@ -106,7 +106,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       openVault: "点击进入金库",
       buy: "买入",
       sell: "卖出",
-      fee: "手续费 1.2%",
+      fee: "手续费 1.1%",
       balance: "余额",
       myStake: "我的质押",
       myShares: "我的份额",
@@ -134,7 +134,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       btnClaimed: "已领取",
     }
     : {
-      title: "Explore Stake War",
+      title: "Market",
       subtitle: "Find and interact with OnChain consensus vaults & prediction markets",
       connect: "Connect Wallet",
       loading: "Loading…",
@@ -171,7 +171,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({
       openVault: "Open vault",
       buy: "Buy",
       sell: "Sell",
-      fee: "Fee 1.2%",
+      fee: "Fee 1.1%",
       balance: "Balance",
       myStake: "My stake",
       myShares: "My shares",

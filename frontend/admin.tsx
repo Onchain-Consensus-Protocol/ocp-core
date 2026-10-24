@@ -47,9 +47,9 @@ const ADMIN_RPC_URL = env?.VITE_ADMIN_RPC_URL?.trim() || "https://base.gateway.t
 const RECOVERY_RPC_URL = env?.VITE_RECOVERY_RPC_URL?.trim() || "https://base.drpc.org";
 const BLOCKSCOUT_API = "https://base.blockscout.com/api/v2";
 const EXPECTED_PROTOCOL_VERSION = 5n;
-const EXPECTED_FEE_BPS = 120n;
-const EXPECTED_VAULT_FEE_BPS = 100n;
-const EXPECTED_PROTOCOL_LP_FEE_BPS = 20n;
+const EXPECTED_FEE_BPS = 110n;
+const EXPECTED_VAULT_FEE_BPS = 80n;
+const EXPECTED_PROTOCOL_LP_FEE_BPS = 10n;
 const REQUIRED_CONFIRMATIONS = 2;
 // v2 隔离 2026-07-29 之前由钱包假哈希/卡死请求留下的旧本地意图；
 // 链上 Vault/Market 不受影响，新意图继续使用完整的 nonce 防重复恢复流程。
@@ -1305,7 +1305,7 @@ function AdminPage() {
             <div className="flex items-start gap-4">
               <div className="rounded-xl bg-accent/10 p-3"><LockKeyhole className="w-6 h-6 text-accent" /></div>
               <div>
-                <h1 className="font-display text-2xl sm:text-3xl font-bold text-text">新建 Stake War Vault</h1>
+                <h1 className="font-display text-2xl sm:text-3xl font-bold text-text">新建 Market Vault</h1>
                 <p className="mt-2 text-sm text-text-muted max-w-3xl leading-6">
                   这是管理操作界面，不是权限边界。任何人都能打开页面，但只有链上 Factory owner 能通过 <code>onlyOwner</code> 创建。
                   创建后题面、截止时间和最低质押均不可修改，Vault 也不能从链上删除。
@@ -1448,21 +1448,17 @@ function AdminPage() {
                     <input value={form.durationDays} onChange={(e) => updateForm("durationDays", e.target.value)} inputMode="decimal" className="mt-2 w-full rounded-lg border border-border p-3 font-mono text-sm focus:border-accent outline-none" />
                     <span className="block mt-1 text-xs text-text-muted">1 小时–30 天；默认 5 天</span>
                   </label>
-                  <label className="block text-sm font-bold">最低质押（USDC）
-                    <input value={form.minStake} onChange={(e) => updateForm("minStake", e.target.value)} inputMode="decimal" className="mt-2 w-full rounded-lg border border-border p-3 font-mono text-sm focus:border-accent outline-none" />
-                    <span className="block mt-1 text-xs text-text-muted">6 位精度；默认 1 USDC</span>
-                  </label>
                 </div>
                 <div className="rounded-lg bg-slate-50 border border-border p-4 text-xs text-text-muted leading-5">
                   固定参数：Base 主网 · 官方 USDC · LMSR b = 1,000 USDC。Vault 与预测市场在同一笔交易中原子创建；
                   Factory allowance 必须至少为 693.147183 USDC，页面可发起该精确额度的授权。补贴承担 LMSR 最坏做市亏损，终局后只能取回扣除份额兑付责任与手续费托管后的余额。
-                  质押期限 1 小时–30 天、最低质押不超过 1,000 USDC 是管理页运营限制；合约本身只要求未来截止时间和正数 minStake。
+                  质押期限为 1 小时–30 天。此管理页仍连接既有 Base Factory；旧合约的历史质押规则不会随页面更新改变。
                 </div>
                 <div className="rounded-lg bg-accent/5 border border-accent/30 p-4 text-xs text-text-muted leading-5">
                   V5 Vault：题面与三侧定义只用于展示，合约不会读取文字判案。没有秘密期、挑战期或 Keeper；单一公开期内，同地址首次选边后不可换边或撤回。
                   截止时 YES 严格超过总本金 50% 则 YES，NO 严格超过总本金 50% 则 NO；否则（包括恰好 50%，即使无人押 INVALID）自动 INVALID。
                   Vault 为 INVALID 时所有质押者按本金比例分配 Vault 结算池；LMSR 份额是另一套账本，INVALID 时 YES/NO 每份仅兑付 0.5 USDC。
-                  市场总手续费按税前现金流的 1.2% 向上取整，Vault 份额按 1.0% 向下取整，剩余部分归官方流动性池。
+                  市场总手续费按税前现金流的 1.1% 向上取整：Vault 奖励 0.8%，做市份额 0.2%，协议 0.1%。
                   其中 Vault 份额按每笔交易发生时的质押权重写入三套条件账：YES/NO 终局只兑现最终胜侧账本；INVALID 终局由 YES 与 NO 质押者共享 INVALID 条件账；
                   直接质押 INVALID 不获得预测市场手续费奖励。
                 </div>

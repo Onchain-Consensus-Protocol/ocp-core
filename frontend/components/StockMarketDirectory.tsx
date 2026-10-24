@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Contract, JsonRpcProvider, formatUnits, ZeroAddress } from "ethers";
 import { ArrowUpRight, Search, RefreshCw, Plus, AlertTriangle } from "lucide-react";
-import { config, FACTORY_ABI, VAULT_ABI, MARKET_ABI, ERC20_ABI } from "../config";
+import { config, FACTORY_ABI, VAULT_ABI, MARKET_ABI, GENESIS_ABI, ERC20_ABI } from "../config";
 
 type Stock = { address: string; symbol: string };
 type Topic = { vault: string; asset: string; symbol: string; title: string; phase: string; deadline: number; yes: number | null; no: number | null; progress: number | null; principal: string; result: string | null };
-const GENESIS_ABI = ["function phase() view returns (uint8)", "function totalRetainedCapital() view returns (uint256)", "function graduationThreshold() view returns (uint256)"];
-const DIRECTORY_VAULT_ABI = [...VAULT_ABI,"function effectiveResolutionTime() view returns (uint256)"];
 const DIRECTORY_ABI = [...FACTORY_ABI,
   "function genesisTopicCount() view returns (uint256)",
   "function genesisVaultAt(uint256) view returns (address)",
@@ -46,9 +44,9 @@ export function StockMarketDirectory({ lang }: { lang: "zh" | "en" }) {
       const failures: string[] = [];
       const rows = await Promise.all(vaults.map(async (address): Promise<Topic | null> => {
         try {
-          const vault = new Contract(address, DIRECTORY_VAULT_ABI, rpc);
+          const vault = new Contract(address, VAULT_ABI, rpc);
           const [tokenAddress, deadline, resolved, outcome, principal, meta, marketAddress, genesisAddress] = await Promise.all([
-            vault.stakeToken(), vault.effectiveResolutionTime().catch(() => vault.resolutionTime()), vault.resolved(), vault.outcome(), vault.totalPrincipal(),
+            vault.stakeToken(), vault.effectiveResolutionTime(), vault.resolved(), vault.outcome(), vault.totalPrincipal(),
             factory.getVaultMeta(address), factory.marketByVault(address), factory.genesisByVault(address).catch(() => ZeroAddress),
           ]);
           const token = new Contract(tokenAddress, ERC20_ABI, rpc);

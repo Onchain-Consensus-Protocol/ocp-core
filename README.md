@@ -1,71 +1,50 @@
 # OCP — OnChain Consensus Protocol
 
-OCP（OnChain Consensus Protocol，共识上链协议）旨在把公开争议转化为链上可编程的最终共识。
+OCP explores capital-based consensus and topic markets. Players launch a topic, trade gToken during Genesis, and unlock a binary market and Core staking after graduation. Settlement uses the outcome produced by Core; capital consensus does not guarantee objective truth.
 
-协议核心是 **Proof of Commitment（POC，承诺证明）**：参与者通过资本锁定表达立场，经过质押、锁定与一次性终局流程，输出 YES / NO / INVALID 三态结果。OCP 不声称生产绝对真理，而是输出资本对某一结果的可验证承诺，即 **Finalized Consensus**。
+**Development status — 24 October 2026:** the public multiplayer paper-trading application is live. The current chain implementation is an undeployed development candidate, not an audited or mainnet-ready release. Publishing this source does not authorize real-fund deployment.
 
-Stake War 采用单一公开质押期：YES、NO、INVALID 全程开放；同一地址只能选择一侧并同侧追加，不能撤回或换边。截止时间固定，不会延长。
+- [OCP website](https://ocp-protocol.org/)
+- [OCP Market — virtual funds only](https://market.ocp-protocol.org/)
+- [Public app information](https://market.ocp-protocol.org/about.html) · [Privacy policy](https://market.ocp-protocol.org/privacy.html)
+- [Current implementation status and limitations](docs/CURRENT_STATUS.md)
 
+## Current components
 
+| Directory | Purpose | Status |
+|---|---|---|
+| `frontend/` | React/Vite website, shared market interface and server-side virtual-money ledger | Public paper-trading application |
+| `contracts/dlp-1/` | Isolated Genesis, stock-collateral market, LP/B rights, Core adapter and V3 routing candidate | Local tests; not publicly deployed |
+| `docs/design/dlp-1/` | Current design supplements | Read with implementation status |
+| Other `contracts/`, older scripts and whitepapers | Earlier Vault/market experiments | Historical; not the current launch configuration |
 
----
+The selected target chain is Robinhood Chain. Mainnet pool observations and local fork tests are not evidence of testnet liquidity or a production deployment. Earlier Base network instructions are historical.
 
-## 目录结构
+## Run the web application
 
-```
-./
-├── contracts/        Solidity 智能合约 — OCPVault、预测市场与事件账本
-├── frontend/         前端 UI — OCP/POC 模拟、机制说明、测试网浏览与演示
-├── infra/            基础设施
-└── docs/             文档
-│   ├── whitepaper/     白皮书
-│   ├── ops/            部署与运维
-│   └── testing/        测试与安全报告
-```
-
----
-
-## 核心组件
-
-### contracts/ — 智能合约
-
-Foundry 项目。协议核心与应用实验都在这里。
-
-| 合约 | 用途 |
-|------|------|
-| `OCPVault` + `OCPVaultFactory` | 公开质押 → 固定截止 → 比例结算 |
-| `PredictionMarket` | 预测市场应用层状态展示 |
-
-```bash
-cd contracts && forge build && forge test
+```sh
+cd frontend
+npm ci
+npm run dev
 ```
 
-### frontend/ — 前端
+The public information pages need no account. Multiplayer accounts and trading require your own Clerk configuration and PostgreSQL database; see [frontend setup](frontend/README.md). Never commit real environment files or credentials.
 
-React + Vite，部署在 Vercel。包含 OCP/POC 模拟器、机制解释、AI/Infra/Bridge 未来愿景演示与测试网浏览页。
+## Test the current contracts
 
-```bash
-cd frontend && npm install && npm run dev
+```sh
+cd contracts/dlp-1
+forge test --offline
+forge build --offline --sizes
 ```
 
----
+The DLP candidate includes vendored dependencies and a frozen Core source snapshot. It does not require uncommitted changes to the older root contracts project. Solidity 0.8.20 must already be installed for offline builds. See [contract README](contracts/dlp-1/README.md).
 
-## 部署
+## Design and history
 
-| 服务 | 平台 | 目录 |
-|------|------|------|
-| 前端 | Vercel | `frontend/` |
-| 合约 | Base Sepolia（测试）/ Base（正式） | `contracts/` |
+- [Current deadlines](docs/design/dlp-1/DEADLINES_V2_4_ZH.md)
+- [Stock collateral and routing](docs/design/dlp-1/STOCK_COLLATERAL_AND_ROUTING_SPEC_ZH.md)
+- [Graduation depth correction](docs/design/dlp-1/GRADUATION_DEPTH_CORRECTION_ZH.md)
+- [OCP whitepaper — 中文](docs/whitepaper/OCP_WHITEPAPER_CN.md) · [English](docs/whitepaper/OCP_WHITEPAPER_EN.md)
 
-详见 [部署指南](docs/ops/DEPLOY.md)。
-
----
-
-## 文档索引
-
-| 文档 | 说明 |
-|------|------|
-| [OCP 白皮书 (中文)](docs/whitepaper/OCP_WHITEPAPER_CN.md) | 协议设计与共识机制 |
-| [OCP Whitepaper (EN)](docs/whitepaper/OCP_WHITEPAPER_EN.md) | English version |
-| [POC 白皮书 (中文)](docs/whitepaper/POC_WHITEPAPER_CN.md) | 承诺证明机制、博弈论与协议哲学 |
-| [部署指南](docs/ops/DEPLOY.md) | 测试网部署步骤 |
+Historical reports retain their original dates, assumptions and test results. They do not override current source or establish release readiness.

@@ -83,7 +83,7 @@ describe("DLP locked LP and independent transferable B burn rights", () => {
   });
 
   it("allows LP and B transfers while waiting for Core without reopening trading", () => {
-    let s = dlpAdvanceTime(formal(), 7200);
+    let s = formal();s = dlpAdvanceTime(s, s.TF);
     expect(s.phase).toBe("WAIT_CORE");
     const before = underlying(s);
     s = dlpTransferLP(s, 0, 1, s.accounts[0].lp / 2);

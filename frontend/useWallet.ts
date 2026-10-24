@@ -3,16 +3,20 @@
  * 三个页面（explore、vault、App）共用，行为与其他 dApp 一致。
  */
 import { useCallback, useEffect, useState } from "react";
-import { BrowserProvider, JsonRpcSigner } from "ethers";
+import { BrowserProvider, JsonRpcProvider, JsonRpcSigner } from "ethers";
 import { config } from "./config";
 
-// Base Mainnet 的 EIP-3085 chain 参数，用于 wallet_addEthereumChain
-const BASE_MAINNET_PARAMS = {
-  chainId: "0x2105", // 8453
-  chainName: "Base",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+// 目标网络的 EIP-3085 参数。本地 Permissionless 联调时由 VITE_* 指向 Anvil。
+const TARGET_NETWORK_PARAMS = {
+  chainId: `0x${config.chainId.toString(16)}`,
+  chainName: config.chainName,
+  nativeCurrency: {
+    name: config.nativeCurrencyName,
+    symbol: config.nativeCurrencySymbol,
+    decimals: 18,
+  },
   rpcUrls: [config.rpcUrl],
-  blockExplorerUrls: ["https://basescan.org"],
+  ...(config.explorer ? { blockExplorerUrls: [config.explorer] } : {}),
 };
 
 interface Eip1193Provider {
@@ -82,6 +86,7 @@ export function useWallet() {
 
   // 1) 自动连接：页面加载时若已授权过账户，则静默恢复
   useEffect(() => {
+    if (config.isLocalDev && window.sessionStorage.getItem("ocp-local-account") !== null) return;
     if (!targetChainId) return;
     const eth = getEthereum();
     if (!eth) return;
@@ -108,6 +113,7 @@ export function useWallet() {
     if (!eth?.on) return;
 
     const handleAccountsChanged = (...args: unknown[]) => {
+      if (config.isLocalDev && window.sessionStorage.getItem("ocp-local-account") !== null) return;
       const accounts = args[0] as string[];
       if (!accounts || accounts.length === 0) {
         setSigner(null);
@@ -119,6 +125,7 @@ export function useWallet() {
     };
 
     const handleChainChanged = () => {
+      if (config.isLocalDev && window.sessionStorage.getItem("ocp-local-account") !== null) return;
       // 链变更后重新同步（钱包通常会自动刷新页面，这里兜底）
       syncFromProvider(eth);
     };
@@ -133,6 +140,7 @@ export function useWallet() {
 
   // 3) 主动连接：请求账户 + 必要时切换/添加 Base 主网
   const connectWallet = useCallback(async () => {
+    window.sessionStorage.removeItem("ocp-local-account");
     if (!targetChainId) return;
     const eth = getEthereum();
     if (!eth) {
@@ -146,7 +154,7 @@ export function useWallet() {
       try {
         await eth.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: BASE_MAINNET_PARAMS.chainId }],
+          params: [{ chainId: TARGET_NETWORK_PARAMS.chainId }],
         });
       } catch (switchError) {
         // 4902 = 钱包里没添加这条链，需要 add
@@ -154,7 +162,7 @@ export function useWallet() {
         if (e?.code === 4902 || e?.code === -32603) {
           await eth.request({
             method: "wallet_addEthereumChain",
-            params: [BASE_MAINNET_PARAMS],
+            params: [TARGET_NETWORK_PARAMS],
           });
         }
         // 其它错误（如用户拒绝切换）忽略：仍尝试在当前链建立连接
@@ -168,8 +176,41 @@ export function useWallet() {
     }
   }, [syncFromProvider]);
 
+  // DEV ONLY：直接使用 Anvil 暴露的第二个已解锁测试账户。
+  // 这是独立入口，不读取或修改 MetaMask/Rabby 的账户、nonce 或授权状态。
+  const connectLocalAccount = useCallback(async (accountIndex = 1) => {
+    if (!config.isLocalDev) return;
+    try {
+      const provider = new JsonRpcProvider(config.rpcUrl);
+      const network = await provider.getNetwork();
+      const cid = Number(network.chainId);
+      if (cid !== targetChainId) throw new Error("Local RPC chain mismatch");
+      if (!Number.isInteger(accountIndex) || accountIndex < 0 || accountIndex > 9) throw new Error("Invalid local account");
+      const localSigner = await provider.getSigner(accountIndex);
+      // 仅保存公开的 Anvil 账户索引；页面跳转后重连，不保存钱包密钥。
+      window.sessionStorage.setItem("ocp-local-account", String(accountIndex));
+      setSigner(localSigner);
+      setAddress(await localSigner.getAddress());
+      setConnected(true);
+      setChainId(cid);
+    } catch {
+      setSigner(null);
+      setAddress("");
+      setConnected(false);
+      setChainId(null);
+    }
+  }, [targetChainId]);
+
+  const connectLocalWallet = useCallback(() => connectLocalAccount(1), [connectLocalAccount]);
+  useEffect(() => {
+    if (!config.isLocalDev) return;
+    const stored = window.sessionStorage.getItem("ocp-local-account");
+    if (stored !== null) void connectLocalAccount(Number(stored));
+  }, [connectLocalAccount]);
+
   // 4) 断开：dApp 侧无法真正撤销授权，仅清除本地状态
   const disconnectWallet = useCallback(() => {
+    window.sessionStorage.removeItem("ocp-local-account");
     setSigner(null);
     setAddress("");
     setConnected(false);
@@ -185,6 +226,8 @@ export function useWallet() {
     onTargetNetwork,
     targetChainId,
     connectWallet,
+    connectLocalWallet,
+    connectLocalAccount,
     disconnectWallet,
   };
 }

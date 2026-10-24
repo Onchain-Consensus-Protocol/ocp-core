@@ -29,8 +29,8 @@ describe("DLP locked LP: directly purchased outcome pair redemption",()=>{
   expect(s.accounts[0].yes+s.accounts[0].no).toBeCloseTo(0,7);
  });
  it("allows pair redemption during WAIT_CORE but not after final settlement",()=>{
-  let s=dlpAdvanceTime(bought(),7200);s=dlpRedeemPairs(s,0,10);
-  expect(()=>dlpFormalSell(s,0,"YES",1)).toThrow();s=dlpFinalize(dlpAdvanceTime(s,10800));
+  let s=bought();s=dlpAdvanceTime(s,s.TF);s=dlpRedeemPairs(s,0,10);
+  expect(()=>dlpFormalSell(s,0,"YES",1)).toThrow();s=dlpFinalize(dlpAdvanceTime(s,s.TC));
   expect(()=>dlpRedeemPairs(s,0,1)).toThrow();ledger(s);
  });
  it("rejects nonfinite, excessive and unowned pair amounts without mutating state",()=>{

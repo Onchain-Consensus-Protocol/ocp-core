@@ -1,5 +1,4 @@
-import React, { useState, useCallback } from 'react';
-import { Simulation } from './components/Simulation';
+import React, { useState, useEffect } from 'react';
 import { ProtocolVisualizer } from './components/ProtocolVisualizer';
 import { AIDemo } from './components/AIDemo';
 import { InfraDemo } from './components/InfraDemo';
@@ -23,19 +22,15 @@ function initialView(): View {
 }
 
 function App() {
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLang] = useState<Language>(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('lang') === 'zh' ? 'zh' : 'en');
   const [currentView, setCurrentView] = useState<View>(initialView);
 
-  // Wallet state is purely for simulation demo (no real wallet connection)
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [balance, setBalance] = useState(10000);
-
   const t = CONTENT[lang].ui;
-
-  // Simulation-only "wallet" connect: just toggles local demo state
-  const connectWallet = useCallback(() => {
-    setIsWalletConnected(true);
-  }, []);
+  const marketUrl = `https://market.ocp-protocol.org/?lang=${lang}`;
+  // 兼容旧演示书签，统一进入同一多人市场及账户体系。
+  useEffect(() => {
+    if (window.location.hash === '#sim-container') window.location.replace(marketUrl);
+  }, [marketUrl]);
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-accent/30 selection:text-white">
@@ -49,11 +44,11 @@ function App() {
 
             <div className="flex items-center gap-4">
               <a
-                href="https://market.ocp-protocol.org"
+                href={marketUrl}
                 className="inline-flex items-center gap-1.5 text-xs font-bold transition-all px-3 py-2 rounded-lg font-display text-accent border border-accent/50 hover:bg-accent/10 whitespace-nowrap"
               >
                 <Landmark className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{t.nav_vaults}</span>
+                <span>Market</span>
               </a>
 
               <LanguageToggle lang={lang} setLang={setLang} />
@@ -86,29 +81,15 @@ function App() {
                 </div>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
 
-                  <Button size="md" onClick={() => {
-                    document.getElementById('sim-container')?.scrollIntoView({ behavior: 'smooth' });
-                    if (!isWalletConnected) connectWallet();
-                  }} variant="outline">
+                  <a href={marketUrl} className="inline-flex items-center justify-center px-6 py-3 border border-accent/50 rounded-lg text-accent hover:bg-accent/10 text-sm font-bold font-display">
                     <Terminal className="w-3.5 h-3.5 mr-2" />
                     {t.hero_btn_demo}
-                  </Button>
+                  </a>
                 </div>
               </div>
             </section>
 
-            {/* Simulation Component */}
-            <section id="sim-container" className="py-16">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <Simulation
-                  lang={lang}
-                  isWalletConnected={isWalletConnected}
-                  balance={balance}
-                  setBalance={setBalance}
-                  connectWallet={connectWallet}
-                />
-              </div>
-            </section>
+
           </div>
         )}
 

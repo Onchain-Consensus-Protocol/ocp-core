@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import {Script, console2} from "forge-std/Script.sol";
+import {DLPMarket, IToken6} from "../src/DLPMarket.sol";
+import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
+import {DLPFactory, DLPCoreDeployer, DLPMarketDeployer} from "../src/DLPFactory.sol";
+import {DLPPriceSnapshot} from "../src/DLPPriceSnapshot.sol";
+
+/// @notice Explicit configuration only; no network, token, key or oracle defaults.
+/// @dev Run a simulation first. This script never creates a topic or stakes user funds.
+contract DeployDLP is Script {
+    function run() external returns (DLPFactory factory) {
+        require(block.chainid == vm.envUint("DLP_CHAIN_ID"), "WRONG_CHAIN");
+        address deployer = vm.envAddress("DLP_DEPLOYER");
+        IToken6 token = IToken6(vm.envAddress("DLP_TOKEN"));
+        address protocol = vm.envAddress("DLP_CORE_FALLBACK_RECIPIENT");
+        address ethFeed = vm.envAddress("DLP_ETH_USD_FEED");
+        address usdcFeed = vm.envAddress("DLP_USDC_USD_FEED");
+        uint256 ethHeartbeat = vm.envUint("DLP_ETH_HEARTBEAT");
+        uint256 usdcHeartbeat = vm.envUint("DLP_USDC_HEARTBEAT");
+        uint256 k = vm.envUint("DLP_K_WAD");
+        require(deployer != address(0), "DEPLOYER");
+        require(type(DLPMarket).creationCode.length + 7 * 32 <= 49152, "MARKET_INITCODE");
+        require(type(DLPMarketDeployer).creationCode.length + 32 <= 49152, "CARRIER_INITCODE");
+        vm.startBroadcast(deployer);
+        DLPPriceSnapshot oracle = new DLPPriceSnapshot(ethFeed, usdcFeed, ethHeartbeat, usdcHeartbeat);
+        oracle.ethPrice6(); // Reject misconfigured/stale feeds before deployment can continue.
+        address predicted = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        DLPCoreDeployer coreDeployer = new DLPCoreDeployer(predicted);
+        DLPMarketDeployer marketDeployer = new DLPMarketDeployer(predicted);
+        factory = new DLPFactory(token, protocol, k, oracle, coreDeployer, marketDeployer);
+        require(address(factory) == predicted, "FACTORY_ADDRESS");
+        require(address(factory).code.length <= 24576 && address(coreDeployer).code.length <= 24576, "CODE_SIZE");
+        vm.stopBroadcast();
+        console2.log("Factory", address(factory));
+        console2.log("Oracle", address(oracle));
+        console2.log("Core deployer", address(coreDeployer));
+        console2.log("Market deployer", address(marketDeployer));
+    }
+}

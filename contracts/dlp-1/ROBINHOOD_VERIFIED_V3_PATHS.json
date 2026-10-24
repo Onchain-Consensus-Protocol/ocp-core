@@ -1,0 +1,38 @@
+{
+  "chainId": 4663,
+  "block": 94654506,
+  "router02": "0xCaf681a66D020601342297493863E78C959E5cb2",
+  "stablecoin": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+  "routes": [
+    {
+      "stock": "TSLA",
+      "fee": 3000,
+      "address": "0xf4acdaeeb7022862a763c9b1b885e11191c889e3",
+      "quote1000UsdStockOut": "2.664605978520769078"
+    },
+    {
+      "stock": "NVDA",
+      "fee": 500,
+      "address": "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+      "quote1000UsdStockOut": "4.529297383709352257"
+    },
+    {
+      "stock": "AAPL",
+      "fee": 500,
+      "address": "0xaae0d815ee56e4092a5e5c2911e676fea50b2d6d",
+      "quote1000UsdStockOut": "2.905303951757011062"
+    },
+    {
+      "stock": "GOOGL",
+      "fee": 500,
+      "address": "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7",
+      "quote1000UsdStockOut": "2.992643227808856439"
+    },
+    {
+      "stock": "SPCX",
+      "fee": 500,
+      "address": "0xc61284332117c3fb23a2a56cceffd07f7af60029",
+      "quote1000UsdStockOut": "6.386819248848819224"
+    }
+  ]
+}
