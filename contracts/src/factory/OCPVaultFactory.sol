@@ -2,9 +2,9 @@
 pragma solidity ^0.8.19;
 
 import "../core/OCPVault.sol";
-import "../market/PredictionMarket.sol";
+import "../market/TopicMarket.sol";
 import "./OCPVaultDeployer.sol";
-import "./PredictionMarketDeployer.sol";
+import "./TopicMarketDeployer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -19,7 +19,7 @@ contract OCPVaultFactory is ReentrancyGuard {
     address public immutable officialStakeToken;
     address public immutable officialLiquidityPool;
     OCPVaultDeployer public immutable vaultDeployer;
-    PredictionMarketDeployer public immutable marketDeployer;
+    TopicMarketDeployer public immutable marketDeployer;
     address public owner;
     address public pendingOwner;
 
@@ -55,7 +55,7 @@ contract OCPVaultFactory is ReentrancyGuard {
         officialStakeToken = officialStakeToken_;
         officialLiquidityPool = officialLiquidityPool_;
         vaultDeployer = new OCPVaultDeployer();
-        marketDeployer = new PredictionMarketDeployer();
+        marketDeployer = new TopicMarketDeployer();
         owner = msg.sender;
     }
 
@@ -124,17 +124,17 @@ contract OCPVaultFactory is ReentrancyGuard {
         ));
         vaultAddr = address(vault);
 
-        PredictionMarket predictionMarket = PredictionMarket(marketDeployer.deploy(
+        TopicMarket topicMarket = TopicMarket(marketDeployer.deploy(
             vaultAddr,
             officialLiquidityPool,
             1,
             abi.encode(title, description),
             initialLiquidity
         ));
-        marketAddr = address(predictionMarket);
+        marketAddr = address(topicMarket);
         vault.bindMarket(marketAddr);
 
-        uint256 required = predictionMarket.requiredSubsidy();
+        uint256 required = topicMarket.requiredSubsidy();
         IERC20 collateral = IERC20(stakeToken);
         uint256 balanceBefore = collateral.balanceOf(marketAddr);
         collateral.safeTransferFrom(msg.sender, marketAddr, required);
@@ -142,7 +142,7 @@ contract OCPVaultFactory is ReentrancyGuard {
             collateral.balanceOf(marketAddr) - balanceBefore == required,
             "Subsidy transfer mismatch"
         );
-        predictionMarket.activate(msg.sender);
+        topicMarket.activate(msg.sender);
 
         vaults.push(vaultAddr);
         _markets.push(marketAddr);

@@ -47,6 +47,6 @@ contract DeployLocalDemoScript is Script {
         console.log("Local Demo USDC:", address(token));
         console.log("Local OCPVaultFactory:", address(factory));
         console.log("Local Vault:", vault);
-        console.log("Local PredictionMarket:", market);
+        console.log("Local TopicMarket:", market);
     }
 }

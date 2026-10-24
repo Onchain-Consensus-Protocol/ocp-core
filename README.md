@@ -18,12 +18,12 @@ See [frontend setup](frontend/README.md) for authentication and database configu
 
 ## Contracts
 
-The current implementation is in `contracts/dlp-1/` and includes its dependencies. Older contracts and routes are retained as historical experiments.
+The current implementation is in `contracts/topic-market/` and includes its dependencies. Older contracts and routes are retained as historical experiments.
 
 ```sh
-cd contracts/dlp-1
+cd contracts/topic-market
 forge test --offline
 forge build --offline --sizes
 ```
 
-See [contract setup](contracts/dlp-1/README.md).
+See [contract setup](contracts/topic-market/README.md).

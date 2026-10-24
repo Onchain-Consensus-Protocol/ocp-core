@@ -66,7 +66,7 @@ contract DeployBaseSepoliaDemoScript is Script {
 
         require(token.allowance(deployer, address(factory)) == 0, "Unexpected allowance");
         require(
-            PredictionMarket(market).requiredSubsidy() == EXPECTED_SUBSIDY, "Unexpected subsidy"
+            TopicMarket(market).requiredSubsidy() == EXPECTED_SUBSIDY, "Unexpected subsidy"
         );
 
         vm.stopBroadcast();
@@ -74,7 +74,7 @@ contract DeployBaseSepoliaDemoScript is Script {
         console.log("Base Sepolia Test USDC:", address(token));
         console.log("OCPVaultFactory:", address(factory));
         console.log("OCPVault:", vault);
-        console.log("PredictionMarket:", market);
+        console.log("TopicMarket:", market);
         console.log("Resolution time:", OCPVault(vault).resolutionTime());
     }
 }

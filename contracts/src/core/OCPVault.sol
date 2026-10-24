@@ -175,7 +175,7 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
 
     /**
      * @notice 记录某一笔交易产生的 1.0% Vault 手续费。
-     * @dev 本函数从 PredictionMarket 原子拉取资金，并按当前质押状态更新三套
+     * @dev 本函数从 TopicMarket 原子拉取资金，并按当前质押状态更新三套
      *      互斥条件账。任一步失败都会回滚整笔 PM 交易。
      */
     function depositMarketFee(uint256 amount) external override nonReentrant {

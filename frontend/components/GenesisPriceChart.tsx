@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import { genesisPrice } from "./genesisDisplay";
-import type { DlpEvent } from "./dlpDemoModel";
+import type { TopicMarketEvent } from "./topicMarketDemoModel";
 
-interface Props { history?:{price:number;at:number;kind:string}[]; events: DlpEvent[]; supply: number; k: number; zh: boolean; unit?:string }
+interface Props { history?:{price:number;at:number;kind:string}[]; events: TopicMarketEvent[]; supply: number; k: number; zh: boolean; unit?:string }
 const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: 4 });
 
 export function GenesisPriceChart({ history, events, supply, k, zh, unit="dUSDC" }: Props) {
   const [hovered, setHovered] = useState<number | null>(null);
   const trades = events.filter(e => (e.kind === "GENESIS_BUY" || e.kind === "GENESIS_SELL") && e.quantity !== undefined);
   // 从当前真实供应倒推窗口起点；事件窗口截断后也不伪造从零开始的历史。
-  const delta = (e: DlpEvent) => (e.kind === "GENESIS_BUY" ? 1 : -1) * e.quantity!;
+  const delta = (e: TopicMarketEvent) => (e.kind === "GENESIS_BUY" ? 1 : -1) * e.quantity!;
   let runningSupply = Math.max(0, supply - trades.reduce((n, e) => n + delta(e), 0));
   const localPoints = [{ price: 2 * k * runningSupply, at: trades[0]?.at ?? 0, kind: "START" }];
   for (const e of trades) {

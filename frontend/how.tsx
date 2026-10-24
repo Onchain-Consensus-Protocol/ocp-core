@@ -23,7 +23,7 @@ import "./index.css";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { OCPMenu } from "./components/OCPMenu";
 import type { Language } from "./types";
-import {createDlpDemo,dlpCreate,dlpBuy,dlpSell} from './components/dlpDemoModel';
+import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell} from './components/topicMarketDemoModel';
 import {genesisTokens,genesisPrice} from './components/genesisDisplay';
 
 const copy = {
@@ -250,11 +250,11 @@ function LmsrLab({ lang }: { lang: Language }) {
 
 function GenesisLab({lang}:{lang:Language}) {
   const zh=lang==='zh';
-  const initial=()=>dlpCreate(createDlpDemo({Q:2000,b:150,creatorAccount:-1,protocolAccount:-1}));
+  const initial=()=>topicMarketCreate(createTopicMarketDemo({Q:2000,b:150,creatorAccount:-1,protocolAccount:-1}));
   const [state,setState]=useState(initial),[amount,setAmount]=useState(100),[message,setMessage]=useState('');
   const active=state.phase==='GENESIS',account=state.accounts[0];
   const fmt=(n:number)=>n.toLocaleString('en-US',{maximumFractionDigits:2});
-  const transact=(buy:boolean)=>{try{setState(buy?dlpBuy(state,0,amount):dlpSell(state,0,account.g/2));setMessage('')}catch{setMessage(zh?'请检查金额、余额或持仓。':'Check amount, balance and holdings.')}};
+  const transact=(buy:boolean)=>{try{setState(buy?topicMarketBuy(state,0,amount):topicMarketSell(state,0,account.g/2));setMessage('')}catch{setMessage(zh?'请检查金额、余额或持仓。':'Check amount, balance and holdings.')}};
   return <div className="rounded-2xl border border-border bg-white p-5 sm:p-6" data-testid="genesis-lab">
     <div className="flex justify-between items-center gap-3"><strong>{zh?'买卖 gToken，观察价格与毕业进度':'Trade gToken and watch graduation progress'}</strong><button type="button" onClick={()=>{setState(initial());setMessage('')}} className="text-xs underline text-accent">{zh?'重置':'Reset'}</button></div>
     <div className="grid grid-cols-2 gap-4 my-5"><div><p className="text-xs text-text-muted">{zh?'gToken价格':'gToken price'}</p><strong className="block mt-2">{genesisPrice(2*state.k*state.S)} dUSDC</strong></div><div><p className="text-xs text-text-muted">{zh?'我的gToken':'My gToken'}</p><strong className="block mt-2">{fmt(genesisTokens(account.g))}</strong></div></div>

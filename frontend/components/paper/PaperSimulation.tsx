@@ -3,7 +3,7 @@ import {Simulation,type RemoteSimulation} from '../Simulation';
 import {createStockDemo} from '../stockDemoRouting';
 import {createPaperClient} from '../../shared/paperClient';
 import {PAPER_GTOKEN_SCALE,type PaperMarket,type PaperQuote,type PaperAction,type PaperTradeInput} from '../../shared/paperTypes';
-import type {Side,Outcome} from '../dlpDemoModel';
+import type {Side,Outcome} from '../topicMarketDemoModel';
 
 type Input={tab:'MARKET'|'PROTOCOL';mode:'BUY'|'SELL';amount:number;useStable:boolean};
 type Props={market:PaperMarket;balanceUSD:string;lang:'zh'|'en';signedIn:boolean;pending:boolean;now:number;getToken:()=>Promise<string|null>;onLogin:()=>void;onOrder:(order:PaperTradeInput)=>void;onError:(error:unknown)=>void};

@@ -61,11 +61,11 @@ verify-vault:
 		--etherscan-api-key $$ETHERSCAN_API_KEY \
 		--constructor-args $$(cast abi-encode "constructor(address,address,uint256,uint256)" $$factory $$stake_token $$resolution $$min_stake)
 
-# 验证 PredictionMarket（由工厂创建的市场，每个金库对应一个 market 地址）
+# 验证 TopicMarket（由工厂创建的市场，每个金库对应一个 market 地址）
 verify-market:
 	@test -n "$$ETHERSCAN_API_KEY" || (echo "Set ETHERSCAN_API_KEY in env"; exit 1)
 	@test -n "$(ADDR)" || (echo "Usage: make verify-market ADDR=0x..."; exit 1)
-	forge verify-contract $(ADDR) src/market/PredictionMarket.sol:PredictionMarket \
+	forge verify-contract $(ADDR) src/market/TopicMarket.sol:TopicMarket \
 		--verifier etherscan \
 		--chain-id $(CHAIN_ID) \
 		--verifier-url "$(VERIFIER_URL)" \
