@@ -140,7 +140,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [{name:'paper-api',configureServer(server){
       for(const key of ['DATABASE_URL','CLERK_SECRET_KEY','PAPER_ALLOWED_ORIGINS'])if(env[key])process.env[key]=env[key];
-      server.middlewares.use('/api/market-share',async(req,res)=>{const {marketShareHandler}=await server.ssrLoadModule('/server/share/marketShare.tsx');await marketShareHandler(req,res);});
+      server.middlewares.use('/api/market-share',async(req,res)=>{const {marketShareHandler}=await server.ssrLoadModule('/server/share/marketShare.ts');await marketShareHandler(req,res);});
       server.middlewares.use('/api/paper',async(req,res)=>{const {paperHandler}=await import('./server/paper/http');await paperHandler(req,res);});
     }},permissionlessDevApi(env), react()],
     resolve: {

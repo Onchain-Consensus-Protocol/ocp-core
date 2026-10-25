@@ -32,7 +32,7 @@ export function createMarketShareHandler(load:(id:string)=>Promise<ShareMarket|n
    const image=url.searchParams.get('image')==='1';
    res.setHeader('Content-Type',image?'image/png':'text/html; charset=utf-8');
    if(req.method==='HEAD'){res.setHeader('Cache-Control','public, max-age=60, s-maxage=300');res.end();return;}
-   const body=image?Buffer.from(await new ImageResponse(<MarketCard market={m} {...await loadMarketBrand()}/>,{width:1200,height:630}).arrayBuffer()):marketShareHtml(m);
+   const body=image?Buffer.from(await new ImageResponse(React.createElement(MarketCard,{market:m,...await loadMarketBrand()}),{width:1200,height:630}).arrayBuffer()):marketShareHtml(m);
    res.setHeader('Cache-Control','public, max-age=60, s-maxage=300');res.end(body);
   }catch{
    // 不把数据库连接信息、内部错误或其他账户数据暴露给公开爬虫。
