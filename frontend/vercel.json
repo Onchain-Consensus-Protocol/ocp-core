@@ -20,6 +20,9 @@
   "functions": {
     "api/paper.ts": {
       "includeFiles": "server/paper/schema.sql"
+    },
+    "api/market-share.tsx": {
+      "includeFiles": "{server/paper/schema.sql,public/logo.png,public/ocp-wordmark.svg}"
     }
   }
 }
