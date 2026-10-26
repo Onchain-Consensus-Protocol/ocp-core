@@ -5,8 +5,8 @@
 import React, { useState, Component, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
-import { Shield, AlertTriangle, Moon, Sun } from "lucide-react";
-import "./market-theme.css";
+import { Shield, AlertTriangle } from "lucide-react";
+import { useSiteTheme } from "./components/ThemeToggle";
 import { PaperMarketApp } from "./components/paper/PaperMarketApp";
 import {ClerkProvider,useAuth,useClerk} from "@clerk/react";
 import { OCPMenu } from "./components/OCPMenu";
@@ -43,13 +43,7 @@ function AuthenticatedMarket({lang}:{lang:"zh"|"en"}) {
 const noToken=async()=>null;
 function ExploreStandalone() {
   const [lang, setLang] = useState<"zh" | "en">(new URLSearchParams(window.location.search).get("lang")==="zh"?"zh":"en");
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => document.documentElement.dataset.marketTheme === 'light' ? 'light' : 'dark');
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.marketTheme = next;
-    setTheme(next);
-    try { localStorage.setItem('ocp-market-theme-v1', next); } catch { /* 浏览器限制存储不影响本次切换。 */ }
-  };
+  const theme = useSiteTheme();
 
 
   return (
@@ -59,9 +53,6 @@ function ExploreStandalone() {
           <div className="flex items-center justify-between h-16">
             <OCPMenu lang={lang} suffix="MARKET" />
             <div className="flex items-center gap-4">
-              <button type="button" onClick={toggleTheme} className="market-theme-toggle" aria-label={lang === 'zh' ? (theme === 'dark' ? '切换日间模式' : '切换夜间模式') : (theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')} title={lang === 'zh' ? '切换日夜模式' : 'Toggle theme'}>
-                {theme === 'dark' ? <Moon size={18} aria-hidden="true"/> : <Sun size={18} aria-hidden="true"/>}
-              </button>
               <LanguageToggle lang={lang} setLang={setLang} />
             </div>
           </div>
