@@ -142,7 +142,7 @@ contract TopicMarket {
         SCALE = scale_;
         LIMIT = 1e30 / scale_;
         curveScale = 1e36 * scale_;
-        require(block.timestamp <= type(uint64).max - 3 hours, "TIME");
+        require(block.timestamp <= type(uint64).max - 4 hours, "TIME");
         require(uint256(coreEnd_) > block.timestamp + 4 hours, "DEADLINES");
         require(ethPrice6 > 0 && ethPrice6 <= (1e30 / scale_) / 4, "PRICE");
         require(kWad >= 1e12 && kWad <= 1e24, "PARAMS");
@@ -157,7 +157,7 @@ contract TopicMarket {
         topicCutoff = coreEnd_;
         coreCutoff = coreEnd_;
         formalCutoff = coreEnd_ - 1 hours;
-        genesisCutoff = uint64(block.timestamp + 3 hours);
+        genesisCutoff = coreEnd_ - 2 hours;
         rTarget = Math.mulDiv(ethPrice6, 36, 10);
         bTarget = Math.mulDiv(ethPrice6, 6, 10);
         require(bTarget > 0, "TINY_TARGET");

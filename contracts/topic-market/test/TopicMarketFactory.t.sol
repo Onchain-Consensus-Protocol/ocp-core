@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {TopicMarketFactory, TopicMarketCoreDeployer, TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
 import {TopicMarket, IToken6, ITopicMarketCore} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
@@ -15,6 +16,21 @@ contract FactoryPriceMock is ITopicMarketPriceSnapshot {
     function ethPrice6() external view returns (uint256) { return price; }
 }
 contract TopicMarketFactoryTest is Test {
+    struct CreatedPayload {address adapter;address vault;uint64 createdAt;uint64 genesis;uint64 formal;uint64 core;uint64 topic;uint256 snapshot;}
+    function testCreatedEventUsesDerivedGenesisCutoff() public {
+        vm.recordLogs();
+        create();
+        Vm.Log[] memory logs=vm.getRecordedLogs();
+        bytes32 signature=keccak256("MarketCreated(address,address,address,address,uint64,uint64,uint64,uint64,uint64,uint256)");
+        bool found;
+        for(uint256 i;i<logs.length;i++)if(logs[i].emitter==address(factory)&&logs[i].topics[0]==signature){
+            CreatedPayload memory e=abi.decode(logs[i].data,(CreatedPayload));
+            assertEq(e.genesis,e.formal-1 hours);assertEq(e.genesis,e.core-2 hours);
+            assertEq(e.genesis,block.timestamp+4 hours);assertEq(e.topic,e.core);found=true;
+        }
+        assertTrue(found);
+    }
+
     MockUSDC usd; FactoryPriceMock oracle; TopicMarketFactory factory;
     TopicMarketCoreDeployer coreDeployer; TopicMarketDeployer marketDeployer;
     address alice = address(0xA1); address protocol = address(0xF0);
@@ -40,7 +56,7 @@ contract TopicMarketFactoryTest is Test {
         assertEq(v.permissionlessCreator(), alice); assertFalse(v.earlyTerminationEnabled());
         assertEq(m.coreCutoff(), block.timestamp + 6 hours);
         assertEq(m.formalCutoff(), block.timestamp + 5 hours);
-        assertEq(m.genesisCutoff(), block.timestamp + 3 hours);
+        assertEq(m.genesisCutoff(), block.timestamp + 4 hours);
         assertEq(m.rTarget(), 3.6e6); assertEq(m.bTarget(), .6e6);
         assertEq(factory.marketCount(), 1); assertEq(factory.markets(0), address(m));
         TopicMarketFactory.MarketRecord memory r = factory.marketRecord(address(m));

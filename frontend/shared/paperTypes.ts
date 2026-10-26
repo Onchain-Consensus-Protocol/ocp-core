@@ -13,10 +13,9 @@ export type PaperAction =
  | {type:'CLAIM_MARKET'}
  | {type:'CLAIM_CORE'}
  | {type:'CLAIM_CREATOR_FEES'};
-export interface PaperCreateInput {
+export type PaperCreateInput = {
  title:string;yesRule:string;noRule:string;invalidRule:string;assetSymbol:string;
- coreHours:number;
-}
+} & ({coreHours:number;coreDeadline?:never}|{coreDeadline:number;coreHours?:never});
 /** Server persistence only: never serialize users or full model accounts to public clients. */
 export interface StoredPaperMarket {
  id:string;creatorId:string;title:string;yesRule:string;noRule:string;invalidRule:string;

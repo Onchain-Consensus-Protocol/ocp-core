@@ -1,3 +1,4 @@
+import {validDeadlineTimestamp} from '../../shared/deadlineDate.js';
 import type {IncomingMessage,ServerResponse} from 'node:http';
 import {createHash,randomUUID} from 'node:crypto';
 import {createClerkClient,verifyToken} from '@clerk/backend';
@@ -50,10 +51,15 @@ function action(value:unknown):PaperAction{
 }
 function createInput(b:Record<string,unknown>):PaperCreateInput{
  for(const field of ['title','yesRule','noRule','invalidRule','assetSymbol'])if(typeof b[field]!=='string')throw failure('METADATA',400);
- const fields=['requestId','title','yesRule','noRule','invalidRule','assetSymbol','coreHours'];
+ const fields=['requestId','title','yesRule','noRule','invalidRule','assetSymbol','coreHours','coreDeadline'];
  if(Object.keys(b).some(key=>!fields.includes(key)))throw failure('TIME',400);
- if(typeof b.coreHours!=='number'||!Number.isSafeInteger(b.coreHours*3600)||b.coreHours<=4)throw failure('TIME',400);
- return {title:b.title,yesRule:b.yesRule,noRule:b.noRule,invalidRule:b.invalidRule,assetSymbol:b.assetSymbol,coreHours:b.coreHours} as PaperCreateInput;
+ // 此处只验字段格式；剩余时长由锁内engine校验，成功请求过期后重试仍可命中幂等记录。
+ const hasHours=Object.hasOwn(b,'coreHours'),hasDeadline=Object.hasOwn(b,'coreDeadline');
+ if(hasHours===hasDeadline)throw failure('TIME',400);
+ if(hasHours&&(typeof b.coreHours!=='number'||!Number.isSafeInteger(b.coreHours*3600)||b.coreHours<=4))throw failure('TIME',400);
+ if(hasDeadline&&!validDeadlineTimestamp(b.coreDeadline))throw failure('TIME',400);
+ const deadline=hasDeadline?{coreDeadline:b.coreDeadline}:{coreHours:b.coreHours};
+ return {title:b.title,yesRule:b.yesRule,noRule:b.noRule,invalidRule:b.invalidRule,assetSymbol:b.assetSymbol,...deadline} as PaperCreateInput;
 }
 function allowedOrigins(env:NodeJS.ProcessEnv):string[]{
  const configured=env.PAPER_ALLOWED_ORIGINS||((env.NODE_ENV==='production'||env.VERCEL)?'':'http://127.0.0.1:5189,http://localhost:5189');

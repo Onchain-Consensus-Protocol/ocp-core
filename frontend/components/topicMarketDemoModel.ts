@@ -88,8 +88,8 @@ function graduate(s: TopicMarketState, id: number, kind: string) {
 }
 
 export function createTopicMarketDemo(config: TopicMarketConfig = {}): TopicMarketState {
-  const Q = config.Q ?? 2000, k = config.k ?? 1, b = config.b ?? 150, TG = 10800, TC = config.TC ?? 21600, TF = TC - 3600, TT = TC;
-  if (![Q, k, b].every(positive) || ![TF, TC, TT].every(Number.isSafeInteger) || !(TG < TF) || (config.TF !== undefined && config.TF !== TF) || (config.TT !== undefined && config.TT !== TT)) throw new Error("CONFIG");
+  const Q = config.Q ?? 2000, k = config.k ?? 1, b = config.b ?? 150, TC = config.TC ?? 21600, TF = TC - 3600, TG = TF - 3600, TT = TC;
+  if (![Q, k, b].every(positive) || ![TF, TC, TT].every(Number.isSafeInteger) || TC <= 14400 || !(TG < TF) || (config.TF !== undefined && config.TF !== TF) || (config.TT !== undefined && config.TT !== TT)) throw new Error("CONFIG");
   // -1表示演示账户以外的独立费用收款桶；不向账户1/2/3赋予收款角色。
   const creatorAccount = config.creatorAccount ?? 1, protocolAccount = config.protocolAccount ?? 2;
   if (![creatorAccount, protocolAccount].every(x => Number.isInteger(x) && x >= -1 && x < 3)) throw new Error("ACCOUNT");

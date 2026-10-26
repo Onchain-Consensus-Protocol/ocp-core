@@ -1,3 +1,5 @@
+import {FinalDeadlineInput} from '../FinalDeadlineInput';
+import {defaultDeadlineLocal,parseLocalDeadline,validDeadlineTimestamp} from '../../shared/deadlineDate';
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Search,Plus,ArrowLeft,RefreshCw,LogOut,Share2} from 'lucide-react';
 import {createPaperClient,PaperAPIError} from '../../shared/paperClient';
@@ -12,7 +14,7 @@ const number=(v:string|number,d=2)=>Number(v).toLocaleString('en-US',{maximumFra
 const seconds=(v:number)=>{const n=Math.max(0,Math.floor(v));return `${Math.floor(n/3600)}h ${Math.floor(n/60)%60}m ${n%60}s`;};
 const button='rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-orange-300';
 const panel='rounded-2xl border border-slate-200 bg-white p-5';
-const initialForm:PaperCreateInput={title:'',yesRule:'',noRule:'',invalidRule:'',assetSymbol:'TSLA',coreHours:6};
+const initialForm:Omit<PaperCreateInput,'coreHours'|'coreDeadline'>={title:'',yesRule:'',noRule:'',invalidRule:'',assetSymbol:'TSLA'};
 export function PaperMarketApp({lang,authLoaded,signedIn,getToken,onLogin,onLogout,authAvailable=true}:Props){
  const zh=lang==='zh',t=(a:string,b:string)=>zh?a:b;
  const tokenRef=useRef(getToken);tokenRef.current=getToken;
@@ -20,6 +22,7 @@ export function PaperMarketApp({lang,authLoaded,signedIn,getToken,onLogin,onLogo
  const [session,setSession]=useState<PaperSession|null>(null),[markets,setMarkets]=useState<PaperMarket[]>([]),[market,setMarket]=useState<PaperMarket|null>(null);
  const [selected,setSelected]=useState(()=>new URLSearchParams(window.location.search).get('market'));
  const [query,setQuery]=useState(''),[asset,setAsset]=useState('all'),[phase,setPhase]=useState('all'),[creating,setCreating]=useState(false),[form,setForm]=useState(initialForm);
+ const [coreDateTime,setCoreDateTime]=useState(()=>defaultDeadlineLocal());
 
  const [pending,setPending]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const retryMutation=useRef<null|(()=>Promise<{market:PaperMarket;balanceUSD:string}>)>(null);
@@ -51,8 +54,9 @@ export function PaperMarketApp({lang,authLoaded,signedIn,getToken,onLogin,onLogo
   catch(e){if(mounted.current){if(!(e instanceof PaperAPIError)||e.status>=500)retryMutation.current=fn;setError(errorText(e));}}
   finally{busyRef.current=false;if(mounted.current)setPending(false);}
  };
- const validForm=Object.values(form).every(v=>typeof v==='number'?Number.isFinite(v):Boolean(v.trim()))&&form.coreHours>4&&Number.isSafeInteger(form.coreHours*3600);
- const create=async(e:React.FormEvent)=>{e.preventDefault();if(!validForm)return;const input={...form,title:form.title.trim(),yesRule:form.yesRule.trim(),noRule:form.noRule.trim(),invalidRule:form.invalidRule.trim(),requestId:crypto.randomUUID()};const result=await mutation(()=>api.create(input));if(result){setCreating(false);choose(result.market.id);accept(result.market);}};
+ const coreDeadline=parseLocalDeadline(coreDateTime);
+ const validForm=Object.values(form).every(v=>Boolean(v.trim()))&&validDeadlineTimestamp(coreDeadline)&&coreDeadline>Math.floor(now)+14400;
+ const create=async(e:React.FormEvent)=>{e.preventDefault();if(!validForm)return;const input={...form,coreDeadline,title:form.title.trim(),yesRule:form.yesRule.trim(),noRule:form.noRule.trim(),invalidRule:form.invalidRule.trim(),requestId:crypto.randomUUID()};const result=await mutation(()=>api.create(input));if(result){setCreating(false);choose(result.market.id);accept(result.market);}};
  const visible=markets.filter(m=>(asset==='all'||m.assetSymbol===asset)&&(phase==='all'||m.phase===phase)&&`${m.title} ${m.assetSymbol}`.toLowerCase().includes(query.toLowerCase()));
  const phaseName=(p:string)=>({GENESIS:'Genesis',FORMAL:t('正式市场','Formal'),WAIT_CORE:t('等待Core','Awaiting Core'),SETTLED:t('已结算','Settled'),FAILED:t('未毕业','Not graduated')}[p]??p);
  const loginDisabled=!authLoaded||!authAvailable||pending;
@@ -64,8 +68,8 @@ export function PaperMarketApp({lang,authLoaded,signedIn,getToken,onLogin,onLogo
   {creating?<form onSubmit={create} className={panel+' max-w-xl mx-auto space-y-4'}><div className="flex items-center justify-between"><h2 className="text-xl font-bold">{t('发射市场','Launch a market')}</h2><button type="button" className={button} disabled={pending} onClick={()=>setCreating(false)}>{t('取消','Cancel')}</button></div>
    <label className="block text-sm">{t('股票','Stock')}<select value={form.assetSymbol} onChange={e=>setForm({...form,assetSymbol:e.target.value})} className="block border rounded-lg p-2 w-full mt-2">{STOCK_DEMO_ASSETS.map(a=><option key={a.symbol}>{a.symbol}</option>)}</select></label>
    {([['title',t('话题内容','Market question')],['yesRule','YES'],['noRule','NO'],['invalidRule','INVALID']] as const).map(([key,label])=><label key={key} className="block text-sm">{label}<textarea required rows={2} maxLength={key==='title'?300:1000} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} className="block w-full rounded-lg border p-3 mt-2"/></label>)}
-   <label className="block text-sm">{t('最终截止（Core，小时后）','Final cutoff (Core, hours)')}<input required type="number" step="0.5" min="4.5" value={form.coreHours} onChange={e=>setForm({...form,coreHours:Number(e.target.value)})} className="block w-full rounded-lg border p-2 mt-2"/></label>
-   <p className="text-xs text-slate-500">{t('Genesis固定3小时；正式市场在最终截止前1小时关闭，Core在最终截止时结算。','Genesis lasts 3 hours. The formal market closes 1 hour before the final cutoff; Core settles at the final cutoff.')}</p><button type="submit" disabled={pending||!validForm} className={button+' bg-orange-500 text-white w-full'}>{pending?t('提交中…','Submitting…'):t('发射市场','Launch a market')}</button></form>
+   <FinalDeadlineInput lang={lang} value={coreDateTime} onChange={setCoreDateTime} now={now}/>
+   <p className="text-xs text-slate-500">{t('Genesis比正式市场提前1小时截止；正式市场在最终截止前1小时关闭，Core与话题同时截止。','Genesis closes 1 hour before the formal market. The formal market closes 1 hour before the final cutoff; Core and the topic end together.')}</p><button type="submit" disabled={pending||!validForm} className={button+' bg-orange-500 text-white w-full'}>{pending?t('提交中…','Submitting…'):t('发射市场','Launch a market')}</button></form>
   :selected?<>{!market?<p className="p-10 text-center">{loading?t('正在加载市场…','Loading market…'):t('无法加载市场。','Unable to load market.')} <button className={button} onClick={()=>choose(null)}>{t('返回','Back')}</button></p>:<>
    <div className="flex flex-wrap items-center justify-between gap-3 mb-4"><button className={button+' inline-flex gap-2 items-center'} onClick={()=>choose(null)} disabled={pending}><ArrowLeft size={15}/>{t('全部市场','All markets')}</button><a href={marketXIntent(market.id,market.title)} target="_blank" rel="noopener noreferrer" className={button+' inline-flex gap-2 items-center'}><Share2 size={15}/>{t('分享到 X','Share on X')}</a></div>
    <PaperSimulation market={market} balanceUSD={session?.balanceUSD??'0'} lang={lang} signedIn={signedIn} pending={pending} now={now} getToken={getToken} onLogin={onLogin} onOrder={input=>{void mutation(()=>api.trade(input));}} onError={e=>setError(errorText(e))}/>

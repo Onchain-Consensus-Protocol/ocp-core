@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 contract TopicMarketTest is TopicMarketBase {
     function testThreeDeadlinesAndCoreOpenOnGraduation() public {
         assertEq(market.formalCutoff() + 1 hours, market.coreCutoff());
-        assertEq(market.genesisCutoff() + 2 hours, market.formalCutoff());
+        assertEq(market.genesisCutoff() + 1 hours, market.formalCutoff());
         assertEq(oracle.openedAt(), 0);
         uint256 now_ = block.timestamp;
         _graduate();

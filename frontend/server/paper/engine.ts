@@ -1,3 +1,4 @@
+import {validDeadlineTimestamp} from '../../shared/deadlineDate.js';
 import {
  topicMarketCreate,topicMarketAdvanceTime,topicMarketFinalize,topicMarketAssertLedger,topicMarketPrices,topicMarketClaimPreview,
  topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalSell,topicMarketCoreStake,topicMarketClaim,topicMarketClaimCore,topicMarketClaimFees,
@@ -34,8 +35,13 @@ export function createPaperMarket(id:string,creatorId:string,input:PaperCreateIn
  const asset=STOCK_DEMO_ASSETS.find(a=>a.symbol===input.assetSymbol);if(!asset)throw new Error('ASSET');
  // 创建只接受最终截止；存量市场仍沿用已保存的截止节点。
  if(['formalHours','topicHours','TF','TT'].some(key=>Object.hasOwn(input,key)))throw new Error('TIME');
- const TC=input.coreHours*3600;
- if(typeof input.coreHours!=='number'||!Number.isSafeInteger(TC)||TC<=14400||!Number.isSafeInteger(Math.floor(nowMs/1000)+TC))throw new Error('TIME');
+ // 表单提交UTC秒：拿到事务锁后才核对剩余时间，保留玩家选定的绝对截止，不能因排队而后移。
+ const createdAt=Math.floor(nowMs/1000),hasHours=Object.hasOwn(input,'coreHours'),hasDeadline=Object.hasOwn(input,'coreDeadline');
+ if(hasHours===hasDeadline)throw new Error('TIME');
+ if(hasDeadline&&!validDeadlineTimestamp(input.coreDeadline))throw new Error('TIME');
+ if(hasHours&&typeof input.coreHours!=='number')throw new Error('TIME');
+ const TC=hasDeadline?input.coreDeadline!-createdAt:input.coreHours!*3600;
+ if(!Number.isSafeInteger(TC)||TC<=14400||!Number.isSafeInteger(createdAt+TC))throw new Error('TIME');
  const s=createStockDemo(asset.price,2000,150,{TC});s.accounts=[];s.initialCapital=0;s.config={creatorAccount:0,protocolAccount:-1,depthPolicy:"GRADUATION_CAPITAL"};s.accounts.push(emptyAccount());
  const m:StoredPaperMarket={id,creatorId,title:input.title.trim(),yesRule:input.yesRule.trim(),noRule:input.noRule.trim(),invalidRule:input.invalidRule.trim(),assetSymbol:asset.symbol,assetPriceUSD:asset.price,createdAt:Math.floor(nowMs/1000),revision:0,users:[creatorId],state:topicMarketCreate(s),history:[]};history(m);return m;
 }

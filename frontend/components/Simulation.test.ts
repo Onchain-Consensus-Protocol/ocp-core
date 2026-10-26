@@ -7,7 +7,7 @@ const render = (lang: "zh"|"en") => renderToStaticMarkup(React.createElement(Sim
 }));
 describe("market launch entry",()=>{
  it("collects a topic and all three outcome definitions before entering the demo",()=>{const html=render("zh");expect(html).toContain("launch-market-card");expect(html).toContain("话题内容");for(const side of ["YES","NO","INVALID"])expect(html).toContain(side);expect(html.match(/<textarea/g)).toHaveLength(4);expect(html).toContain("disabled");expect(html).not.toContain("homepage-lifecycle");});
- it("labels the local simulation and fixed deadlines",()=>{const html=render("zh");expect(html).toContain("不会发起链上交易");expect(html).toContain("Genesis固定3小时");expect(html).toContain("发射市场，开始模拟");});
- it("collects only the final deadline and derives market close",()=>{const html=render("zh");expect(html).toContain('aria-label="Core hours"');expect(html).not.toContain('aria-label="Formal hours"');expect(html).not.toContain('aria-label="Topic hours"');expect(html).toContain("最终截止（小时后）");expect(html).toContain("Core与话题同时截止");});
+ it("labels the local simulation and fixed deadlines",()=>{const html=render("zh");expect(html).toContain("不会发起链上交易");expect(html).toContain("Genesis在最终截止前2小时截止");expect(html).toContain("发射市场，开始模拟");});
+ it("collects only the final deadline and derives market close",()=>{const html=render("zh");expect(html).toContain('aria-label="Core deadline"');expect(html).not.toContain('aria-label="Formal hours"');expect(html).not.toContain('aria-label="Topic hours"');expect(html).toContain("最终截止（Core／话题）");expect(html).toContain('type="datetime-local"');expect(html).toContain("时区：");expect(html).toContain("Core与话题同时截止");});
  it("supports the English launch form",()=>{expect(render("en")).toContain("Launch market and start demo");});
 });

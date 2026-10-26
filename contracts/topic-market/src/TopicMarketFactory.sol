@@ -123,7 +123,7 @@ contract TopicMarketFactory {
     {
         require(entered == 1, "REENTER"); entered = 2;
         _length(topic, 512); _length(yesRule, 2048); _length(noRule, 2048); _length(invalidRule, 2048);
-        require(block.timestamp <= type(uint64).max - 3 hours, "TIME");
+        require(block.timestamp <= type(uint64).max - 4 hours, "TIME");
         require(uint256(coreEnd) > block.timestamp + 4 hours, "DEADLINES");
         uint256 price = priceOracle.ethPrice6();
         require(price > 0 && price <= 1e18 / 4, "PRICE");
@@ -144,6 +144,6 @@ contract TopicMarketFactory {
     function _emitCreated(address market) private {
         MarketRecord storage r = records[market];
         emit MarketCreated(market, r.creator, r.adapter, r.vault, r.createdAt,
-            uint64(uint256(r.createdAt) + 3 hours), r.formalCutoff, r.coreCutoff, r.topicCutoff, r.snapshot);
+            r.coreCutoff - 2 hours, r.formalCutoff, r.coreCutoff, r.topicCutoff, r.snapshot);
     }
 }

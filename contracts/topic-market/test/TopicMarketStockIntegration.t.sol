@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {TopicMarketStockFactory} from "../src/TopicMarketStockFactory.sol";
 import {TopicMarketCoreDeployer,TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
@@ -30,6 +31,21 @@ contract FixedStockExchange is ITopicMarketAssetExchange {
     }
 }
 contract TopicMarketStockIntegrationTest is Test {
+    struct CreatedPayload {address adapter;address vault;uint64 createdAt;uint64 genesis;uint64 formal;uint64 core;uint64 topic;uint256 snapshot;}
+    function testCreatedEventUsesDerivedGenesisCutoff() public {
+        vm.recordLogs();
+        factory.createMarket("Event timing", "yes", "no", "invalid", uint64(block.timestamp+6 hours));
+        Vm.Log[] memory logs=vm.getRecordedLogs();
+        bytes32 signature=keccak256("MarketCreated(address,address,address,address,uint64,uint64,uint64,uint64,uint64,uint256)");
+        bool found;
+        for(uint256 i;i<logs.length;i++)if(logs[i].emitter==address(factory)&&logs[i].topics[0]==signature){
+            CreatedPayload memory e=abi.decode(logs[i].data,(CreatedPayload));
+            assertEq(e.genesis,e.formal-1 hours);assertEq(e.genesis,e.core-2 hours);
+            assertEq(e.genesis,block.timestamp+4 hours);assertEq(e.topic,e.core);found=true;
+        }
+        assertTrue(found);
+    }
+
     IntegrationStock c;IntegrationStock u;FixedStockExchange ex;TopicMarketAssetRouter router;TopicMarketStockFactory factory;
     TopicMarket m;VaultCoreAdapter adapter;OCPVault vault;
     address alice=address(0xA1);address bob=address(0xB1);address fallback_=address(0xF0);

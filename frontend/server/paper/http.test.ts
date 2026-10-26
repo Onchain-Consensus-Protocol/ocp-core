@@ -3,7 +3,7 @@ import type {IncomingMessage,ServerResponse} from 'node:http';
 import {describe,it,expect,vi} from 'vitest';
 import {createPaperHandler,type PaperHandlerDependencies} from './http';
 import {createPaperMarket,projectPaperMarket} from './engine';
-import type {PaperMutationContext,PaperMutationUpdate} from './store';
+import {PaperStoreError,type PaperMutationContext,type PaperMutationUpdate} from './store';
 import {STOCK_DEMO_ASSETS} from '../../components/stockDemoRouting';
 
 const origin='https://market.example.test';
@@ -15,7 +15,7 @@ function setup(overrides:PaperHandlerDependencies={}){
  const nowMs=1_000_000;
  const market=createPaperMarket('market-1',user.id,createBody,nowMs);
  const store={ensureUser:vi.fn(async()=>({...user})),listMarkets:vi.fn(async()=>[market]),getMarket:vi.fn(async()=>market),mutate:vi.fn(async(_u:string,_r:string,_h:string,_m:string|null,callback:(context:PaperMutationContext)=>unknown)=>{
-  const result=await callback({user:{...user},market:_m?structuredClone(market):null}) as {response:ReturnType<typeof projectPaperMarket>};return result.response as never;
+  const result=await callback({user:{...user},market:_m?structuredClone(market):null}) as PaperMutationUpdate;return result.response;
  })};
  const verifySession=vi.fn(async()=>({sub:'clerk-subject',azp:origin}));
  const getIdentity=vi.fn(async()=>identity());
@@ -72,6 +72,25 @@ describe('paper HTTP security boundary',()=>{
    const s=setup();expect((await request(s.handler,'create',{payload:{...createBody,...patch}})).status).toBe(400);expect(s.store.mutate).not.toHaveBeenCalled();
   }
  });
+ it('accepts an absolute cutoff and keeps it fixed while waiting for the wallet lock',async()=>{
+  let clock=1_000_000;const s=setup({now:()=>clock});const {coreHours,...fields}=createBody;const deadline=Math.floor(clock/1000)+21600;
+  s.store.mutate.mockImplementation(async(_u,_r,_h,_m,callback)=>{clock+=3600000;const result=await callback({user,market:null}) as PaperMutationUpdate;return result.response;});
+  const r=await request(s.handler,'create',{payload:{...fields,coreDeadline:deadline}});expect(r.status).toBe(200);expect(r.body.market.coreDeadline).toBe(deadline);expect(r.body.market.genesisDeadline).toBe(deadline-7200);expect(r.body.market.formalDeadline).toBe(deadline-3600);
+ });
+ it('rejects an absolute cutoff that becomes only four hours away inside the lock',async()=>{
+  let clock=1_000_000;const s=setup({now:()=>clock});const {coreHours,...fields}=createBody;const deadline=Math.floor(clock/1000)+21600;
+  s.store.mutate.mockImplementation(async(_u,_r,_h,_m,callback)=>{clock+=7200000;const result=await callback({user,market:null}) as PaperMutationUpdate;return result.response;});
+  const r=await request(s.handler,'create',{payload:{...fields,coreDeadline:deadline}});expect(r.status).toBe(400);expect(r.body.error).toBe('TIME');
+ });
+ it('rejects conflicting, missing or malformed calendar deadlines before mutation',async()=>{
+  const {coreHours,...fields}=createBody;
+  for(const payload of [fields,{...createBody,coreDeadline:30000},...['bad',null,30000.5,1800000000000,253402300800].map(coreDeadline=>({...fields,coreDeadline}))]){const s=setup();expect((await request(s.handler,'create',{payload})).status).toBe(400);expect(s.store.mutate).not.toHaveBeenCalled();}
+ });
+ it('replays the same successful absolute deadline after it is past without re-executing creation',async()=>{
+  let clock=1_000_000;const s=setup({now:()=>clock});const {coreHours,...fields}=createBody;const payload={...fields,coreDeadline:Math.floor(clock/1000)+21600};let saved:unknown;let savedHash='';let calls=0;
+  s.store.mutate.mockImplementation(async(_u,_r,hash,_m,callback)=>{if(saved){if(hash!==savedHash)throw new PaperStoreError('IDEMPOTENCY_CONFLICT',409);return saved as never;}calls++;savedHash=hash;const next=await callback({user,market:null}) as PaperMutationUpdate;saved=next.response;return next.response;});
+  const first=await request(s.handler,'create',{payload});expect(first.status).toBe(200);clock+=86400000;const replay=await request(s.handler,'create',{payload});expect(replay.status).toBe(200);expect(replay.body.market.id).toBe(first.body.market.id);expect(calls).toBe(1);expect((await request(s.handler,'create',{payload:{...payload,coreDeadline:payload.coreDeadline+3600}})).status).toBe(409);
+ });
  it('rejects failed verification, missing or foreign authorized party, and identity mismatch',async()=>{
   const bad:PaperHandlerDependencies[]=[
    {verifySession:async()=>{throw new Error('secret token details');}},
@@ -125,7 +144,7 @@ describe('paper HTTP security boundary',()=>{
  it('samples real server time inside the wallet/market lock callback',async()=>{
   let clock=1_000_000;const s=setup({now:()=>clock});
   s.store.mutate.mockImplementation(async(_u,_r,_h,_m,callback)=>{
-   clock=s.nowMs+3*3600*1000;
+   clock=s.nowMs+s.market.state.TG*1000;
    return (await callback({user,market:structuredClone(s.market)})) as never;
   });
   const response=await request(s.handler,'trade',{payload:{marketId:'market-1',requestId:createBody.requestId,expectedRevision:0,action:{type:'GENESIS_BUY',budgetUSD:'10'}}});
