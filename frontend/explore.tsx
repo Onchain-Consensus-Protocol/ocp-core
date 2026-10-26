@@ -5,7 +5,8 @@
 import React, { useState, Component, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
-import { Shield, AlertTriangle } from "lucide-react";
+import { Shield, AlertTriangle, Moon, Sun } from "lucide-react";
+import "./market-theme.css";
 import { PaperMarketApp } from "./components/paper/PaperMarketApp";
 import {ClerkProvider,useAuth,useClerk} from "@clerk/react";
 import { OCPMenu } from "./components/OCPMenu";
@@ -42,6 +43,13 @@ function AuthenticatedMarket({lang}:{lang:"zh"|"en"}) {
 const noToken=async()=>null;
 function ExploreStandalone() {
   const [lang, setLang] = useState<"zh" | "en">(new URLSearchParams(window.location.search).get("lang")==="zh"?"zh":"en");
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => document.documentElement.dataset.marketTheme === 'light' ? 'light' : 'dark');
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.marketTheme = next;
+    setTheme(next);
+    try { localStorage.setItem('ocp-market-theme-v1', next); } catch { /* 浏览器限制存储不影响本次切换。 */ }
+  };
 
 
   return (
@@ -51,6 +59,9 @@ function ExploreStandalone() {
           <div className="flex items-center justify-between h-16">
             <OCPMenu lang={lang} suffix="MARKET" />
             <div className="flex items-center gap-4">
+              <button type="button" onClick={toggleTheme} className="market-theme-toggle" aria-label={lang === 'zh' ? (theme === 'dark' ? '切换日间模式' : '切换夜间模式') : (theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')} title={lang === 'zh' ? '切换日夜模式' : 'Toggle theme'}>
+                {theme === 'dark' ? <Moon size={18} aria-hidden="true"/> : <Sun size={18} aria-hidden="true"/>}
+              </button>
               <LanguageToggle lang={lang} setLang={setLang} />
             </div>
           </div>
@@ -58,21 +69,19 @@ function ExploreStandalone() {
       </nav>
       <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <section aria-labelledby="market-purpose-title" className="mb-6 text-text">
-            <h1 id="market-purpose-title" className="text-2xl font-bold">OCP Market</h1>
-            <p className="mt-2 max-w-4xl text-sm leading-relaxed text-text-muted">{lang === "zh" ? "围绕股票相关话题的多人虚拟交易模拟。体验 Genesis 启动与价格发现、毕业后的市场交易，以及 Core 质押和结果结算。仅使用虚拟资金，不进行真实股票买卖、充值或提现。" : "A multiplayer virtual trading simulation for stock-related topics. Explore Genesis price discovery, market trading after graduation, and Core staking and settlement. This simulation uses virtual funds, with no real stock trades, deposits or withdrawals."}</p>
-            <p className="mt-2 text-xs leading-relaxed text-text-muted">{lang === "zh" ? "登录用于识别你的模拟账户，保存虚拟余额、持仓和操作记录；应用说明与隐私政策无需登录即可查看。" : "Sign-in identifies your simulation account and saves your virtual balance, positions and activity. App information and the privacy policy are available without signing in."} <a href="/about.html" className="underline text-accent">{lang === "zh" ? "应用介绍" : "About OCP Market"}</a> · <a href="/privacy.html" className="underline text-accent">{lang === "zh" ? "隐私政策" : "Privacy policy"}</a></p>
-          </section>
-          {publicKey?<ClerkProvider publishableKey={publicKey} appearance={{elements:{socialButtonsBlock:{display:"none"},socialButtons:{display:"none"},dividerRow:{display:"none"}}}}><AuthenticatedMarket lang={lang}/></ClerkProvider>:<PaperMarketApp lang={lang} authLoaded signedIn={false} getToken={noToken} onLogin={()=>{}} onLogout={()=>{}} authAvailable={false}/>}
+          {publicKey?<ClerkProvider publishableKey={publicKey} appearance={{variables:{colorBackground:theme === 'dark' ? '#15181d' : '#ffffff',colorForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorMutedForeground:theme === 'dark' ? '#9ba3b1' : '#64748b',colorInput:theme === 'dark' ? '#1b1f26' : '#ffffff',colorInputForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorPrimary:theme === 'dark' ? '#ff9454' : '#ea580c'},elements:{socialButtonsBlock:{display:"none"},socialButtons:{display:"none"},dividerRow:{display:"none"}}}}><AuthenticatedMarket lang={lang}/></ClerkProvider>:<PaperMarketApp lang={lang} authLoaded signedIn={false} getToken={noToken} onLogin={()=>{}} onLogout={()=>{}} authAvailable={false}/>}
         </div>
       </main>
-      <footer className="py-6 border-t border-border bg-[#0b0c11]/60">
+      <footer className="py-6 border-t border-border bg-surface">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap gap-4 justify-between items-center">
           <div className="flex items-center gap-2 opacity-60">
             <Shield className="w-5 h-5 text-accent" />
             <span className="font-display font-bold text-text text-sm tracking-widest">OCP MARKET</span>
           </div>
-          <a href="/privacy.html" className="text-xs underline text-text-muted">{lang === "zh" ? "隐私政策" : "Privacy policy"}</a>
+          <div className="flex items-center gap-4 text-xs text-text-muted">
+            <a href="/about.html" className="underline hover:text-accent">{lang === "zh" ? "应用介绍" : "About OCP Market"}</a>
+            <a href="/privacy.html" className="underline hover:text-accent">{lang === "zh" ? "隐私政策" : "Privacy policy"}</a>
+          </div>
           <span className="text-text-muted text-xs font-mono">{lang === "zh" ? "多人模拟 · 仅使用虚拟资金" : "Multiplayer simulation · Virtual funds only."}</span>
         </div>
       </footer>
