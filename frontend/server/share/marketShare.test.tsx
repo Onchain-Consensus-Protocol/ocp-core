@@ -4,6 +4,11 @@ import {describe,it,expect,vi} from 'vitest';
 import {createMarketShareHandler,marketShareHtml} from './marketShare';
 import {marketCardFacts,type ShareMarket} from './marketCard';
 import {marketShareUrl,marketXIntent} from '../../shared/marketShare';
+import type {MarketShareSnapshot} from '../../shared/marketShare';
+import {MarketCard} from './marketCard';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {loadMarketBrand} from './marketBrand';
 const market:ShareMarket={id:'test-market',title:'Will Tesla reach a new high?',assetSymbol:'TSLA',phase:'GENESIS',result:null,R:'1800',B:'300',rTarget:'7200',bTarget:'1200',yesPrice:.6,noPrice:.4,volumeUSD:'12345',participants:8};
 async function request(url:string,method='GET',load=vi.fn(async()=>market as ShareMarket|null)){
  const req=Object.assign(Readable.from([]),{method,url,headers:{host:'untrusted.test'}}) as IncomingMessage;
@@ -12,6 +17,20 @@ async function request(url:string,method='GET',load=vi.fn(async()=>market as Sha
  await createMarketShareHandler(load)(req,res);return {status:res.statusCode,headers,body,load};
 }
 describe('public market share cards',()=>{
+ it('serves frozen snapshots independent of visitor identity, URL theme, or later market changes',async()=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  const snapshot:MarketShareSnapshot={id,market:{...market},at:1793088000,revision:1,theme:'dark',prices:[{label:'gTOKEN PRICE',value:'$0.0001',change:'+25.00%',positive:true}],priceSince:1793087000,priceNote:'Retained record comparison.',pnl:{label:'MY EXIT P&L',low:123,high:123,note:'Locked B excluded.'}};
+  const frozen=vi.fn(async()=>snapshot),live=vi.fn(async()=>({...market,title:'Later changed title'}));
+  const req=Object.assign(Readable.from([]),{method:'GET',url:`/api/market-share?snapshot=${id}&theme=light`,headers:{authorization:'Bearer ignored'}}) as IncomingMessage;
+  const headers:Record<string,string>={};let html='';
+  const res={statusCode:200,setHeader:(k:string,v:string)=>{headers[k]=v;},end:(v:string)=>{html=v;}} as unknown as ServerResponse;
+  await createMarketShareHandler(live,frozen)(req,res);
+  expect(res.statusCode).toBe(200);expect(frozen).toHaveBeenCalledWith(id);expect(live).not.toHaveBeenCalled();expect(html).toContain('123.00');expect(html).toContain('snapshot='+id+'&amp;image=1');expect(html).not.toContain('Later changed title');expect(html).not.toContain('Bearer');
+  const dark=renderToStaticMarkup(React.createElement(MarketCard,{market:snapshot.market,snapshot,...await loadMarketBrand('dark')}));
+  const light=renderToStaticMarkup(React.createElement(MarketCard,{market:snapshot.market,snapshot:{...snapshot,theme:'light'},...await loadMarketBrand('light')}));
+  expect(dark).toContain('+25.00%');expect(dark).toContain('+123.00');expect(dark).toContain('Snapshot:');expect(light).not.toBe(dark);
+  const wordmark=(await loadMarketBrand('dark')).wordmarkUrl.split(',')[1];expect(Buffer.from(wordmark,'base64').toString()).toContain('#ffffff');
+ });
  it('builds an encoded X composer URL, without posting',()=>{
   const url=new URL(marketXIntent('id','Test & 中文?'));
   expect(url.origin+url.pathname).toBe('https://x.com/intent/tweet');expect(url.searchParams.get('text')).toContain('Test & 中文?');expect(url.searchParams.get('url')).toBe(marketShareUrl('id'));

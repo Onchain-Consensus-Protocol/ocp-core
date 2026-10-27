@@ -5,6 +5,7 @@ import {createPaperHandler,type PaperHandlerDependencies} from './http';
 import {createPaperMarket,projectPaperMarket} from './engine';
 import {PaperStoreError,type PaperMutationContext,type PaperMutationUpdate} from './store';
 import {STOCK_DEMO_ASSETS} from '../../components/stockDemoRouting';
+import {createShareSnapshot} from '../share/snapshot';
 
 const origin='https://market.example.test';
 const env={CLERK_SECRET_KEY:'secret-never-return',DATABASE_URL:'postgres://hidden-password',PAPER_ALLOWED_ORIGINS:origin,NODE_ENV:'production'};
@@ -34,6 +35,18 @@ async function request(handler:ReturnType<typeof createPaperHandler>,op:string,o
 }
 
 describe('paper HTTP security boundary',()=>{
+ it('creates only authenticated, server-calculated personal snapshots and rejects forged fields',async()=>{
+  const s=setup(),snapshot=createShareSnapshot(s.market,user.id,'dark',s.nowMs,'00000000-0000-4000-8000-000000000001');
+  const save=vi.fn(async()=>snapshot);
+  const configured=setup({getStore:()=>({...s.store,createShareSnapshot:save})});
+  const payload={marketId:s.market.id,theme:'dark',requestId:'share_request_000001'};
+  const good=await request(configured.handler,'share',{payload});
+  expect(good.status).toBe(200);expect(save).toHaveBeenCalledWith(user.id,s.market.id,'dark',payload.requestId,expect.any(Function));expect(good.body.url).toContain('?snapshot=');expect(good.headers['Cache-Control']).toBe('no-store');
+  save.mockClear();
+  for(const extra of [{pnl:999999},{userId:'victim'},{theme:'url(https://evil.test)'}])expect((await request(configured.handler,'share',{payload:{...payload,...extra}})).status).toBe(400);
+  expect((await request(configured.handler,'share',{payload,headers:{authorization:undefined}})).status).toBe(401);
+  expect(save).not.toHaveBeenCalled();
+ });
  it('executes a quoted buy with zero receive floor, then sells and updates holdings/balance',async()=>{
   const nowMs=1_000_000;let stored=createPaperMarket('market-1',user.id,createBody,nowMs),wallet=user.balanceMicros;
   const store={ensureUser:async()=>({...user,balanceMicros:wallet}),listMarkets:async()=>[stored],getMarket:async()=>stored,

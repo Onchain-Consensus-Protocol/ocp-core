@@ -2,6 +2,8 @@ import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {Pool, type PoolClient} from 'pg';
 import type {StoredPaperMarket, PaperMutationResult} from '../../shared/paperTypes.js';
+import type {MarketShareSnapshot,ShareTheme} from '../../shared/marketShare.js';
+import {createShareSnapshot} from '../share/snapshot.js';
 
 export interface PaperStoreUser {id:string;name:string;email:string;balanceMicros:bigint}
 export interface PaperAuthenticatedUser {subject:string;email:string;name:string}
@@ -67,6 +69,27 @@ export class PaperStore {
  async getMarket(id:string):Promise<StoredPaperMarket|null>{
   if(!text(id,200))throw new PaperStoreError('MARKET_ID',400);
   await this.ready();const result=await this.pool.query('SELECT document FROM ocp_paper_markets WHERE id=$1',[id]);return result.rows[0]?.document??null;
+ }
+ async createShareSnapshot(userId:string,marketId:string,theme:ShareTheme,requestId:string,now:()=>number=Date.now):Promise<MarketShareSnapshot>{
+  if(!text(userId,200)||!text(marketId,200)||!text(requestId,100)||!['light','dark'].includes(theme))throw new PaperStoreError('SHARE_INPUT',400);
+  return this.transaction(async client=>{
+   // Serialize only this user's snapshot quota; never update wallet, market, or journal.
+   const user=await client.query('SELECT id FROM ocp_paper_users WHERE id=$1 FOR UPDATE',[userId]);
+   if(!user.rows[0])throw new PaperStoreError('AUTH_REQUIRED',401);
+   const old=await client.query('SELECT market_id,theme,document FROM ocp_paper_share_snapshots WHERE user_id=$1 AND request_id=$2',[userId,requestId]);
+   if(old.rows[0]){if(old.rows[0].market_id!==marketId||old.rows[0].theme!==theme)throw new PaperStoreError('IDEMPOTENCY_CONFLICT',409);return old.rows[0].document;}
+   const count=await client.query("SELECT count(*)::int AS total,count(*) FILTER (WHERE created_at>now()-interval '1 minute')::int AS recent FROM ocp_paper_share_snapshots WHERE user_id=$1",[userId]);
+   if(count.rows[0].recent>=10||count.rows[0].total>=2000)throw new PaperStoreError('SHARE_LIMIT',429);
+   const selected=await client.query('SELECT document FROM ocp_paper_markets WHERE id=$1',[marketId]);
+   if(!selected.rows[0])throw new PaperStoreError('MARKET_NOT_FOUND',404);
+   const snapshot=createShareSnapshot(selected.rows[0].document,userId,theme,now(),randomUUID());
+   await client.query('INSERT INTO ocp_paper_share_snapshots(id,user_id,request_id,market_id,theme,document) VALUES($1,$2,$3,$4,$5,$6::jsonb)',[snapshot.id,userId,requestId,marketId,theme,JSON.stringify(snapshot)]);
+   return snapshot;
+  });
+ }
+ async getShareSnapshot(id:string):Promise<MarketShareSnapshot|null>{
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))return null;
+  await this.ready();const found=await this.pool.query('SELECT document FROM ocp_paper_share_snapshots WHERE id=$1',[id]);return found.rows[0]?.document??null;
  }
  async mutate(userId:string,requestId:string,payloadHash:string,marketId:string|null,
   callback:(context:PaperMutationContext)=>PaperMutationUpdate|Promise<PaperMutationUpdate>):Promise<PaperMutationResult>{

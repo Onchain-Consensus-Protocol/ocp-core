@@ -36,6 +36,7 @@ describe.skipIf(!connectionString)('PaperStore real PostgreSQL transactions',()=
    try{
     await client.query('BEGIN');
     const ids='SELECT id FROM ocp_paper_users WHERE subject LIKE $1';
+    await client.query(`DELETE FROM ocp_paper_share_snapshots WHERE user_id IN (${ids})`,[prefix+'%']);
     await client.query(`DELETE FROM ocp_paper_journal WHERE user_id IN (${ids})`,[prefix+'%']);
     await client.query(`DELETE FROM ocp_paper_requests WHERE user_id IN (${ids})`,[prefix+'%']);
     await client.query(`DELETE FROM ocp_paper_markets WHERE creator_id IN (${ids})`,[prefix+'%']);
@@ -56,6 +57,15 @@ describe.skipIf(!connectionString)('PaperStore real PostgreSQL transactions',()=
   expect(updated.id).toBe(users[0].id);expect(updated.balanceMicros).toBe(100_000_000_000n);
   expect(updated.email).toBe('new@example.test');
   const count=await inspect.query('SELECT count(*)::int AS n FROM ocp_paper_grants WHERE user_id=$1',[updated.id]);expect(count.rows[0].n).toBe(1);
+ });
+ it('persists immutable snapshots with user-scoped idempotency without changing wallets',async()=>{
+  const user=await newUser(),created=await create(user),requestId=randomUUID();
+  const before=await inspect.query('SELECT balance_micros FROM ocp_paper_users WHERE id=$1',[user.id]);
+  const [a,b]=await Promise.all([store.createShareSnapshot(user.id,created.market.id,'dark',requestId),store.createShareSnapshot(user.id,created.market.id,'dark',requestId)]);
+  expect(a.id).toBe(b.id);expect(a.theme).toBe('dark');expect(await store.getShareSnapshot(a.id)).toEqual(a);
+  expect(JSON.stringify(a)).not.toContain(user.email);expect(JSON.stringify(a)).not.toContain(user.id);
+  await expect(store.createShareSnapshot(user.id,created.market.id,'light',requestId)).rejects.toThrow('IDEMPOTENCY_CONFLICT');
+  const after=await inspect.query('SELECT balance_micros FROM ocp_paper_users WHERE id=$1',[user.id]);expect(after.rows).toEqual(before.rows);
  });
  it('same email on distinct authenticated subjects is not the same wallet',async()=>{
   const a=await newUser(),b=await newUser();expect(a.id).not.toBe(b.id);

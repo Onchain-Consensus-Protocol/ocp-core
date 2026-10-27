@@ -44,3 +44,14 @@ CREATE TABLE IF NOT EXISTS ocp_paper_journal (
   UNIQUE (user_id, request_id)
 );
 CREATE INDEX IF NOT EXISTS ocp_paper_markets_created_idx ON ocp_paper_markets(created_at DESC, id);
+CREATE TABLE IF NOT EXISTS ocp_paper_share_snapshots (
+  id uuid PRIMARY KEY,
+  user_id text NOT NULL REFERENCES ocp_paper_users(id),
+  request_id text NOT NULL,
+  market_id text NOT NULL REFERENCES ocp_paper_markets(id),
+  theme text NOT NULL CHECK (theme IN ('light','dark')),
+  document jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id,request_id)
+);
+CREATE INDEX IF NOT EXISTS ocp_paper_share_user_created_idx ON ocp_paper_share_snapshots(user_id,created_at);

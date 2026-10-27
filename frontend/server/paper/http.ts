@@ -5,10 +5,11 @@ import {createClerkClient,verifyToken} from '@clerk/backend';
 import {PaperStore,PaperStoreError} from './store.js';
 import {createPaperMarket,applyPaperAction,quotePaperAction,projectPaperMarket,advancePaperMarket,parseUSD,formatUSD} from './engine.js';
 import type {PaperAction,PaperCreateInput,PaperMutationResult} from '../../shared/paperTypes.js';
+import {marketSnapshotUrl} from '../../shared/marketShare.js';
 
 class HttpError extends Error {constructor(message:string,readonly status:number){super(message);}}
 const failure=(code:string,status:number)=>new HttpError(code,status);
-type StoreAPI=Pick<PaperStore,'ensureUser'|'listMarkets'|'getMarket'|'mutate'>;
+type StoreAPI=Pick<PaperStore,'ensureUser'|'listMarkets'|'getMarket'|'mutate'>&Partial<Pick<PaperStore,'createShareSnapshot'>>;
 interface Identity {
  id:string;firstName:string|null;primaryEmailAddressId:string|null;
  externalAccounts:{provider:string;emailAddress:string;verification:{status:string}|null}[];
@@ -82,7 +83,7 @@ export function createPaperHandler(deps:PaperHandlerDependencies={}){
   const env=deps.env??process.env,now=deps.now??Date.now;
   const url=new URL(req.url||'/','http://paper.invalid'),op=url.searchParams.get('op');
   if(!['GET','POST'].includes(req.method||'')){res.setHeader('Allow','GET, POST');throw failure('METHOD',405);}
-  const read=['session','markets','market'].includes(op||''),write=['quote','create','trade'].includes(op||'');
+  const read=['session','markets','market'].includes(op||''),write=['quote','create','trade','share'].includes(op||'');
   if(!read&&!write)throw failure('NOT_FOUND',404);
   if((read&&req.method!=='GET')||(write&&req.method!=='POST'))throw failure('METHOD',405);
   const databaseConfigured=!!env.DATABASE_URL,configured=!!env.CLERK_SECRET_KEY&&databaseConfigured;
@@ -125,6 +126,12 @@ export function createPaperHandler(deps:PaperHandlerDependencies={}){
   const b=await body(req);
   if(op==='quote'){const m=await db.getMarket(id(b.marketId));if(!m)throw failure('NOT_FOUND',404);return json(res,200,quotePaperAction(m,user.id,action(b.action),now()));}
   if(typeof b.requestId!=='string'||! /^[a-zA-Z0-9_-]{16,100}$/.test(b.requestId))throw failure('REQUEST_ID',400);
+  if(op==='share'){
+   if(Object.keys(b).some(k=>!['marketId','theme','requestId'].includes(k))||typeof b.theme!=='string'||!['light','dark'].includes(b.theme))throw failure('SHARE_INPUT',400);
+   if(!db.createShareSnapshot)throw failure('SERVICE_UNAVAILABLE',503);
+   const snapshot=await db.createShareSnapshot(user.id,id(b.marketId),b.theme as 'light'|'dark',b.requestId,now);
+   return json(res,200,{url:marketSnapshotUrl(snapshot.id),snapshot});
+  }
   const marketId=op==='trade'?id(b.marketId):null;
   const input=op==='create'?createInput(b):null;
   const tradeAction=op==='trade'?action(b.action):null;

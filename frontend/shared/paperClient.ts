@@ -1,4 +1,5 @@
 import type {PaperSession,PaperMarket,PaperCreateInput,PaperQuote,PaperAction,PaperTradeInput,PaperMutationResult} from './paperTypes';
+import type {MarketShareSnapshot,ShareTheme} from './marketShare';
 export class PaperAPIError extends Error {
  constructor(public code:string,public status:number){super(code);this.name='PaperAPIError';}
 }
@@ -21,5 +22,6 @@ export function createPaperClient(getToken:()=>Promise<string|null>){
   create:(input:PaperCreateInput&{requestId:string})=>request<PaperMutationResult>('create',input),
   quote:(marketId:string,action:PaperAction,signal?:AbortSignal)=>request<PaperQuote>('quote',{marketId,action},undefined,signal),
   trade:(input:PaperTradeInput)=>request<PaperMutationResult>('trade',input),
+  share:(input:{marketId:string;requestId:string;theme:ShareTheme})=>request<{url:string;snapshot:MarketShareSnapshot}>('share',input),
  };
 }
