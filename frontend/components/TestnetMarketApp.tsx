@@ -1,8 +1,10 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {BrowserProvider, JsonRpcProvider, ZeroAddress, formatUnits, isAddress, parseUnits} from 'ethers';
-import {ArrowLeftRight, LayoutDashboard, ShieldAlert} from 'lucide-react';
+import {ArrowLeftRight, LayoutDashboard, ShieldAlert, Search, Plus} from 'lucide-react';
 import {Button} from './Button';
 import {FinalDeadlineInput} from './FinalDeadlineInput';
+import {StockPriceReference} from './StockPriceReference';
+import {stockCategories, filterStockMarkets, referenceSymbol} from '../testnet/marketDirectory';
 import {config} from '../config';
 import {defaultDeadlineLocal, parseLocalDeadline} from '../shared/deadlineDate';
 import {createChainClient, type MarketState} from '../testnet/chainClient';
@@ -38,6 +40,8 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   const [selected, setSelected] = useState('');
   const [stockAddress, setStockAddress] = useState('');
   const [creating, setCreating] = useState(false);
+  const [category, setCategory] = useState('all');
+  const [query, setQuery] = useState('');
   const [topic, setTopic] = useState({topic: '', yesRule: '', noRule: '', invalidRule: ''});
   const [deadline, setDeadline] = useState(defaultDeadlineLocal);
   const [tab, setTab] = useState<'MARKET' | 'CORE'>('MARKET');
@@ -55,6 +59,12 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   const stock = directory?.stocks.find(asset => asset.address.toLowerCase() === market?.stock.toLowerCase());
   const enabledStocks = directory?.stocks.filter(asset => asset.enabled) ?? [];
   const creationStock = enabledStocks.find(asset => asset.address === stockAddress);
+  const categories = stockCategories(directory?.stocks ?? []);
+  const visibleMarkets = filterStockMarkets(directory?.markets ?? [], directory?.stocks ?? [], category, query);
+  const categoryCount = (symbol: string) => filterStockMarkets(directory?.markets ?? [], directory?.stocks ?? [], symbol, '').length;
+  function chooseCategory(symbol: string) {
+    setCategory(symbol);setSelected('');setMarket(null);setAmount('');setQuote(null);setNotice('');
+  }
 
   const refresh = useCallback(async () => {
     if (!reader) return;
@@ -236,7 +246,13 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     {!configured && <div className={`${box} bg-white/80`} role="status"><h2 className="font-bold">{t('测试网合约尚未配置', 'Testnet contracts are not configured')}</h2><p className="text-sm text-text-muted mt-2">{t('尚未部署或未设置统一工厂地址，当前没有可交易市场。', 'The shared factory has not been deployed or configured. No markets are available for trading.')}</p><p className="text-xs mt-2 font-mono">VITE_TOPIC_MARKET_FACTORY · Robinhood Chain Testnet 46630</p></div>}
     {notice && <div className={`${box} text-sm break-words`} role="status">{notice}{txHash && <a className="block mt-2 text-accent underline" target="_blank" rel="noreferrer" href={`https://explorer.testnet.chain.robinhood.com/tx/${txHash}`}>{t('查看交易', 'View transaction')} · {short(txHash)}</a>}</div>}
     {configured && <>
-      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-display font-bold">{t('市场', 'Markets')}</h2><Button disabled={busy || !directory || !enabledStocks.length} onClick={() => {setCreating(value => !value);setNotice('');}}>{creating ? t('返回市场', 'Back to markets') : t('发射市场', 'Launch market')}</Button></div>
+      <section className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-slate-50 p-6 sm:p-10 mb-6">
+        <div className="text-xs tracking-widest font-bold text-orange-600 mb-3">OCP MARKET</div>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6"><div>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">{category === 'all' ? t('围绕你关注的股票发起话题，参与交易。', 'Ticker. Topic. Trade.') : category}</h1>
+          <p className="text-sm text-slate-500 mt-4">Every stock has a story. Trade &amp; Pump it.</p>
+        </div><Button disabled={busy || (!creating && (!directory || !enabledStocks.length))} onClick={() => {setCreating(value => !value);setNotice('');}}><Plus size={16} className="mr-2"/>{creating ? t('返回市场', 'Back to markets') : t('发起话题', 'Create topic')}</Button></div>
+      </section>
       {!directory && <p className="text-sm text-text-muted">{t('正在读取测试网工厂…', 'Reading the testnet factory…')}</p>}
       {creating ? <form className="max-w-xl mx-auto bg-white/80 border border-border rounded-2xl p-6 sm:p-8 space-y-4" onSubmit={event => {
         event.preventDefault();if (!validCreation) return;
@@ -252,11 +268,24 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
         <p className="text-xs text-text-muted">{t('最终截止须晚于4小时。Genesis提前2小时截止，Formal提前1小时截止。创建只需支付测试网 gas。', 'Final deadline must be more than 4 hours away. Genesis ends 2 hours earlier; Formal ends 1 hour earlier. Creation requires testnet gas only.')}</p>
         <Button type="submit" className="w-full" disabled={!wallet || busy || !validCreation}>{t('在钱包中确认创建', 'Confirm creation in wallet')}</Button>
       </form> : <>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{directory?.markets.map(item => {
+        <div className="grid lg:grid-cols-[176px_minmax(0,1fr)] gap-4">
+          <aside aria-label={t('股票分类', 'Stock topics')} className="rounded-xl border border-border bg-white p-2 self-start">
+            <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1">{['all', ...categories].map(symbol => <button key={symbol} type="button" aria-pressed={category === symbol} className={'shrink-0 lg:w-full flex flex-col rounded-lg px-3 py-2.5 text-sm text-left ' + (category === symbol ? 'bg-orange-50 text-orange-600 font-bold' : 'text-text-muted hover:text-text')} onClick={() => chooseCategory(symbol)}>
+              <span className="flex w-full items-center justify-between gap-4"><span>{symbol === 'all' ? t('全部话题', 'All topics') : symbol}</span><span className="text-[11px] text-text-muted">{categoryCount(symbol)}</span></span>
+              {symbol !== 'all' && referenceSymbol(symbol) && <span className="w-full"><StockPriceReference symbol={referenceSymbol(symbol)!} lang={lang} compact context="testnet"/></span>}
+            </button>)}</div>
+            <p className="hidden lg:block text-[10px] text-text-muted px-3 mt-3 mb-1">{t('主网参考行情 · DEX Screener', 'Mainnet reference · DEX Screener')}</p>
+          </aside>
+          <section className="min-w-0">
+            {category !== 'all' && referenceSymbol(category) && <StockPriceReference key={category} symbol={referenceSymbol(category)!} lang={lang} context="testnet"/>}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4"><h2 className="text-xl font-bold">{category === 'all' ? t('全部市场', 'All markets') : t(`${category} 的全部话题`, `${category} topics`)}</h2>
+              <label className="flex items-center gap-2 bg-white border border-border rounded-xl px-3"><Search size={16}/><input aria-label={t('搜索市场', 'Search markets')} value={query} onChange={event => setQuery(event.target.value)} placeholder={t('搜索主题或股票…', 'Search questions or stocks…')} className="py-3 bg-transparent text-sm w-full outline-none"/></label>
+            </div>
+        <div className="grid sm:grid-cols-2 gap-4">{visibleMarkets.map(item => {
           const asset = directory.stocks.find(value => value.address.toLowerCase() === item.stock.toLowerCase());
           return <button key={item.address} disabled={busy} onClick={() => {setSelected(item.address);setAmount('');setQuote(null);setNotice('');}} className={`${box} bg-white/80 text-left hover:border-accent ${selected === item.address ? 'border-accent' : ''}`}><div className="text-xs font-mono text-text-muted">{asset?.symbol ?? short(item.stock)} · {short(item.address)}</div><strong className="block my-2 break-words">{item.topic}</strong><span className="text-xs text-text-muted">{t('最终截止', 'Final deadline')} · {date(item.coreCutoff)}</span></button>;
         })}</div>
-        {directory && !directory.markets.length && <p className={`${box} text-text-muted`}>{t('当前工厂还没有市场。', 'This factory has no markets yet.')}</p>}
+        {directory && !visibleMarkets.length && <p className="border border-dashed border-border rounded-2xl p-10 text-center text-sm text-text-muted">{t('当前分类没有匹配的测试网市场。', 'No matching testnet markets in this category.')}</p>}
         {market && stock && <div className="vault-shell bg-white/80 border border-border rounded-2xl shadow-sm flex flex-col md:flex-row overflow-hidden">
           <div className="p-4 sm:p-6 md:w-1/3 border-b md:border-b-0 md:border-r border-border space-y-4">
             <h3 className="text-lg font-display font-bold flex items-center gap-2">{tab === 'CORE' ? <ShieldAlert className="w-5 h-5 text-accent"/> : <ArrowLeftRight className="w-5 h-5 text-purple-600"/>}{tab === 'CORE' ? 'OCP Core' : t('交易', 'Trade')}</h3>
@@ -294,6 +323,8 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
             </div>
           </div>
         </div>}
+          </section>
+        </div>
       </>}
       <p className="text-xs text-text-muted font-mono break-all">Factory {factoryAddress}{directory ? ` · ${t('区块', 'Block')} ${directory.blockNumber}` : ''}</p>
     </>}
