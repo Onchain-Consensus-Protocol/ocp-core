@@ -1,26 +1,266 @@
 {
   "chainId": 46630,
-  "network": "Robinhood Chain Testnet",
-  "deployer": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
-  "owner": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
-  "coreFallbackRecipient": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+  "wallet": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
   "contracts": {
     "TopicMarketCoreDeployer": {
-      "address": "0x9cf6392765683e147b1b5bdb60654f9d627773cc",
-      "transactionHash": "0x80dc67c766e4e8050cd35236475975dea42d3cf062c1e3351ff3037625649a55",
-      "sourceVerification": "not verified; Blockscout automatic attempt failed, native submission pending"
+      "address": "0x19BF21294FFBCaa2A83adBbB84e1b6d6Af5Eb715",
+      "transactionHash": "0x20e3a91c4dd080aa3bb1bb33ef295d02faafb3d659c750df10eee6c1c18cb191",
+      "source": "TopicMarketFactory.sol:TopicMarketCoreDeployer",
+      "args": [
+        "0xB5C08A89F11D18A62361b87Dc963379281CA6D82"
+      ],
+      "constructorArgs": "000000000000000000000000b5c08a89f11d18a62361b87dc963379281ca6d82",
+      "sourceVerification": "pending"
     },
     "TopicMarketDeployer": {
-      "address": "0x3d2fb30e303f5e2d36a2f435adaee254afe801d1",
-      "transactionHash": "0x000983525cfd15444eaebaa2476476859b6d9d6ab0ef596f73a0b790b2f2bb1d",
-      "sourceVerification": "not verified; Blockscout automatic attempt failed, native submission pending"
+      "address": "0xaaC1107E6FebDbA424A3477DfEEe9D8d3A58cBB7",
+      "transactionHash": "0xf624baad54ea486986ffc1e68e67a7d3147c804cbd61610cddb9e00653d68f61",
+      "source": "TopicMarketFactory.sol:TopicMarketDeployer",
+      "args": [
+        "0xB5C08A89F11D18A62361b87Dc963379281CA6D82"
+      ],
+      "constructorArgs": "000000000000000000000000b5c08a89f11d18a62361b87dc963379281ca6d82",
+      "sourceVerification": "pending"
     },
-    "TopicMarketStockFactory": {
-      "address": "0x21210a6213d7b1c6d83f393488f0afc0913ebed5",
-      "transactionHash": "0x2ac2ae4b1e813e7872df90f1d46aa5850ef6c3689ba1c35b9d3069f889eecebd",
-      "sourceVerification": "not verified; Blockscout automatic attempt failed, native submission pending"
+    "TopicMarketTestnetStockFactory": {
+      "address": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
+      "transactionHash": "0xba2c0b22e826aaa27ea3e6b15429a70006f697d1acaca203ddab503ddacc0b55",
+      "source": "TopicMarketTestnetStockFactory.sol:TopicMarketTestnetStockFactory",
+      "args": [
+        "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+        "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+        "0x19BF21294FFBCaa2A83adBbB84e1b6d6Af5Eb715",
+        "0xaaC1107E6FebDbA424A3477DfEEe9D8d3A58cBB7"
+      ],
+      "constructorArgs": "0000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be70000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be700000000000000000000000019bf21294ffbcaa2a83adbbb84e1b6d6af5eb715000000000000000000000000aac1107e6febdba424a3477dfeee9d8d3a58cbb7",
+      "sourceVerification": "pending"
+    },
+    "TopicMarketTestnetStockPriceSnapshot": {
+      "address": "0x7Dce9f918bcaDB559035449599764D75eb3BaE4B",
+      "transactionHash": "0x918157f5426928d67479f93c4e71abb74e22c745880f4dd9dbeda0f72ad7b5ee",
+      "source": "TopicMarketTestnetStockPriceSnapshot.sol:TopicMarketTestnetStockPriceSnapshot",
+      "args": [],
+      "constructorArgs": "",
+      "sourceVerification": "pending"
+    },
+    "TopicMarketV3Exchange": {
+      "address": "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300",
+      "transactionHash": "0x57a7d977aaa227b148006bc44d173fa42564b440450c7adadc5112a3c00c92b9",
+      "source": "TopicMarketV3Exchange.sol:TopicMarketV3Exchange",
+      "args": [
+        "0x1b32F47434a7EF83E97d0675C823E547F9266725",
+        "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
+        "0x7E955252E15c84f5768B83c41a71F9eba181802F",
+        3000
+      ],
+      "constructorArgs": "0000000000000000000000001b32f47434a7ef83e97d0675c823e547f9266725000000000000000000000000c9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e0000000000000000000000007e955252e15c84f5768b83c41a71f9eba181802f0000000000000000000000000000000000000000000000000000000000000bb8",
+      "sourceVerification": "pending"
+    },
+    "TopicMarketAssetRouter": {
+      "address": "0x1DA3854B8138f8fFd99061393d3fD938c05539de",
+      "transactionHash": "0x60042c537f77055730220e53c1eaa3b0954d5a4d989783b540b010e63906b08a",
+      "source": "TopicMarketAssetRouter.sol:TopicMarketAssetRouter",
+      "args": [
+        "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
+        "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300",
+        [
+          "0x7E955252E15c84f5768B83c41a71F9eba181802F"
+        ]
+      ],
+      "constructorArgs": "000000000000000000000000b5c08a89f11d18a62361b87dc963379281ca6d820000000000000000000000003b277dfda0851bbb2888d07d1ec4bd059b805300000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000007e955252e15c84f5768b83c41a71f9eba181802f",
+      "sourceVerification": "pending"
     }
   },
-  "stocks": [],
-  "status": "factory deployed; asset registration pending user selection; no test prices or replacement stablecoin silently configured"
+  "transactions": [
+    {
+      "label": "deploy TopicMarketCoreDeployer",
+      "nonce": 25,
+      "hash": "0x20e3a91c4dd080aa3bb1bb33ef295d02faafb3d659c750df10eee6c1c18cb191",
+      "status": 1,
+      "block": 144762795,
+      "gasUsed": "8226100",
+      "contractAddress": "0x19BF21294FFBCaa2A83adBbB84e1b6d6Af5Eb715"
+    },
+    {
+      "label": "deploy TopicMarketDeployer",
+      "nonce": 26,
+      "hash": "0xf624baad54ea486986ffc1e68e67a7d3147c804cbd61610cddb9e00653d68f61",
+      "status": 1,
+      "block": 144762841,
+      "gasUsed": "7240495",
+      "contractAddress": "0xaaC1107E6FebDbA424A3477DfEEe9D8d3A58cBB7"
+    },
+    {
+      "label": "deploy TopicMarketTestnetStockFactory",
+      "nonce": 27,
+      "hash": "0xba2c0b22e826aaa27ea3e6b15429a70006f697d1acaca203ddab503ddacc0b55",
+      "status": 1,
+      "block": 144762890,
+      "gasUsed": "1953064",
+      "contractAddress": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82"
+    },
+    {
+      "label": "deploy TopicMarketTestnetStockPriceSnapshot",
+      "nonce": 28,
+      "hash": "0x918157f5426928d67479f93c4e71abb74e22c745880f4dd9dbeda0f72ad7b5ee",
+      "status": 1,
+      "block": 144763190,
+      "gasUsed": "229082",
+      "contractAddress": "0x7Dce9f918bcaDB559035449599764D75eb3BaE4B"
+    },
+    {
+      "label": "deploy TopicMarketV3Exchange",
+      "nonce": 29,
+      "hash": "0x57a7d977aaa227b148006bc44d173fa42564b440450c7adadc5112a3c00c92b9",
+      "status": 1,
+      "block": 144763227,
+      "gasUsed": "851066",
+      "contractAddress": "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300"
+    },
+    {
+      "label": "deploy TopicMarketAssetRouter",
+      "nonce": 30,
+      "hash": "0x60042c537f77055730220e53c1eaa3b0954d5a4d989783b540b010e63906b08a",
+      "status": 1,
+      "block": 144763255,
+      "gasUsed": "1509954",
+      "contractAddress": "0x1DA3854B8138f8fFd99061393d3fD938c05539de"
+    },
+    {
+      "label": "register test TSLA",
+      "nonce": 31,
+      "hash": "0x15510379ff7dbca9310ca81e19a00d6068b583d871c1ce46537c7e4e614ba324",
+      "status": 1,
+      "block": 144763288,
+      "gasUsed": "183117",
+      "contractAddress": null
+    },
+    {
+      "label": "create TSLA integration market",
+      "nonce": 32,
+      "hash": "0xe101ae59e060bc212b72e4f27b287e7390c385a760c52b3f1aca050f3c7f4358",
+      "status": 1,
+      "block": 144796095,
+      "gasUsed": "12334964",
+      "contractAddress": null
+    },
+    {
+      "label": "approve exact 0.1 USDG route",
+      "nonce": 33,
+      "hash": "0x5b860d9d595bac13b47ba7013e59816c00c50eb246e136b8b8af01ccdf7a84d9",
+      "status": 1,
+      "block": 144797989,
+      "gasUsed": "57976",
+      "contractAddress": null
+    },
+    {
+      "label": "0.1 USDG via new router into Genesis",
+      "nonce": 34,
+      "hash": "0x7859c8a2f6c5c7fa9d34d3aff4e40fccda2d53ee495b239b2230948957bda003",
+      "status": 1,
+      "block": 144798027,
+      "gasUsed": "584081",
+      "contractAddress": null
+    },
+    {
+      "label": "approve exact 0.014 TSLA graduation",
+      "nonce": 35,
+      "hash": "0x375965a46accee015b8ee083e8c55d0e014c6bd2d4fdc210d4af2492f3b47e94",
+      "status": 1,
+      "block": 144798064,
+      "gasUsed": "60576",
+      "contractAddress": null
+    },
+    {
+      "label": "graduate with native test TSLA",
+      "nonce": 36,
+      "hash": "0xd77eb194a607e555b59abc11647598a66241a39242d19863599e6a14216177ab",
+      "status": 1,
+      "block": 144798096,
+      "gasUsed": "494854",
+      "contractAddress": null
+    },
+    {
+      "label": "approve exact Core smoke stake",
+      "nonce": 37,
+      "hash": "0x2a335d0ae531486d5a4ea0519cf7c2b6826a14ae2d7ebe14ac784cb77a60a2f4",
+      "status": 1,
+      "block": 144798125,
+      "gasUsed": "60588",
+      "contractAddress": null
+    },
+    {
+      "label": "Core smoke YES stake",
+      "nonce": 38,
+      "hash": "0x9094c3bed0a15f0e94479c2da2a39a13c5581ad389e34eb15e3e8564947756dc",
+      "status": 1,
+      "block": 144798170,
+      "gasUsed": "275153",
+      "contractAddress": null
+    },
+    {
+      "label": "Core smoke exit at 90 percent",
+      "nonce": 39,
+      "hash": "0xe933d242b22f80c1bfd607da66ed0e6b737054a4ca07649187327b02d07ee7bd",
+      "status": 1,
+      "block": 144798195,
+      "gasUsed": "199436",
+      "contractAddress": null
+    }
+  ],
+  "testPrice": "400 USD/TSLA, fixed test-only price; no ETH quote",
+  "pool": "0x8cC4de04B1a61c25ad7b4a3Cf23D15547aC670DB",
+  "startNonce": 25,
+  "predictedFactory": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
+  "internal": {
+    "implementation": "0x276131C2D7Be736B1Ddd9abb5E63507f7D91774c",
+    "coreCodeA": "0x7eFf7308b8b278cf06d919Abb69919A2696c42E9",
+    "coreCodeB": "0xEeAB346364d2A381787F4b655728f26ae61ce892",
+    "marketCodeA": "0x52742aF4792f34F498D4e643179134471F1972f0",
+    "marketCodeB": "0x0895A2133C39a5D45684548B8061C8659fA81bC4"
+  },
+  "stock": {
+    "token": "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
+    "stable": "0x7E955252E15c84f5768B83c41a71F9eba181802F",
+    "oracle": "0x7Dce9f918bcaDB559035449599764D75eb3BaE4B",
+    "exchange": "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300",
+    "router": "0x1DA3854B8138f8fFd99061393d3fD938c05539de"
+  },
+  "market": {
+    "address": "0xBe0d01292Df5cef376A40be7433C9b5B0C398857",
+    "record": [
+      "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+      "0xC1A0ca08B564c6E4aB88610d0Cd5Dfbd06f38ACa",
+      "0xaf18a2379AD5D5462A8218c07F56546CbcB8A2d0",
+      "1793278833",
+      "1793361629",
+      "1793365229",
+      "1793365229",
+      "0",
+      "TSLA \u6d4b\u8bd5\u7f51\u8054\u8c03\uff1a\u5b8c\u6574\u751f\u547d\u5468\u671f",
+      "Core YES \u4e25\u683c\u591a\u6570",
+      "Core NO \u4e25\u683c\u591a\u6570",
+      "\u5176\u4f59\u60c5\u51b5 Invalid"
+    ],
+    "core": "0xaf18a2379AD5D5462A8218c07F56546CbcB8A2d0",
+    "adapter": "0xC1A0ca08B564c6E4aB88610d0Cd5Dfbd06f38ACa",
+    "module": "0x3d0486e0f4bF82f448916CE3E7C5BeB70F0fdB7D",
+    "cutoff": "1793365229"
+  },
+  "smoke": {
+    "stableBuy": "0x7859c8a2f6c5c7fa9d34d3aff4e40fccda2d53ee495b239b2230948957bda003",
+    "exited": true,
+    "phase": 1,
+    "r": "0",
+    "b": "641269411763089",
+    "exitPenalty": "100000000000000",
+    "stockBalance": "4935411084273463005",
+    "stableBalance": "3873139"
+  },
+  "network": "Robinhood Chain Testnet",
+  "owner": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
+  "coreFallbackRecipient": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
+  "status": "deployed and TSLA registered; live 0.1 USDG route, graduation and Core exit smoke passed; source verification submitted, awaiting confirmation",
+  "sourceVerificationStatus": "Submitted to Blockscout; final verification not confirmed (Unknown UID on Foundry watch)",
+  "website": "https://market.ocp-protocol.org/testnet.html"
 }

@@ -11,9 +11,10 @@ contract TopicMarketStockPriceSnapshotTest is Test {
         for(uint8 d=6;d<=18;d++) {
             TopicMarketStockPriceSnapshot p=new TopicMarketStockPriceSnapshot(address(eth),address(stock),d,60,60,address(0),0);
             assertEq(p.ethPrice6(),8*10**d);
+            assertEq(p.collateralForUsd(500e18),2*10**d);
         }
         TopicMarketStockPriceSnapshot price=new TopicMarketStockPriceSnapshot(address(eth),address(stock),18,60,60,address(0),0);
-        stock.set(8,200e6,10000,10000,8);assertEq(price.ethPrice6(),10e18);
+        stock.set(8,200e6,10000,10000,8);assertEq(price.ethPrice6(),10e18);assertEq(price.collateralForUsd(500e18),25e17);
         vm.warp(10061);vm.expectRevert(bytes("STALE"));price.ethPrice6();
     }
     function testRejectsBadDataAndSequencerRecovery() public {

@@ -63,7 +63,7 @@ function accrueGenesis(s: TopicMarketState, id: number, gross: number) {
   const reserve = .045 * gross; s.B += reserve; s.accounts[id].z += reserve;
   s.creatorFees += .01 * gross;
 }
-/** 沿用OCPVault：三套条件奖励只在终局择一兑现；手续费不加入质押本金或多数分母。 */
+/** 沿用OCPCore：三套条件奖励只在终局择一兑现；手续费不加入质押本金或多数分母。 */
 function accrueCoreFee(s: TopicMarketState, amount: number) {
   s.core.fees += amount; s.core.feeTotal += amount;
   const bases = [s.core.yes, s.core.no, s.core.yes + s.core.no];

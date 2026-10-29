@@ -26,6 +26,11 @@
         "name": "emptySettlementRecipient_",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "earlyBondAmount_",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "nonpayable"
@@ -123,6 +128,19 @@
   },
   {
     "type": "function",
+    "name": "claimEarlyTerminationBond",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "claimEmptySettlement",
     "inputs": [],
     "outputs": [
@@ -181,6 +199,25 @@
   },
   {
     "type": "function",
+    "name": "claimableEarlyBond",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "claimableMarketFees",
     "inputs": [
       {
@@ -226,6 +263,19 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "configureEarlyTerminationModule",
+    "inputs": [
+      {
+        "name": "module",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -312,16 +362,29 @@
   },
   {
     "type": "function",
-    "name": "donate",
-    "inputs": [
+    "name": "earlyTerminationBondAmount",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "amount",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "earlyTerminationBondRequired",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -332,6 +395,45 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "earlyTerminationModule",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "earlyTerminationProcessingDue",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "earlyTerminationRequestCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -380,6 +482,37 @@
     "name": "enableEarlyTermination",
     "inputs": [],
     "outputs": [],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "exitPenaltyPool",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "exitStake",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "refund",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "penalty",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
@@ -397,10 +530,100 @@
   },
   {
     "type": "function",
+    "name": "failedProposalBondPool",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "finalize",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "forfeitedBonusPool",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "forfeitedBonusPoolRemaining",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "forfeitedFeeRemainders",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "forfeitedMarketFees",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "historicalFeePoolRemaining",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -539,7 +762,70 @@
       {
         "name": "",
         "type": "uint8",
-        "internalType": "enum IOCPVault.Outcome"
+        "internalType": "enum IOCPCore.Outcome"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingBondEscrow",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingEarlyTermination",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "request",
+        "type": "tuple",
+        "internalType": "struct IOCPCore.EarlyTerminationRequest",
+        "components": [
+          {
+            "name": "id",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "proposer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "requestedOutcome",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "proposedAt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "processAfter",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "bond",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "reasonHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -556,6 +842,67 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "previewExitStake",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "refund",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "penalty",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "processEarlyTermination",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "finalized",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "proposeEarlyTermination",
+    "inputs": [
+      {
+        "name": "requestedOutcome",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "reasonHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -663,6 +1010,19 @@
   },
   {
     "type": "function",
+    "name": "settledPenaltyAmount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "settlementPool",
     "inputs": [],
     "outputs": [
@@ -701,7 +1061,7 @@
       {
         "name": "side",
         "type": "uint8",
-        "internalType": "enum IOCPVault.Side"
+        "internalType": "enum IOCPCore.Side"
       },
       {
         "name": "hasPosition",
@@ -718,7 +1078,7 @@
       {
         "name": "side",
         "type": "uint8",
-        "internalType": "enum IOCPVault.Side"
+        "internalType": "enum IOCPCore.Side"
       },
       {
         "name": "amount",
@@ -776,13 +1136,13 @@
     "name": "terminateEarly",
     "inputs": [
       {
-        "name": "reasonHash",
+        "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -812,7 +1172,7 @@
   },
   {
     "type": "function",
-    "name": "totalDonations",
+    "name": "totalEarlyBondRefunds",
     "inputs": [],
     "outputs": [
       {
@@ -923,10 +1283,10 @@
   },
   {
     "type": "event",
-    "name": "Donated",
+    "name": "EarlyBondClaimed",
     "inputs": [
       {
-        "name": "from",
+        "name": "user",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -972,7 +1332,7 @@
         "name": "outcome",
         "type": "uint8",
         "indexed": false,
-        "internalType": "enum IOCPVault.Outcome"
+        "internalType": "enum IOCPCore.Outcome"
       },
       {
         "name": "totalYes",
@@ -1010,6 +1370,105 @@
   },
   {
     "type": "event",
+    "name": "EarlyTerminationModuleConfigured",
+    "inputs": [
+      {
+        "name": "module",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EarlyTerminationProcessed",
+    "inputs": [
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "accepted",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "regularDeadline",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "actualOutcome",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum IOCPCore.Outcome"
+      },
+      {
+        "name": "refundedBond",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "forfeitedBond",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EarlyTerminationProposed",
+    "inputs": [
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "proposer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "requestedOutcome",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "processAfter",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "bond",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "reasonHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "EmptySettlementClaimed",
     "inputs": [
       {
@@ -1029,13 +1488,44 @@
   },
   {
     "type": "event",
+    "name": "FeeHistoryForfeited",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "yesFees",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "noFees",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "invalidFees",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Finalized",
     "inputs": [
       {
         "name": "outcome",
         "type": "uint8",
         "indexed": false,
-        "internalType": "enum IOCPVault.Outcome"
+        "internalType": "enum IOCPCore.Outcome"
       },
       {
         "name": "totalYes",
@@ -1051,6 +1541,31 @@
       },
       {
         "name": "totalInvalid",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ForfeitedBonusSnapshotted",
+    "inputs": [
+      {
+        "name": "outcome",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum IOCPCore.Outcome"
+      },
+      {
+        "name": "historicalPool",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "bonusPool",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1205,6 +1720,43 @@
   },
   {
     "type": "event",
+    "name": "StakeExited",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "side",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum IOCPCore.Side"
+      },
+      {
+        "name": "principal",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "refund",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "penalty",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Staked",
     "inputs": [
       {
@@ -1217,7 +1769,7 @@
         "name": "side",
         "type": "uint8",
         "indexed": true,
-        "internalType": "enum IOCPVault.Side"
+        "internalType": "enum IOCPCore.Side"
       },
       {
         "name": "amount",

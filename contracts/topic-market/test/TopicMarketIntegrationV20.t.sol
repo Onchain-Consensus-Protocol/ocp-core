@@ -3,18 +3,18 @@ pragma solidity ^0.8.20;
 import {TopicMarketBase} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
-import {OCPVault} from "ocp/core/OCPVault.sol";
-import {IOCPVault} from "ocp/interfaces/IOCPVault.sol";
+import {OCPCore} from "ocp/core/OCPCore.sol";
+import {IOCPCore} from "ocp/interfaces/IOCPCore.sol";
 
 contract TopicMarketIntegrationV20Test is TopicMarketBase {
     VaultCoreAdapter internal adapter;
-    OCPVault internal vault;
+    OCPCore internal vault;
 
     function setUp() public override {
         super.setUp();
         uint64 end = uint64(block.timestamp + 6 hours);
-        adapter = new VaultCoreAdapter(usd, creator, protocol, end);
-        vault = OCPVault(address(adapter.vault()));
+        adapter = new VaultCoreAdapter(usd, creator, protocol, end, 500e6);
+        vault = OCPCore(address(adapter.vault()));
         market = new TopicMarket(usd, adapter, creator, protocol, end, 1e6, W);
         adapter.bind(address(market));
         address[4] memory users = [alice, bob, carol, dave];
@@ -32,7 +32,7 @@ contract TopicMarketIntegrationV20Test is TopicMarketBase {
         _formalBuy(bob, true, W);
         _formalBuy(dave, false, W / 2);
         vm.prank(bob);
-        vault.stake(result == 1 ? IOCPVault.Side.YES : result == 2 ? IOCPVault.Side.NO : IOCPVault.Side.INVALID, 3e6);
+        vault.stake(result == 1 ? IOCPCore.Side.YES : result == 2 ? IOCPCore.Side.NO : IOCPCore.Side.INVALID, 3e6);
         _formalBuy(dave, true, W / 3);
     }
 

@@ -10,12 +10,13 @@ import {TopicMarketV3Router02Exchange,ITopicMarketV3Router02} from "../src/Topic
 import {TopicMarketV3Exchange,ITopicMarketV3SwapRouter} from "../src/TopicMarketV3Exchange.sol";
 import {ITopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
-import {OCPVault} from "ocp/core/OCPVault.sol";
+import {OCPCore} from "ocp/core/OCPCore.sol";
 
 /// @dev Local test-only threshold configuration. This deliberately does NOT validate production feeds.
 contract ForkOnlySnapshot is ITopicMarketPriceSnapshot {
     uint256 public constant unit=1e18;
     function ethPrice6() external pure returns(uint256){return 1e18;}
+    function collateralForUsd(uint256 usdWad) external pure returns(uint256){return usdWad;}
 }
 contract RHMainnetForkTest is Test {
     address constant USDG=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168;
@@ -31,7 +32,7 @@ contract RHMainnetForkTest is Test {
         if(bytes(url).length==0){vm.skip(true);return;}
         uint256 pin=vm.envOr("RH_FORK_BLOCK",uint256(94363412));
         vm.createSelectFork(url,pin);
-        assertEq(block.number,pin);assertGt(USDG.code.length,0);assertGt(ROUTER02.code.length,0);
+        assertEq(block.number,pin);assertEq(block.chainid,4663);assertGt(USDG.code.length,0);assertGt(ROUTER02.code.length,0);
         // Only a local fork storage balance is seeded. No real tokens are minted or transferred.
         deal(USDG,alice,100000e6);
     }
@@ -59,7 +60,7 @@ contract RHMainnetForkTest is Test {
         TopicMarketStockFactory factory=new TopicMarketStockFactory(address(this),address(0xF0),cd,md);
         factory.registerStock(IToken6(stock),1e18,oracle,address(router));
         vm.prank(alice);(address mm,address aa,address vv)=factory.createMarket(stock,"fork only", "yes", "no", "invalid", uint64(block.timestamp + 6 hours));
-        TopicMarket m=TopicMarket(mm);OCPVault vault=OCPVault(vv);
+        TopicMarket m=TopicMarket(mm);OCPCore vault=OCPCore(vv);
         vm.prank(alice);IERC20(USDG).approve(address(router),type(uint256).max);
         TopicMarketAssetRouter.Request memory r=request(mm,TopicMarketAssetRouter.Action.GenesisBuy);r.inputAmount=15000e6;r.minCollateral=14e18;
         vm.prank(alice);router.execute(r);assertEq(uint8(m.phase()),1);assertGt(m.shares(alice)+m.lpToken().balanceOf(alice),0);assertEq(m.shares(address(router)),0);

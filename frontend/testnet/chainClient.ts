@@ -1,18 +1,19 @@
-import { Contract, ZeroAddress, getAddress, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
+import { Contract, ZeroAddress, getAddress, id, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
 import factoryAbi from './abi/TopicMarketStockFactory.json';
 import marketAbi from './abi/TopicMarket.json';
-import vaultAbi from './abi/OCPVault.json';
+import vaultAbi from './abi/OCPCore.json';
 import adapterAbi from './abi/VaultCoreAdapter.json';
 import routerAbi from './abi/TopicMarketAssetRouter.json';
 import oracleAbi from './abi/TopicMarketStockPriceSnapshot.json';
 
 export const TESTNET_CHAIN_ID = 46630n;
 const tokenAbi = ['function symbol() view returns(string)', 'function decimals() view returns(uint8)', 'function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'];
-export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint }
+export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; fixedRTarget?:bigint; fixedBTarget?:bigint }
 export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint }
 export interface AccountPosition { balance:bigint; genesisShares:bigint; yes:bigint; no:bigint; lp:bigint; b:bigint; coreYes:bigint; coreNo:bigint; coreInvalid:bigint; marketAllowance:bigint; vaultAllowance:bigint; routerAllowance:bigint }
-export interface MarketState extends MarketSummary { phase:number; outcome:number; R:bigint; B:bigint; S:bigint; rTarget:bigint; bTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; bBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
-export interface DirectoryState { factory:string; owner:string; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
+export interface CoreLifecycle {bond:bigint; requestId:bigint; requestedOutcome:number; processAfter:bigint; effectiveCutoff:bigint; due:boolean; refund?:bigint; penalty?:bigint; bondRefund?:bigint}
+export interface MarketState extends MarketSummary { early?:CoreLifecycle; phase:number; outcome:number; R:bigint; B:bigint; S:bigint; rTarget:bigint; bTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; bBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
+export interface DirectoryState { factory:string; owner:string; fixedTestTargets?:boolean; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
 export interface CreateMarketInput { stock:string; topic:string; yesRule:string; noRule:string; invalidRule:string; coreEnd:bigint }
 export enum RouterAction { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket, ClaimOutcome, ClaimLP, ClaimB, ClaimFailed, ClaimCore, RedeemPairs }
 export interface RouterRequest { market:string; action:RouterAction; paymentAsset:string; inputAmount:bigint; quantity:bigint; minCollateral:bigint; businessLimit:bigint; minOutput:bigint; deadline:bigint; side:0|1|2; graduationIntent:0|1|2 }
@@ -45,17 +46,25 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     if(account) account=nonzeroAddress(account);
     const [owner,ns,nm,block]=await Promise.all([factory.owner(),factory.stockCount(),factory.marketCount(),provider.getBlock('latest')]);
     if(!block) throw new Error('无法读取最新区块');
+    const fixedTestTargets=await new Contract(address,['function fixedTestnetGraduation() view returns(bool)'],provider).fixedTestnetGraduation().catch(()=>false);
     const stocks=await Promise.all(Array.from({length:Number(ns)},async(_,i):Promise<StockState>=>{
       const stock=await factory.stockTokens(i);const token=new Contract(stock,tokenAbi,provider);
       const config=await factory.stocks(stock);
       const [symbol,decimals,balance]=await Promise.all([token.symbol().catch(()=>stock.slice(0,10)),token.decimals(),account?token.balanceOf(account):undefined]);
       const result:StockState={address:stock,symbol,decimals:Number(decimals),enabled:config.enabled,oracle:config.priceOracle,router:config.trustedForwarder,k:config.k,balance};
-      try {result.snapshot=await new Contract(result.oracle,oracleAbi,provider).ethPrice6();}
+      try {
+        const oracle=new Contract(result.oracle,oracleAbi,provider);
+        if(fixedTestTargets){
+          if(getAddress(stock)!==getAddress('0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E') || result.decimals!==18) throw new Error('TESTNET_TSLA_ONLY');
+          await oracle.collateralForUsd(500n*10n**18n); // Bond still needs a valid USD conversion.
+          result.fixedRTarget=3600000000000000n;result.fixedBTarget=600000000000000n;
+        } else result.snapshot=await oracle.ethPrice6();
+      }
       catch {result.snapshotError='价格快照不可用：请检查喂价时效、状态和配置';}
       return result;
     }));
     const markets=await Promise.all(Array.from({length:Number(nm)},async(_,i)=>summary(await factory.markets(i))));
-    return {factory:address,owner,stocks,markets,blockNumber:block.number,timestamp:BigInt(block.timestamp)};
+    return {factory:address,owner,fixedTestTargets,stocks,markets,blockNumber:block.number,timestamp:BigInt(block.timestamp)};
   }
   async function readMarket(marketAddress:string,account?:string):Promise<MarketState> {
     await ready();const base=await summary(marketAddress);
@@ -72,6 +81,11 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       const [balance,genesisShares,yes,no,lpBalance,bBalance,stake,marketAllowance,vaultAllowance,routerAllowance]=await Promise.all([token.balanceOf(account),m.shares(account),m.yes(account),m.no(account),new Contract(lp,tokenAbi,provider).balanceOf(account),new Contract(b,tokenAbi,provider).balanceOf(account),v.stakeOf(account),token.allowance(account,base.address),token.allowance(account,base.vault),token.allowance(account,router)]);
       state.position={balance,genesisShares,yes,no,lp:lpBalance,b:bBalance,coreYes:stake[0],coreNo:stake[1],coreInvalid:stake[2],marketAllowance,vaultAllowance,routerAllowance};
     }
+    try {
+      const [bond, request, due, effectiveCutoff] = await Promise.all([v.earlyTerminationBondRequired(),v.pendingEarlyTermination(),v.earlyTerminationProcessingDue(),v.effectiveResolutionTime()]);
+      state.early={bond,requestId:request.id,requestedOutcome:Number(request.requestedOutcome),processAfter:request.processAfter,effectiveCutoff,due};
+      if(account){const [exit,bondRefund]=await Promise.all([v.previewExitStake(account),v.claimableEarlyBond(account)]);state.early.refund=exit[0];state.early.penalty=exit[1];state.early.bondRefund=bondRefund;}
+    } catch { /* Existing immutable deployments do not expose these new lifecycle methods. */ }
     return state;
   }
   async function quote(marketAddress:string,method:string,args:unknown[]) {
@@ -109,6 +123,13 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       formalBuy:(market:string,isYes:boolean,quantity:bigint,maxPaid:bigint,expiry:bigint)=>send(market,'market','formalBuy',[isYes,quantity,maxPaid,expiry]),
       formalSell:(market:string,isYes:boolean,quantity:bigint,minOut:bigint,expiry:bigint)=>send(market,'market','formalSell',[isYes,quantity,minOut,expiry]),
       stakeCore:(market:string,side:0|1|2,amount:bigint)=>send(market,'vault','stake',[side,amount]),
+      exitCore:(market:string)=>send(market,'vault','exitStake',[]),
+      proposeEarlyTermination:(market:string,outcome:1|2,reason:string)=>{
+        if(!reason.trim()) throw new Error('请填写提前终止原因');
+        return send(market,'vault','proposeEarlyTermination',[outcome,id(reason.trim())]);
+      },
+      processEarlyTermination:(market:string)=>send(market,'adapter','finalizeMarket',[]),
+      claimEarlyBond:(market:string)=>send(market,'vault','claimEarlyTerminationBond',[]),
       closeExpired:(market:string)=>send(market,'market','closeExpired',[]),
       finalizeMarket:(market:string)=>send(market,'adapter','finalizeMarket',[]),
       claimMarket:(market:string)=>send(market,'market','claimAll',[]),
@@ -131,9 +152,9 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
   }
   return {readDirectory,readMarket,withSigner,
     quoteGenesisBuy:(market:string,paid:bigint):Promise<bigint>=>quote(market,'quoteGenesisBuy',[paid]),
-    async quoteGenesisSell(market:string,quantity:bigint):Promise<{gross:bigint;seller:bigint}>{const r=await quote(market,'quoteGenesisSell',[quantity]);return {gross:r[0],seller:r[1]};},
+    async quoteGenesisSell(market:string,quantity:bigint,account?:string):Promise<{gross:bigint;seller:bigint}>{const r=await quote(market,'quoteGenesisSell',[quantity]);return {gross:r[0],seller:r[1]};},
     quoteFormalBuy:(market:string,isYes:boolean,quantity:bigint):Promise<bigint>=>quote(market,'quoteFormalBuy',[isYes,quantity]),
-    async quoteFormalSell(market:string,isYes:boolean,quantity:bigint):Promise<{gross:bigint;seller:bigint}>{const r=await quote(market,'quoteFormalSell',[isYes,quantity]);return {gross:r[0],seller:r[1]};},
+    async quoteFormalSell(market:string,isYes:boolean,quantity:bigint,account?:string):Promise<{gross:bigint;seller:bigint}>{const r=await quote(market,'quoteFormalSell',[isYes,quantity]);return {gross:r[0],seller:r[1]};},
   };
 }
 export type ChainClient=ReturnType<typeof createChainClient>;

@@ -1,17 +1,46 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {TopicMarket, IToken6, ITopicMarketCore} from "./TopicMarket.sol";
+import {TopicMarketEarlyTerminationModule} from "./TopicMarketEarlyTerminationModule.sol";
 import {VaultCoreAdapter} from "./VaultCoreAdapter.sol";
-import {ITopicMarketPriceSnapshot} from "./TopicMarketPriceSnapshot.sol";
+import {ITopicMarketPriceSnapshot,IUsdCollateralSnapshot} from "./TopicMarketPriceSnapshot.sol";
 
 /// @notice Dedicated creation-code carrier. Only the immutable factory can deploy or bind.
 contract TopicMarketCoreDeployer {
+    address public immutable earlyTerminationImplementation;
     address public immutable factory;
-    constructor(address factory_) { require(factory_ != address(0), "FACTORY"); factory = factory_; }
+    address public immutable codeA;
+    address public immutable codeB;
+    uint256 public immutable lengthA;
+    uint256 public immutable lengthB;
+    constructor(address factory_) {
+        require(factory_ != address(0), "FACTORY"); factory = factory_;
+        earlyTerminationImplementation = address(new TopicMarketEarlyTerminationModule());
+        bytes memory code = type(VaultCoreAdapter).creationCode;
+        uint256 first = code.length > 24000 ? 24000 : code.length;
+        uint256 second = code.length - first;
+        require(second <= 24000, "INITCODE_SIZE");
+        bytes memory a = new bytes(first); bytes memory b = new bytes(second);
+        // 创建码只存在STOP开头的不可执行数据仓，运行时不嵌入完整Core，避免EIP170超限。
+        assembly {
+            let source := add(code,32)
+            for {let i := 0} lt(i,first) {i := add(i,32)} {mstore(add(add(a,32),i),mload(add(source,i)))}
+            for {let i := 0} lt(i,second) {i := add(i,32)} {mstore(add(add(b,32),i),mload(add(add(source,first),i)))}
+        }
+        codeA = address(new TopicMarketCreationCodeStore(a));
+        codeB = address(new TopicMarketCreationCodeStore(b)); lengthA=first;lengthB=second;
+    }
     modifier onlyFactory() { require(msg.sender == factory, "ONLY_FACTORY"); _; }
-    function deploy(IToken6 token, address creator, address protocol, uint64 end)
-        external onlyFactory returns (VaultCoreAdapter)
-    { return new VaultCoreAdapter(token, creator, protocol, end); }
+    function deploy(IToken6 token, address creator, address protocol, uint64 end, uint256 bondAmount)
+        external onlyFactory returns (VaultCoreAdapter adapter)
+    {
+        uint256 a=lengthA;uint256 b=lengthB;address sa=codeA;address sb=codeB;
+        bytes memory code = new bytes(a+b);
+        assembly {extcodecopy(sa,add(code,32),1,a) extcodecopy(sb,add(add(code,32),a),1,b)}
+        bytes memory initcode=abi.encodePacked(code,abi.encode(token,creator,protocol,end,bondAmount));
+        address deployed;assembly {deployed := create(0,add(initcode,32),mload(initcode))}
+        require(deployed != address(0), "CORE_DEPLOY_FAILED");adapter=VaultCoreAdapter(deployed);
+    }
     function configureCore(VaultCoreAdapter adapter, address forwarder) external onlyFactory { adapter.configureForwarder(forwarder); }
     function bindCore(VaultCoreAdapter adapter, address market) external onlyFactory { adapter.bind(market); }
 }
@@ -127,7 +156,8 @@ contract TopicMarketFactory {
         require(uint256(coreEnd) > block.timestamp + 4 hours, "DEADLINES");
         uint256 price = priceOracle.ethPrice6();
         require(price > 0 && price <= 1e18 / 4, "PRICE");
-        VaultCoreAdapter createdCore = coreDeployer.deploy(token, msg.sender, protocol, coreEnd);
+        VaultCoreAdapter createdCore = coreDeployer.deploy(token, msg.sender, protocol, coreEnd,
+            IUsdCollateralSnapshot(address(priceOracle)).collateralForUsd(500e18));
         TopicMarket createdMarket = marketDeployer.deploy(token, ITopicMarketCore(address(createdCore)), msg.sender,
             protocol, coreEnd, price, k);
         market = address(createdMarket); adapter = address(createdCore); vault = address(createdCore.vault());

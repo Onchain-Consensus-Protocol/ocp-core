@@ -5,14 +5,14 @@ import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {MockUSDC} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
-import {OCPVault} from "ocp/core/OCPVault.sol";
-import {IOCPVault} from "ocp/interfaces/IOCPVault.sol";
+import {OCPCore} from "ocp/core/OCPCore.sol";
+import {IOCPCore} from "ocp/interfaces/IOCPCore.sol";
 
 contract TopicMarketStatefulHandler is Test {
     MockUSDC public immutable usd;
     TopicMarket public immutable market;
     VaultCoreAdapter public immutable adapter;
-    OCPVault public immutable vault;
+    OCPCore public immutable vault;
     address[4] public actors;
     uint256 public successes;
     uint256 public genesisSuccesses;
@@ -23,7 +23,7 @@ contract TopicMarketStatefulHandler is Test {
     uint256 public rightSuccesses;
 
     constructor(MockUSDC u,TopicMarket m,VaultCoreAdapter a) {
-        usd=u;market=m;adapter=a;vault=OCPVault(address(a.vault()));
+        usd=u;market=m;adapter=a;vault=OCPCore(address(a.vault()));
         actors=[address(0xA1),address(0xB1),address(0xC1),address(0xD1)];
         for(uint256 i;i<4;i++) {
             vm.startPrank(actors[i]);
@@ -68,7 +68,7 @@ contract TopicMarketStatefulHandler is Test {
     function stake(uint256 who,uint256 side,uint256 raw) public {
         address a=actors[who%4];uint256 balance=usd.balanceOf(a);if(balance==0)return;
         uint256 amount=bound(raw,1,balance>10e6?10e6:balance);
-        vm.prank(a);try vault.stake(IOCPVault.Side(side%3),amount){_ok();stakeSuccesses++;}catch{}
+        vm.prank(a);try vault.stake(IOCPCore.Side(side%3),amount){_ok();stakeSuccesses++;}catch{}
     }
     function advance(uint256 raw) public {
         uint256 end=market.coreCutoff();
@@ -89,7 +89,7 @@ contract TopicMarketStatefulInvariantTest is StdInvariant,Test {
     MockUSDC internal usd;
     TopicMarket internal market;
     VaultCoreAdapter internal adapter;
-    OCPVault internal vault;
+    OCPCore internal vault;
     TopicMarketStatefulHandler internal handler;
     uint256 internal constant INITIAL=4000e6;
     address internal constant CREATOR=address(0xC0);
@@ -98,8 +98,8 @@ contract TopicMarketStatefulInvariantTest is StdInvariant,Test {
     function setUp() public {
         vm.warp(100000);
         usd=new MockUSDC();
-        adapter=new VaultCoreAdapter(usd,CREATOR,PROTOCOL,uint64(block.timestamp+6 hours));
-        vault=OCPVault(address(adapter.vault()));
+        adapter=new VaultCoreAdapter(usd,CREATOR,PROTOCOL,uint64(block.timestamp+6 hours),500e6);
+        vault=OCPCore(address(adapter.vault()));
         market=new TopicMarket(usd, adapter, CREATOR, PROTOCOL, uint64(block.timestamp+6 hours), 1e6, 1e18);
         adapter.bind(address(market));
         address[4] memory users=[address(0xA1),address(0xB1),address(0xC1),address(0xD1)];

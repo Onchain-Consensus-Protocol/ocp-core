@@ -1,0 +1,107 @@
+{
+  "chainId": 46630,
+  "addresses": {
+    "wallet": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
+    "tsla": "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
+    "usdg": "0x7E955252E15c84f5768B83c41a71F9eba181802F",
+    "sourceFactory": "0x99D7fcf0153b1CB171F0de432D8aC159Abc63b24",
+    "quoter": "0x7C8772fbdF1A1d9Ded219E51D3147d7C04475921",
+    "sourceRouter": "0x7D428Ea2B371DFB7f97B6541F785c29bb0963A81",
+    "factory": "0xFECCB63CD759d768538458Ea56F47eA8004323c1",
+    "router": "0x1b32F47434a7EF83E97d0675C823E547F9266725",
+    "manager": "0xBc82a9aA33ff24FCd56D36a0fB0a2105B193A327",
+    "referencePool": "0x67817C72cd742Ed5A6347b986725BeA959793Cd5"
+  },
+  "transactions": [
+    {
+      "label": "create and initialize OCP TSLA USDG pool",
+      "hash": "0xe64ce25ec64f174c013cb08a9600148aee877e241be2e542714b276c817c0c2d",
+      "status": 1,
+      "blockNumber": 144607399,
+      "gasUsed": "4613817"
+    },
+    {
+      "label": "approve TSLA liquidity",
+      "hash": "0x00e79958ef71be0436cba10b246f815846c62198e50615ca13f4aab51e595e1d",
+      "status": 1,
+      "blockNumber": 144607441,
+      "gasUsed": "60600"
+    },
+    {
+      "label": "approve USDG liquidity",
+      "hash": "0x314c915aec7b3dbbe65768d28d963a227582d5e6f2cbf16f241fa8dcac1d49ed",
+      "status": 1,
+      "blockNumber": 144607467,
+      "gasUsed": "57976"
+    },
+    {
+      "label": "mint OCP test liquidity position",
+      "hash": "0xe47d8cad67ac9ded0678b73b6f72ec462ebba62c56ceb9cb1284c3d29da29f10",
+      "status": 1,
+      "blockNumber": 144607487,
+      "gasUsed": "624834"
+    },
+    {
+      "label": "clear TSLA liquidity allowance reset",
+      "hash": "0x7722660e2109a0d943f86ffceae43a207b0a9da721f29518c1715925a312dfca",
+      "status": 1,
+      "blockNumber": 144607552,
+      "gasUsed": "38616"
+    },
+    {
+      "label": "approve 0.1 USDG test buy",
+      "hash": "0xa4844006caf5905c598e113eab9de8073e6bafa33e95d33c03a52d967077e3a8",
+      "status": 1,
+      "blockNumber": 144608015,
+      "gasUsed": "57976"
+    },
+    {
+      "label": "test pool USDG to TSLA",
+      "hash": "0x73591561e93a7806d4d0c2033940943a4cba5e784b7d6dd19207ace3272c7b68",
+      "status": 1,
+      "blockNumber": 144608070,
+      "gasUsed": "166332"
+    },
+    {
+      "label": "approve test TSLA sell",
+      "hash": "0xbf2e187cbeb8dd9365bf237c7980aaf63bf54c073c364fd044192d571bd20996",
+      "status": 1,
+      "blockNumber": 144608115,
+      "gasUsed": "60588"
+    },
+    {
+      "label": "test pool TSLA to USDG",
+      "hash": "0xf537eb457a763d3a0184b59f942ee879ac9f15fb20dade6ef023fa98f2cceb87",
+      "status": 1,
+      "blockNumber": 144608170,
+      "gasUsed": "168173"
+    }
+  ],
+  "plan": {
+    "referenceSqrtPriceX96": "3980728956641828497010589055996557",
+    "desiredTSLA": "50488915726552537",
+    "desiredUSDG": "20000000",
+    "fee": 3000,
+    "tickLower": -887220,
+    "tickUpper": 887220
+  },
+  "pool": "0x8cC4de04B1a61c25ad7b4a3Cf23D15547aC670DB",
+  "position": {
+    "tokenId": "838",
+    "owner": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
+    "liquidity": "1004877263416",
+    "tslaBalance": "4949511084273463005",
+    "usdgBalance": "3973737"
+  },
+  "testBuy": {
+    "usdgIn": "100000",
+    "tslaOut": "250438807441766"
+  },
+  "roundTrip": {
+    "usdgIn": "100000",
+    "tslaBoughtAndSold": "250438807441766",
+    "usdgReturned": "99402",
+    "tslaBalance": "4949511084273463005",
+    "usdgBalance": "3973139"
+  }
+}

@@ -10,8 +10,8 @@ import {TopicMarketAssetRouter,ITopicMarketAssetExchange,ITopicMarketRouterRegis
 import {TopicMarketStockPriceSnapshot} from "../src/TopicMarketStockPriceSnapshot.sol";
 import {TopicMarket,IToken6} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
-import {OCPVault} from "ocp/core/OCPVault.sol";
-import {IOCPVault} from "ocp/interfaces/IOCPVault.sol";
+import {OCPCore} from "ocp/core/OCPCore.sol";
+import {IOCPCore} from "ocp/interfaces/IOCPCore.sol";
 import {SnapshotFeedMock} from "./TopicMarketPriceSnapshot.t.sol";
 contract IntegrationStock is ERC20 {
     uint8 private immutable precision;
@@ -48,7 +48,7 @@ contract TopicMarketStockIntegrationTest is Test {
     }
 
     IntegrationStock c;IntegrationStock u;FixedStockExchange ex;TopicMarketAssetRouter router;TopicMarketStockFactory factory;
-    TopicMarket m;VaultCoreAdapter adapter;OCPVault vault;
+    TopicMarket m;VaultCoreAdapter adapter;OCPCore vault;
     address alice=address(0xA1);address bob=address(0xB1);address fallback_=address(0xF0);
     function setUp() public {
         vm.warp(100000);c=new IntegrationStock(18);u=new IntegrationStock(6);ex=new FixedStockExchange(address(c),address(u));
@@ -62,7 +62,7 @@ contract TopicMarketStockIntegrationTest is Test {
         assertEq(address(factory),predicted);
         factory.registerStock(IToken6(address(c)),1e18/250,price,address(router));
         vm.prank(alice);(address mm,address aa,address vv)=factory.createMarket(address(c),"Stock-backed topic", "yes", "no", "invalid", uint64(block.timestamp + 6 hours));
-        m=TopicMarket(mm);adapter=VaultCoreAdapter(aa);vault=OCPVault(vv);
+        m=TopicMarket(mm);adapter=VaultCoreAdapter(aa);vault=OCPCore(vv);
         c.mint(address(ex),100000e18);u.mint(address(ex),100000000e6);
         u.mint(alice,100000e6);c.mint(alice,1000e18);c.mint(bob,1000e18);
         vm.startPrank(alice);u.approve(address(router),type(uint256).max);c.approve(address(router),type(uint256).max);c.approve(address(m),type(uint256).max);c.approve(address(vault),type(uint256).max);vm.stopPrank();
@@ -76,6 +76,15 @@ contract TopicMarketStockIntegrationTest is Test {
         vm.prank(alice);router.execute(r);
     }
     function graduate() internal {buy(27000e6);assertEq(uint8(m.phase()),1);}
+    function testFixedFiveHundredUsdBondUsesCreationTokenSnapshot() public {
+        assertEq(vault.earlyTerminationBondRequired(),2e18); // 500 USD / 250 USD per token
+        (ITopicMarketPriceSnapshot price,,,,)=factory.stocks(address(c));
+        SnapshotFeedMock stock=SnapshotFeedMock(address(TopicMarketStockPriceSnapshot(address(price)).stockUsd()));
+        stock.set(8,500e8,block.timestamp,block.timestamp,8);
+        (, , address nextVault)=factory.createMarket(address(c),"new price","yes","no","invalid",uint64(block.timestamp+6 hours));
+        assertEq(OCPCore(nextVault).earlyTerminationBondRequired(),1e18);
+        assertEq(vault.earlyTerminationBondRequired(),2e18); // Existing market never reprices.
+    }
     function testRealFactoryRegistrationForwarderAndUnits() public view {
         assertTrue(factory.isMarket(address(m)));assertEq(m.rTarget(),288e17);assertEq(m.bTarget(),48e17);
         assertTrue(m.isTrustedForwarder(address(router)));assertTrue(vault.isTrustedForwarder(address(router)));
@@ -114,10 +123,10 @@ contract TopicMarketStockIntegrationTest is Test {
         uint256 before=c.balanceOf(alice);vm.prank(alice);m.claimAll();assertGt(c.balanceOf(alice),before);
     }
     function testCannotBypassSideLockOrClaimOthersWithSuffix() public {
-        graduate();vm.prank(alice);vault.stake(IOCPVault.Side.NO,1e18);
+        graduate();vm.prank(alice);vault.stake(IOCPCore.Side.NO,1e18);
         TopicMarketAssetRouter.Request memory r=req(TopicMarketAssetRouter.Action.CoreStake);r.inputAmount=250e6;r.side=0;
         vm.prank(alice);vm.expectRevert();router.execute(r);
-        vm.prank(bob);(bool ok,)=address(vault).call(abi.encodePacked(abi.encodeWithSelector(vault.stake.selector,IOCPVault.Side.YES,1e18),alice));assertTrue(ok);
+        vm.prank(bob);(bool ok,)=address(vault).call(abi.encodePacked(abi.encodeWithSelector(vault.stake.selector,IOCPCore.Side.YES,1e18),alice));assertTrue(ok);
         (uint256 aY,uint256 aN,)=vault.stakeOf(alice);assertEq(aY,0);assertEq(aN,1e18);
     }
     function testCoreRouterStakeDoesNotInheritOldFeesAndCannotSwitchDirectly() public {
@@ -128,7 +137,7 @@ contract TopicMarketStockIntegrationTest is Test {
         TopicMarketAssetRouter.Request memory r=req(TopicMarketAssetRouter.Action.CoreStake);r.inputAmount=250e6;r.side=0;
         vm.prank(alice);router.execute(r);
         assertEq(vault.claimableMarketFees(alice),0);
-        vm.prank(alice);vm.expectRevert();vault.stake(IOCPVault.Side.NO,1e18);
+        vm.prank(alice);vm.expectRevert();vault.stake(IOCPCore.Side.NO,1e18);
         cost=m.quoteFormalBuy(true,1e18);vm.prank(bob);m.formalBuy(true,1e18,cost,type(uint64).max);
         vm.warp(m.coreCutoff());adapter.finalizeMarket();
         assertGt(vault.claimableMarketFees(alice),0);
@@ -186,7 +195,7 @@ contract TopicMarketStockIntegrationTest is Test {
         (address mm,address aa,address vv)=factory.createMarket(address(second),"second stock","yes","no","invalid",uint64(block.timestamp+6 hours));
         TopicMarket other=TopicMarket(mm);
         assertEq(factory.stockCount(),2);assertEq(factory.marketCount(),2);
-        assertEq(address(other.token()),address(second));assertEq(address(OCPVault(vv).stakeToken()),address(second));
+        assertEq(address(other.token()),address(second));assertEq(address(OCPCore(vv).stakeToken()),address(second));
         assertEq(other.trustedForwarder(),address(secondRouter));assertEq(VaultCoreAdapter(aa).trustedForwarder(),address(secondRouter));
         assertEq(factory.marketRecord(mm).snapshot,20e6);assertEq(factory.marketCollateral(mm),address(second));
         second.mint(alice,100e6);

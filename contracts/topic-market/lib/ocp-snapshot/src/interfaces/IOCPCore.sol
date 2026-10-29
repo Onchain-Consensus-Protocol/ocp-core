@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IOCPVault {
+interface IOCPCore {
     enum Side {
         YES,
         NO,
@@ -15,6 +15,15 @@ interface IOCPVault {
         NO,
         INVALID
     }
+    struct EarlyTerminationRequest {
+        uint256 id;
+        address proposer;
+        uint8 requestedOutcome;
+        uint256 proposedAt;
+        uint256 processAfter;
+        uint256 bond;
+        bytes32 reasonHash;
+    }
 
     function protocolVersion() external pure returns (uint256);
     function stakeToken() external view returns (IERC20);
@@ -22,7 +31,6 @@ interface IOCPVault {
     function effectiveResolutionTime() external view returns (uint256);
     function minStake() external view returns (uint256);
     function totalPrincipal() external view returns (uint256);
-    function totalDonations() external view returns (uint256);
     function totalStakeYes() external view returns (uint256);
     function totalStakeNo() external view returns (uint256);
     function totalStakeInvalid() external view returns (uint256);
@@ -46,7 +54,18 @@ interface IOCPVault {
     function canResolve() external view returns (bool);
 
     function stake(Side side, uint256 amount) external;
-    function donate(uint256 amount) external;
+    function exitStake() external returns (uint256 refund, uint256 penalty);
+    function previewExitStake(address user) external view returns (uint256 refund, uint256 penalty);
+    function earlyTerminationBondRequired() external view returns (uint256);
+    function earlyTerminationBondAmount() external view returns (uint256);
+    function earlyTerminationModule() external view returns (address);
+    function configureEarlyTerminationModule(address module) external;
+    function pendingEarlyTermination() external view returns (EarlyTerminationRequest memory);
+    function earlyTerminationProcessingDue() external view returns (bool);
+    function proposeEarlyTermination(uint8 requestedOutcome, bytes32 reasonHash) external returns (uint256 requestId);
+    function processEarlyTermination() external returns (bool finalized);
+    function claimEarlyTerminationBond() external returns (uint256 amount);
+    function claimableEarlyBond(address user) external view returns (uint256);
     function bindMarket(address market_) external;
     function setMarketCoordinator(address coordinator) external;
     function authorizeAdditionalMarket(address market_) external;

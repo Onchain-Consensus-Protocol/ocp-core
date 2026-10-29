@@ -8,6 +8,10 @@ interface ITopicMarketPriceSnapshot {
     function ethPrice6() external view returns (uint256);
 }
 
+interface IUsdCollateralSnapshot {
+    function collateralForUsd(uint256 usdWad) external view returns (uint256);
+}
+
 interface ITopicMarketAggregator {
     function decimals() external view returns (uint8);
     function latestRoundData() external view returns (
@@ -52,6 +56,11 @@ contract TopicMarketPriceSnapshot is ITopicMarketPriceSnapshot {
         require(block.timestamp - updatedAt <= heartbeat, "FEED_STALE");
         require(uint256(answer) <= type(uint256).max / normalization, "FEED_RANGE");
         return uint256(answer) * normalization;
+    }
+
+    /// @notice USD面额按创建时价格换为固定抵押币数量，向上取整避免不足保证金。
+    function collateralForUsd(uint256 usdWad) external view returns (uint256) {
+        return Math.mulDiv(usdWad, 1e6, _read(usdcUsd, usdcHeartbeat, usdcNormalization), Math.Rounding.Ceil);
     }
 
     function ethPrice6() external view returns (uint256 price) {

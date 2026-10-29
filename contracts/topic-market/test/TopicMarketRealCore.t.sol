@@ -4,18 +4,18 @@ import {TopicMarketBase, MockUSDC} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter, ILegacyVault} from "../src/VaultCoreAdapter.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {OCPVault} from "ocp/core/OCPVault.sol";
-import {IOCPVault} from "ocp/interfaces/IOCPVault.sol";
+import {OCPCore} from "ocp/core/OCPCore.sol";
+import {IOCPCore} from "ocp/interfaces/IOCPCore.sol";
 
 contract TopicMarketRealCoreTest is TopicMarketBase {
-    OCPVault internal vault;
+    OCPCore internal vault;
     VaultCoreAdapter internal adapter;
 
     function setUp() public override {
         super.setUp();
         uint64 end = uint64(block.timestamp + 6 hours);
-        adapter = new VaultCoreAdapter(usd, creator, protocol, end);
-        vault = OCPVault(address(adapter.vault()));
+        adapter = new VaultCoreAdapter(usd, creator, protocol, end, 500e6);
+        vault = OCPCore(address(adapter.vault()));
         market = new TopicMarket(usd, adapter, creator, protocol, end, 1e6, 1e18);
         adapter.bind(address(market));
         address[4] memory users = [alice, bob, carol, dave];
@@ -27,7 +27,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         }
     }
 
-    function _stake(address a, IOCPVault.Side side, uint256 amount) private {
+    function _stake(address a, IOCPCore.Side side, uint256 amount) private {
         vm.prank(a);
         vault.stake(side, amount);
     }
@@ -35,11 +35,11 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
     function testRealCoreLockedBeforeGraduationAndOpenAfter() public {
         vm.prank(bob);
         vm.expectRevert("Staking not open");
-        vault.stake(IOCPVault.Side.YES, 1e6);
+        vault.stake(IOCPCore.Side.YES, 1e6);
         uint256 t = block.timestamp;
         _graduate();
         assertEq(adapter.openedAt(), t);
-        _stake(bob, IOCPVault.Side.YES, 3e6);
+        _stake(bob, IOCPCore.Side.YES, 3e6);
         assertEq(vault.totalPrincipal(), 3e6);
         _accounting();
     }
@@ -47,17 +47,17 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
     function testRealCoreOneHourAfterFormalAndYesFinal() public {
         _graduate();
         _formalBuy(bob, true, 1e18);
-        _stake(bob, IOCPVault.Side.YES, 3e6);
-        _stake(carol, IOCPVault.Side.NO, 1e6);
+        _stake(bob, IOCPCore.Side.YES, 3e6);
+        _stake(carol, IOCPCore.Side.NO, 1e6);
         vm.warp(market.formalCutoff());
         market.closeExpired();
-        _stake(bob, IOCPVault.Side.YES, 1e6);
+        _stake(bob, IOCPCore.Side.YES, 1e6);
         vm.expectRevert("CORE_PENDING");
         market.finalize();
         vm.warp(market.coreCutoff());
         vm.prank(bob);
         vm.expectRevert("Staking ended");
-        vault.stake(IOCPVault.Side.YES, 1e6);
+        vault.stake(IOCPCore.Side.YES, 1e6);
         vault.finalize();
         assertEq(uint256(vault.outcome()), 1);
         market.finalize();
@@ -72,7 +72,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
 
     function testRealCoreNoOutcome() public {
         _graduate();
-        _stake(carol, IOCPVault.Side.NO, 3e6);
+        _stake(carol, IOCPCore.Side.NO, 3e6);
         vm.warp(market.coreCutoff());
         vault.finalize();
         market.finalize();
@@ -83,7 +83,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
 
     function testRealCoreInvalidOutcome() public {
         _graduate();
-        _stake(carol, IOCPVault.Side.INVALID, 3e6);
+        _stake(carol, IOCPCore.Side.INVALID, 3e6);
         vm.warp(market.coreCutoff());
         vault.finalize();
         market.finalize();
@@ -101,7 +101,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         assertEq(adapter.openedAt(), 0);
         vm.prank(bob);
         vm.expectRevert("Staking not open");
-        vault.stake(IOCPVault.Side.YES, 1e6);
+        vault.stake(IOCPCore.Side.YES, 1e6);
         _claimAll(alice);
         _accounting();
     }
@@ -127,7 +127,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         (bool ok,) = address(adapter).call(abi.encodeWithSignature("enableEarlyTermination()"));
         assertFalse(ok);
         assertFalse(vault.earlyTerminationEnabled());
-        _stake(bob, IOCPVault.Side.YES, 1e6);
+        _stake(bob, IOCPCore.Side.YES, 1e6);
         vm.warp(market.coreCutoff());
         vault.finalize();
         market.finalize();
@@ -137,9 +137,9 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
 
     function testRealCoreFeeConditionalHistoricalSnapshotsAndInvalid() public {
         _graduate();
-        _stake(bob, IOCPVault.Side.YES, 10e6);
-        _stake(carol, IOCPVault.Side.NO, 30e6);
-        _stake(dave, IOCPVault.Side.INVALID, 100e6);
+        _stake(bob, IOCPCore.Side.YES, 10e6);
+        _stake(carol, IOCPCore.Side.NO, 30e6);
+        _stake(dave, IOCPCore.Side.INVALID, 100e6);
         uint256 originalProtocol = market.protocolFees();
         uint256 gross = market.quoteFormalBuy(true, 1e18);
         _formalBuy(alice, true, 1e18);
@@ -156,7 +156,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         assertApproxEqAbs(bi, fee / 4, 1);
         assertApproxEqAbs(ci, fee * 3 / 4, 1);
         assertEq(dy + dn + di, 0);
-        _stake(alice, IOCPVault.Side.YES, 1e6);
+        _stake(alice, IOCPCore.Side.YES, 1e6);
         (uint256 lateY,, uint256 lateI) = vault.conditionalMarketFees(alice);
         assertEq(lateY + lateI, 0);
         vm.warp(market.coreCutoff());
@@ -165,12 +165,16 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         assertEq(uint256(vault.outcome()), 3);
         assertEq(vault.claimableMarketFees(dave), 0);
         uint256 before = usd.balanceOf(alice) + usd.balanceOf(bob) + usd.balanceOf(carol);
+        uint256 projectBefore = usd.balanceOf(protocol);
         vm.prank(bob);
         vault.withdraw();
         vm.prank(carol);
         vault.withdraw();
         vm.prank(alice); vault.withdraw();
-        assertEq(usd.balanceOf(alice) + usd.balanceOf(bob) + usd.balanceOf(carol) - before, 41e6 + fee);
+        uint256 userNet = usd.balanceOf(alice) + usd.balanceOf(bob) + usd.balanceOf(carol) - before;
+        uint256 projectFee = usd.balanceOf(protocol) - projectBefore;
+        assertEq(userNet + projectFee, 41e6 + fee);
+        assertEq(projectFee, 0);
         assertEq(vault.marketFeeUserPoolRemaining(), 0);
         _accounting();
     }
@@ -179,7 +183,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         _graduate();
         _formalBuy(alice, true, 1e18);
         uint256 earlyFee = market.coreFeesSent();
-        _stake(bob, IOCPVault.Side.YES, 1e6);
+        _stake(bob, IOCPCore.Side.YES, 1e6);
         _formalBuy(alice, false, 1e18);
         uint256 total = market.coreFeesSent();
         vm.warp(market.coreCutoff());
@@ -198,8 +202,8 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
 
     function testRealCoreNoSideFeeFinalAndNoBackfill() public {
         _graduate();
-        _stake(carol, IOCPVault.Side.NO, 3e6);
-        _stake(bob, IOCPVault.Side.YES, 1e6);
+        _stake(carol, IOCPCore.Side.NO, 3e6);
+        _stake(bob, IOCPCore.Side.YES, 1e6);
         _formalBuy(alice, true, 1e18);
         uint256 total = market.coreFeesSent();
         vm.warp(market.coreCutoff());
@@ -211,7 +215,8 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         uint256 before = usd.balanceOf(carol);
         vm.prank(carol);
         vault.withdraw();
-        assertEq(usd.balanceOf(carol) - before, 4e6 + total);
+        uint256 grossPayout = 4e6 + total;
+        assertEq(usd.balanceOf(carol) - before, grossPayout);
         _claimAll(alice);
         _accounting();
     }
@@ -229,8 +234,8 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
     function _paritySetup() internal {
         usd = new MockUSDC();
         uint64 end = uint64(block.timestamp+6 hours);
-        adapter = new VaultCoreAdapter(usd,bob,carol,end);
-        vault = OCPVault(address(adapter.vault()));
+        adapter = new VaultCoreAdapter(usd,bob,carol,end,500e6);
+        vault = OCPCore(address(adapter.vault()));
         market = new TopicMarket(usd, adapter, bob, carol, end, 2000e6, 1e18);
         adapter.bind(address(market));
         address[3] memory users=[alice,bob,carol];
@@ -270,7 +275,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
   market.materializeLP(alice);vm.startPrank(alice);market.lpToken().transfer(bob,10e18);vm.stopPrank();_parityLog("transfer_lp_10");
   vm.startPrank(alice);market.bToken().transfer(carol,100e18);vm.stopPrank();_parityLog("transfer_b_100");
   vm.prank(carol);market.formalSell(true,30e18,0,type(uint64).max);_parityLog("sell_yes_30");
-  _stake(bob,IOCPVault.Side.YES,100e6);
+  _stake(bob,IOCPCore.Side.YES,100e6);
   vm.warp(market.coreCutoff());vault.finalize();market.finalize();_parityLog("finalized");
   vm.prank(bob);market.claimLP(1e18);_parityLog("burn_lp_1");
   vm.prank(carol);market.claimB(50e18);_parityLog("burn_b_50");

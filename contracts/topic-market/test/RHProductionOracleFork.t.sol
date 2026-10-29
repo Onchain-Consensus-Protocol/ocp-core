@@ -9,6 +9,8 @@ import {TopicMarketStockPriceSnapshot} from "../src/TopicMarketStockPriceSnapsho
 import {ITopicMarketAggregator} from "../src/TopicMarketPriceSnapshot.sol";
 import {TopicMarketAssetRouter,ITopicMarketRouterRegistry} from "../src/TopicMarketAssetRouter.sol";
 import {TopicMarketV3Router02Exchange,ITopicMarketV3Router02} from "../src/TopicMarketV3Router02Exchange.sol";
+import {OCPCore} from "ocp/core/OCPCore.sol";
+import {IEarlyTerminationModule} from "ocp/interfaces/IEarlyTerminationModule.sol";
 interface IRHStockOracleStatus {
     function oraclePaused() external view returns(bool);
     function uiMultiplier() external view returns(uint256);
@@ -56,8 +58,14 @@ contract RHProductionOracleForkTest is Test {
             TopicMarketV3Router02Exchange exchange=new TopicMarketV3Router02Exchange(ITopicMarketV3Router02(ROUTER),stocks[i],USDG,i==0?3000:500);
             TopicMarketAssetRouter router=new TopicMarketAssetRouter(ITopicMarketRouterRegistry(address(factory)),exchange,stable);
             factory.registerStock(IToken6(stocks[i]),1e18,oracle,address(router));
-            (address market,,)=factory.createMarket(stocks[i],"official feeds fork","yes","no","invalid",uint64(block.timestamp+6 hours));
+            (address market,,address core)=factory.createMarket(stocks[i],"official feeds fork","yes","no","invalid",uint64(block.timestamp+6 hours));
             assertEq(factory.marketRecord(market).snapshot,expected);
+            // Independent native-unit conversion of a real 500 USD bond, rounded upward.
+            uint256 expectedBond=Math.mulDiv(500e18,10**decimals,stockPrice*1e10,Math.Rounding.Ceil);
+            assertEq(OCPCore(core).earlyTerminationBondRequired(),expectedBond);
+            address module=OCPCore(core).earlyTerminationModule();
+            assertEq(module.code.length,45);assertEq(IEarlyTerminationModule(module).core(),core);
+            assertEq(IEarlyTerminationModule(module).bondAmount(),expectedBond);
             assertEq(TopicMarket(market).rTarget(),Math.mulDiv(expected,36,10));
             assertEq(TopicMarket(market).bTarget(),Math.mulDiv(expected,6,10));
             emit log_named_address("official stock feed",feeds[i]);

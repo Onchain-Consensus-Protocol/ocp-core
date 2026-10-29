@@ -9,12 +9,13 @@ import {TopicMarketAssetRouter,ITopicMarketRouterRegistry} from "../src/TopicMar
 import {TopicMarketV3Router02Exchange,ITopicMarketV3Router02} from "../src/TopicMarketV3Router02Exchange.sol";
 import {ITopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
-import {OCPVault} from "ocp/core/OCPVault.sol";
+import {OCPCore} from "ocp/core/OCPCore.sol";
 
 /// @dev Fork-only threshold fixture: this does not exercise or validate production price feeds.
 contract SharedForkOnlySnapshot is ITopicMarketPriceSnapshot {
     uint256 public constant unit=1e18;
     function ethPrice6() external pure returns(uint256){return 1e18;}
+    function collateralForUsd(uint256 usdWad) external pure returns(uint256){return usdWad;}
 }
 
 /// @notice One local factory, five live mainnet stock tokens and real V3 pools at a pinned block.
@@ -34,7 +35,7 @@ contract RHSharedFactoryForkTest is Test {
     TopicMarketV3Router02Exchange[5] exchanges;
     TopicMarket[5] markets;
     VaultCoreAdapter[5] adapters;
-    OCPVault[5] vaults;
+    OCPCore[5] vaults;
 
     function setUp() public {
         string memory url=vm.envOr("RH_FORK_RPC",string(""));
@@ -72,7 +73,7 @@ contract RHSharedFactoryForkTest is Test {
         for(uint256 i;i<5;i++){
             vm.prank(ALICE);
             (address mm,address aa,address vv)=factory.createMarket(stocks[i],"shared fork only","yes","no","invalid",cutoff);
-            markets[i]=TopicMarket(mm);adapters[i]=VaultCoreAdapter(aa);vaults[i]=OCPVault(vv);
+            markets[i]=TopicMarket(mm);adapters[i]=VaultCoreAdapter(aa);vaults[i]=OCPCore(vv);
             assertTrue(factory.isMarket(mm));assertEq(factory.marketCollateral(mm),stocks[i]);
             assertEq(address(markets[i].token()),stocks[i]);assertEq(address(vaults[i].stakeToken()),stocks[i]);
             assertTrue(markets[i].isTrustedForwarder(address(routers[i])));
@@ -92,7 +93,14 @@ contract RHSharedFactoryForkTest is Test {
             IERC20(USDG).balanceOf(address(routers[i])),IERC20(USDG).balanceOf(address(exchanges[i]))));
         bytes32 ledger=keccak256(abi.encode(m.accountedBalance(),m.R(),m.B(),m.cash(),m.collateralCash(),
             m.lpFees(),m.lpBudgetRemaining(),m.bBudgetRemaining(),vaults[i].resolved(),vaults[i].settlementReady()));
-        return keccak256(abi.encode(custody,ledger,m.phase(),m.shares(ALICE),m.yes(ALICE),m.no(ALICE),
+        OCPCore core=vaults[i];
+        bytes32 requests=keccak256(abi.encode(core.earlyTerminationModule(),core.pendingEarlyTermination(),
+            core.earlyTerminationRequestCount(),core.pendingBondEscrow(),core.totalEarlyBondRefunds(),
+            core.claimableEarlyBond(ALICE),core.exitPenaltyPool(),core.failedProposalBondPool(),core.effectiveResolutionTime()));
+        bytes32 fees=keccak256(abi.encode(core.totalMarketFeesAccrued(),core.marketFeeUserPoolRemaining(),
+            core.officialMarketFeesClaimable(),core.historicalFeePoolRemaining(),core.forfeitedBonusPoolRemaining(),
+            core.accYesFeePerStake(),core.accNoFeePerStake(),core.accInvalidFeePerStake()));
+        return keccak256(abi.encode(custody,ledger,requests,fees,m.phase(),m.shares(ALICE),m.yes(ALICE),m.no(ALICE),
             m.bToken().balanceOf(ALICE),m.lpToken().balanceOf(ALICE),yes,no,invalid));
     }
     function _otherStates(uint256 active) private view returns(bytes32[5] memory states){

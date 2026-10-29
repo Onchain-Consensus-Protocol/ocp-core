@@ -110,7 +110,7 @@ contract TopicMarket {
     event PairsRedeemed(address indexed user, uint256 cashReleased, uint256 tokensBurned);
     event CoreFeeSent(uint256 amount);
     event Finalized(uint8 result, uint256 cover, uint256 lpBudget, uint256 bBudget);
-    event Claimed(address indexed user, bytes32 kind, uint256 amount);
+    event Claimed(address indexed user, bytes32 kind, uint256 amount); // gross entitlement
     modifier lock() {
         _lockBefore();
         _;
@@ -144,10 +144,16 @@ contract TopicMarket {
         curveScale = 1e36 * scale_;
         require(block.timestamp <= type(uint64).max - 4 hours, "TIME");
         require(uint256(coreEnd_) > block.timestamp + 4 hours, "DEADLINES");
-        require(ethPrice6 > 0 && ethPrice6 <= (1e30 / scale_) / 4, "PRICE");
+        bool fixedTestTargets = ethPrice6 == 0;
+        if (fixedTestTargets) {
+            require(block.chainid == 46630
+                && address(token_) == 0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E && decimals_ == 18,
+                "PRICE");
+        } else require(ethPrice6 <= (1e30 / scale_) / 4, "PRICE");
         require(kWad >= 1e12 && kWad <= 1e24, "PARAMS");
         (bool ok, bytes memory data) = address(core_).staticcall(abi.encodeWithSignature("trustedForwarder()"));
         trustedForwarder = ok && data.length == 32 ? abi.decode(data,(address)) : address(0);
+        require(trustedForwarder != protocol_, "FEE_RECIPIENT_FORWARDER");
         token = token_;
         lpToken = new TopicMarketRightsToken("Topic Market LP", "TOPIC-LP");
         bToken = new TopicMarketRightsToken("Topic Market B Contribution", "TOPIC-B");
@@ -158,8 +164,8 @@ contract TopicMarket {
         coreCutoff = coreEnd_;
         formalCutoff = coreEnd_ - 1 hours;
         genesisCutoff = coreEnd_ - 2 hours;
-        rTarget = Math.mulDiv(ethPrice6, 36, 10);
-        bTarget = Math.mulDiv(ethPrice6, 6, 10);
+        rTarget = fixedTestTargets ? 36e14 : Math.mulDiv(ethPrice6, 36, 10);
+        bTarget = fixedTestTargets ? 6e14 : Math.mulDiv(ethPrice6, 6, 10);
         require(bTarget > 0, "TINY_TARGET");
         k = kWad;
     }
@@ -269,7 +275,7 @@ contract TopicMarket {
         }
         emit GenesisTrade(user, false, gross, quantity);
         if (hit) _graduate(false);
-        _send(msg.sender, seller);
+        _send(msg.sender, Math.mulDiv(gross, 945, 1000));
     }
 
     /// @notice 本版Demo无转让操作；筹资、LP均不开放转让，保留ABI以明确拒绝。
@@ -314,7 +320,14 @@ contract TopicMarket {
         return TopicMarketMath.priceYes(y, n, bWad);
     }
 
+    function _requireCoreTrading() private view {
+        // 测试/旧结果适配器无此扩展时沿用固定截止；真实新Adapter明确检查到期申请。
+        (bool ok, bytes memory data) = address(core).staticcall(abi.encodeWithSignature("tradingAllowed()"));
+        if (ok && data.length == 32) require(abi.decode(data,(bool)), "CORE_FROZEN");
+    }
+
     function _formalOpen() private view {
+        _requireCoreTrading();
         require(phase == Phase.FORMAL && block.timestamp < formalCutoff && !liquidityClosed, "FORMAL_CLOSED");
     }
 
@@ -428,12 +441,13 @@ contract TopicMarket {
         dust += rem;
         _sendCoreFee(coreFee);
         emit FormalTrade(user, false, isYes, amount, gross);
-        _send(msg.sender, seller);
+        _send(msg.sender, Math.mulDiv(gross, 98, 100));
     }
 
     /// @notice 免交易费完整组合兑换；参数为collateral native units金额，两侧各烧amount6*SCALE份。
     /// @dev 不依赖做市深度，全LP退出/等待Core时仍可用；终局快照之后禁止此入口。
     function redeemPairs(uint256 amount6) external lock {
+        _requireCoreTrading();
         address user = _actor();
         require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "PHASE");
         require(amount6 > 0 && amount6 <= collateralCash, "AMOUNT");
@@ -524,7 +538,7 @@ contract TopicMarket {
     }
 
     function finalize() external lock {
-        require((phase == Phase.FORMAL || phase == Phase.WAIT_CORE) && block.timestamp >= coreCutoff, "CORE_PENDING");
+        require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "CORE_PENDING");
         uint8 result = core.finalOutcome();
         require(result >= 1 && result <= 3, "CORE_PENDING");
         outcome = result;
@@ -651,7 +665,7 @@ contract TopicMarket {
         return (nav + cover, B - cover, cover);
     }
 
-    /// @notice Account payout in collateral native units, including LP rights still held in escrow.
+    /// @notice Account payout, including escrowed LP rights.
     /// @dev Failed launches ignore result because no YES/NO market ever opened.
     function previewAccount(address account, uint8 result)
         external view returns (uint256 outcomePay, uint256 lpPay, uint256 bPay, uint256 failedPay)
@@ -691,17 +705,20 @@ contract TopicMarket {
 
     function claimFees() external lock {
         address user = _actor();
-        uint256 pay;
+        uint256 projectPay;
+        uint256 creatorPay;
         if (user == protocol) {
-            pay += protocolFees;
+            projectPay = protocolFees;
             protocolFees = 0;
         }
         if (user == creator) {
-            pay += creatorFees;
+            creatorPay = creatorFees;
             creatorFees = 0;
         }
-        require(pay > 0, "NO_FEES");
-        _send(msg.sender, pay);
+        require(projectPay + creatorPay > 0, "NO_FEES");
+        // 创建者及项目领取已记账的交易费，不叠加尚未采用的提现费。
+        _send(msg.sender, projectPay);
+        _send(msg.sender, creatorPay);
     }
 
     /// @notice Retained liabilities, excluding unsolicited donations. No dust/surplus rescue exists.

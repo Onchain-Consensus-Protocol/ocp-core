@@ -5,14 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "../interfaces/IOCPVault.sol";
+import "../interfaces/IOCPCore.sol";
 import "../interfaces/ITopicMarket.sol";
+import "../interfaces/IEarlyTerminationModule.sol";
 
 /**
- * @title OCPVault
- * @notice 单一公开质押期。每个地址只能选择一个方向，可同侧追加，不可撤回或换边。
+ * @title OCPCore
+ * @notice 公开质押、全仓罚没退出，以及有保证金的一小时提前终止申请。
  */
-contract OCPVault is ReentrancyGuard, IOCPVault {
+contract OCPCore is ReentrancyGuard, IOCPCore {
     using SafeERC20 for IERC20;
 
     uint256 private constant FEE_INDEX_PRECISION = 1e30;
@@ -39,9 +40,17 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
     mapping(address => StakeInfo) private _stakeOf;
     mapping(address => bool) private _claimed;
     mapping(address => bool) private _marketFeeClaimed;
-    mapping(address => uint256) private _yesFeeDebt;
-    mapping(address => uint256) private _noFeeDebt;
-    mapping(address => uint256) private _invalidFeeDebt;
+    // 每套结果条件账独立保存上次指数和已赚的小数余量。不能用新本金乘旧累计指数，
+    // 再减向下取整的debt：晚加入/追加会把历史小数误变成新的整数奖励。
+    struct FeeHistory {
+        uint256 yesIndex;
+        uint256 noIndex;
+        uint256 invalidIndex;
+        uint256 yesRemainder;
+        uint256 noRemainder;
+        uint256 invalidRemainder;
+    }
+    mapping(address => FeeHistory) private _feeHistory;
     mapping(address => uint256) private _pendingYesFees;
     mapping(address => uint256) private _pendingNoFees;
     mapping(address => uint256) private _pendingInvalidFees;
@@ -49,8 +58,22 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
     uint256[3] private _participantCountBySide;
     uint256 private _totalPrincipal;
     uint256 private _totalParticipants;
+    // 退出罚金和失败申请保证金没有投票权；不能把这些余额计入totalPrincipal。
+    uint256 public exitPenaltyPool;
+    uint256 public failedProposalBondPool;
+    uint256 public settledPenaltyAmount;
+    uint256[3] public forfeitedMarketFees;
+    uint256[3] public forfeitedFeeRemainders;
+    uint256 public historicalFeePoolRemaining;
+    uint256 public forfeitedBonusPool;
+    uint256 public forfeitedBonusPoolRemaining;
+    address public override earlyTerminationModule;
+    // 真实保证金债务由Core独立记账，不从模块余额或其pending字段推算。
+    uint256 public pendingBondEscrow;
+    uint256 public immutable override earlyTerminationBondAmount;
+    mapping(address => uint256) public override claimableEarlyBond;
+    uint256 public totalEarlyBondRefunds;
 
-    uint256 public override totalDonations;
     bool public override resolved;
     Outcome public override outcome;
     uint256 public remainingEligibleClaims;
@@ -72,7 +95,6 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
     uint256 public remainingMarketFeeClaims;
 
     event Staked(address indexed user, Side indexed side, uint256 amount, uint256 totalAmount);
-    event Donated(address indexed from, uint256 amount);
     event Finalized(Outcome outcome, uint256 totalYes, uint256 totalNo, uint256 totalInvalid);
     event MarketBound(address indexed market);
     event MarketCoordinatorSet(address indexed coordinator);
@@ -104,13 +126,23 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
     event OfficialMarketFeesClaimed(address indexed recipient, uint256 amount);
     event SurplusClaimed(address indexed recipient, uint256 amount);
     event Withdrawn(address indexed user, uint256 principalPayout, uint256 marketFeePayout);
+    event StakeExited(address indexed user, Side indexed side, uint256 principal, uint256 refund, uint256 penalty);
+    event FeeHistoryForfeited(address indexed user, uint256 yesFees, uint256 noFees, uint256 invalidFees);
+    event EarlyTerminationProposed(uint256 indexed requestId, address indexed proposer, uint8 requestedOutcome,
+        uint256 processAfter, uint256 bond, bytes32 reasonHash);
+    event EarlyTerminationProcessed(uint256 indexed requestId, bool accepted, bool regularDeadline,
+        Outcome actualOutcome, uint256 refundedBond, uint256 forfeitedBond);
+    event EarlyBondClaimed(address indexed user, uint256 amount);
+    event EarlyTerminationModuleConfigured(address indexed module);
+    event ForfeitedBonusSnapshotted(Outcome outcome, uint256 historicalPool, uint256 bonusPool);
 
     constructor(
         address factory_,
         address stakeToken_,
         uint256 resolutionTime_,
         uint256 /* legacyMinStake */,
-        address emptySettlementRecipient_
+        address emptySettlementRecipient_,
+        uint256 earlyBondAmount_
     ) {
         require(factory_ != address(0), "Invalid factory");
         require(stakeToken_ != address(0), "Invalid token");
@@ -121,6 +153,9 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         originalResolutionTime = resolutionTime_;
         // 保留旧 ABI getter；最低质押机制已移除，任何正数原始单位均可参与。
         minStake = 0;
+        // 新第六个构造参数为部署时固定的申请保证金，单位为stakeToken原始单位。
+        // 工厂按创建时股票/USD快照换算500U；此处不引入可变价格源或管理员setter。0禁用新申请。
+        earlyTerminationBondAmount = earlyBondAmount_;
         emptySettlementRecipient = emptySettlementRecipient_;
         createdAt = block.timestamp;
         outcome = Outcome.PENDING;
@@ -128,7 +163,7 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
 
     /**
      * @notice Factory 在绑定 Market 前一次性写入 Permissionless 市场的创建者与提前关闭规则。
-     * @dev 普通 V5 路径不调用本函数时，Vault 行为与原实现完全一致。
+     * @dev 创建者即时终止路径已禁用；此参数只能为false，提前终止统一走保证金窗口。
      */
     function configurePermissionless(address creator_, bool earlyTerminationEnabled_) external {
         require(msg.sender == factory, "Only factory");
@@ -136,22 +171,17 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         require(permissionlessCreator == address(0), "Already configured");
         require(creator_ != address(0), "Invalid creator");
         permissionlessCreator = creator_;
-        earlyTerminationEnabled = earlyTerminationEnabled_;
-        emit PermissionlessConfigurationSet(creator_, earlyTerminationEnabled_);
+        require(!earlyTerminationEnabled_, "LEGACY_EARLY_DISABLED");
+        earlyTerminationEnabled = false;
+        emit PermissionlessConfigurationSet(creator_, false);
     }
 
     /**
-     * @notice Genesis 成功毕业并绑定正式 Market 后，由 Factory 开启创建者提前终止权。
-     * @dev Genesis 期间保持关闭，避免创建者在尚未形成正式市场时用严格多数没收本金。
+     * @notice 保留旧selector但永久禁用，Factory也不能开启创建者绕过保证金窗口的路径。
      */
-    function enableEarlyTermination() external {
+    function enableEarlyTermination() external view {
         require(msg.sender == factory, "Only factory");
-        require(permissionlessCreator != address(0), "Not permissionless");
-        require(market != address(0), "Market not bound");
-        require(!resolved, "Already finalized");
-        require(!earlyTerminationEnabled, "Already enabled");
-        earlyTerminationEnabled = true;
-        emit EarlyTerminationEnabled(permissionlessCreator);
+        revert("LEGACY_EARLY_DISABLED");
     }
 
     function cancelUnlaunched(bytes32 reasonHash) external nonReentrant {
@@ -171,30 +201,136 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
     }
 
     /**
-     * @notice Permissionless 创建者可把“当前交易执行时刻”变成最终截止点。
-     * @dev 调用不接受 Outcome；结果只能由当前已锁定本金按严格多数规则派生。
-     *      同一交易内写入终局状态与结算快照，之后 Vault 与绑定 Market 均无法继续入金或交易。
+     * @notice 旧创建者即时终止接口永久禁用。
      */
-    function terminateEarly(bytes32 reasonHash) external override nonReentrant {
-        require(msg.sender == permissionlessCreator, "Only creator");
-        require(earlyTerminationEnabled, "Early termination disabled");
-        require(!resolved, "Already finalized");
-        require(block.timestamp < originalResolutionTime, "Deadline reached");
-        require(reasonHash != bytes32(0), "Missing reason");
+    function terminateEarly(bytes32) external pure override {
+        revert("LEGACY_EARLY_DISABLED");
+    }
 
-        terminatedEarlyAt = block.timestamp;
-        terminationReasonHash = reasonHash;
-        _finalizeNow();
-        emit EarlyTerminated(
-            msg.sender,
-            block.timestamp,
-            block.number,
-            reasonHash,
-            outcome,
-            _totalStakeBySide[0],
-            _totalStakeBySide[1],
-            _totalStakeBySide[2]
+    /// @notice 仅创建Adapter在绑定Market之前配置一次；后续无升级或替换入口。
+    function configureEarlyTerminationModule(address module) external override {
+        require(msg.sender == factory, "Only factory");
+        require(market == address(0) && earlyTerminationModule == address(0) && !resolved, "EARLY_MODULE_CONFIG");
+        require(module.code.length > 0, "EARLY_MODULE_CODE");
+        require(IEarlyTerminationModule(module).core() == address(this), "EARLY_MODULE_CORE");
+        require(IEarlyTerminationModule(module).bondAmount() == earlyTerminationBondAmount, "EARLY_MODULE_BOND");
+        earlyTerminationModule = module;
+        emit EarlyTerminationModuleConfigured(module);
+    }
+
+    function pendingEarlyTermination() public view override returns (EarlyTerminationRequest memory request) {
+        if (earlyTerminationModule == address(0)) return request;
+        return IEarlyTerminationModule(earlyTerminationModule).pending();
+    }
+
+    function earlyTerminationRequestCount() external view returns (uint256) {
+        if (earlyTerminationModule == address(0)) return 0;
+        return IEarlyTerminationModule(earlyTerminationModule).proposalCount();
+    }
+
+    function earlyTerminationProcessingDue() public view override returns (bool) {
+        EarlyTerminationRequest memory request = pendingEarlyTermination();
+        return request.id != 0 && block.timestamp >= request.processAfter;
+    }
+
+    function earlyTerminationBondRequired() public view override returns (uint256) {
+        return earlyTerminationModule == address(0) ? earlyTerminationBondAmount
+            : IEarlyTerminationModule(earlyTerminationModule).bondRequired();
+    }
+
+    /// @dev 窗口到期后先锁住所有影响投票/历史费的操作。处理者必须另发process交易，
+    /// 不能在stake中先成功结算又revert：那会把结算一并回滚、使申请永远不能落地。
+    function _requirePendingProcessed() private view {
+        require(!earlyTerminationProcessingDue(), "PROCESS_EARLY_REQUEST");
+    }
+
+    function _requireStakingOpen() private view {
+        require(!resolved, "Already finalized");
+        require(block.timestamp < originalResolutionTime, "Staking ended");
+        _requirePendingProcessed();
+        require(permissionlessCreator == address(0)
+            || (market != address(0) && ITopicMarket(market).isFormalMarket()), "Staking not open");
+    }
+
+    function proposeEarlyTermination(uint8 requestedOutcome, bytes32 reasonHash)
+        external override nonReentrant returns (uint256 requestId)
+    {
+        require(earlyTerminationModule != address(0), "EARLY_MODULE_UNCONFIGURED");
+        _requireStakingOpen();
+        require(pendingBondEscrow == 0, "EARLY_PENDING");
+        address proposer = _actor();
+        uint256 expectedBond = earlyTerminationBondRequired();
+        EarlyTerminationRequest memory request = IEarlyTerminationModule(earlyTerminationModule).propose(
+            proposer, requestedOutcome, reasonHash
         );
+        // 模块负责申请规则；Core再次核对返回的资金/时间边界，不接受模块指定的终局结果。
+        require(request.id != 0 && request.proposer == proposer && request.requestedOutcome == requestedOutcome
+            && request.reasonHash == reasonHash && request.proposedAt == block.timestamp
+            && request.processAfter > block.timestamp
+            && request.processAfter < originalResolutionTime, "EARLY_REQUEST_CONFIG");
+        require(request.bond > 0 && request.bond == expectedBond, "EARLY_BOND_CONFIG");
+        uint256 beforeBalance = stakeToken.balanceOf(address(this));
+        stakeToken.safeTransferFrom(msg.sender, address(this), request.bond);
+        require(stakeToken.balanceOf(address(this)) - beforeBalance == request.bond, "Transfer mismatch");
+        pendingBondEscrow = request.bond;
+        requestId = request.id;
+        _assertVaultSolvent();
+        emit EarlyTerminationProposed(requestId, proposer, requestedOutcome,
+            request.processAfter, request.bond, reasonHash);
+    }
+
+    /// @notice Permissionless执行到期申请；Keeper延迟不改变窗口到期的逻辑截止或票数快照。
+    function processEarlyTermination() external override nonReentrant returns (bool finalized) {
+        require(!resolved, "Already finalized");
+        require(earlyTerminationModule != address(0), "EARLY_MODULE_UNCONFIGURED");
+        return _processEarlyRequest();
+    }
+
+    function _processEarlyRequest() private returns (bool finalized) {
+        EarlyTerminationRequest memory request = pendingEarlyTermination();
+        require(request.id != 0, "NO_EARLY_REQUEST");
+        require(block.timestamp >= request.processAfter, "EARLY_PENDING_WINDOW");
+        require(request.processAfter > request.proposedAt
+            && request.processAfter < originalResolutionTime, "EARLY_REQUEST_CONFIG");
+        require(request.requestedOutcome == 1 || request.requestedOutcome == 2, "EARLY_OUTCOME");
+        require(request.proposer != address(0) && request.bond > 0
+            && request.bond == pendingBondEscrow, "EARLY_ESCROW_CONFIG");
+        EarlyTerminationRequest memory consumed = IEarlyTerminationModule(earlyTerminationModule).consume();
+        require(keccak256(abi.encode(consumed)) == keccak256(abi.encode(request)), "EARLY_REQUEST_CHANGED");
+        pendingBondEscrow = 0;
+        Outcome actual = _deriveOutcome();
+        if (uint8(actual) == request.requestedOutcome) {
+            // 原子冻结票数和资金；保证金使用独立pull退款债务，避免收款方阻断公共结算。
+            claimableEarlyBond[request.proposer] += request.bond;
+            totalEarlyBondRefunds += request.bond;
+            terminatedEarlyAt = request.processAfter;
+            terminationReasonHash = request.reasonHash;
+            _finalizeNow();
+            emit EarlyTerminated(request.proposer, request.processAfter, block.number, request.reasonHash,
+                outcome, _totalStakeBySide[0], _totalStakeBySide[1], _totalStakeBySide[2]);
+            emit EarlyTerminationProcessed(request.id, true, false, outcome, request.bond, 0);
+            return true;
+        }
+        failedProposalBondPool += request.bond;
+        emit EarlyTerminationProcessed(request.id, false, block.timestamp >= originalResolutionTime,
+            actual, 0, request.bond);
+        if (block.timestamp >= originalResolutionTime) {
+            _finalizeNow();
+            return true;
+        }
+        _assertVaultSolvent();
+        return false;
+    }
+
+    function claimEarlyTerminationBond() external override nonReentrant returns (uint256 amount) {
+        address user = _actor();
+        amount = claimableEarlyBond[user];
+        require(amount > 0, "NO_BOND_REFUND");
+        claimableEarlyBond[user] = 0;
+        totalEarlyBondRefunds -= amount;
+        stakeToken.safeTransfer(msg.sender, amount);
+        _assertVaultSolvent();
+        emit EarlyBondClaimed(user, amount);
     }
 
     function effectiveResolutionTime() public view override returns (uint256) {
@@ -276,7 +412,7 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
     }
 
     function canResolve() public view override returns (bool) {
-        return resolved || block.timestamp >= effectiveResolutionTime();
+        return resolved || block.timestamp >= effectiveResolutionTime() || earlyTerminationProcessingDue();
     }
 
     address public trustedForwarder;
@@ -285,6 +421,7 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
     function setTrustedForwarder(address forwarder) external {
         require(msg.sender == factory && market == address(0) && trustedForwarder == address(0), "FORWARDER_CONFIG");
         require(forwarder.code.length > 0, "FORWARDER_CODE");
+        require(forwarder != emptySettlementRecipient, "FORWARDER_RECIPIENT");
         trustedForwarder = forwarder;
     }
 
@@ -303,17 +440,8 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
 
     function stake(Side side, uint256 amount) external override nonReentrant {
         address actor = _actor();
-        require(!resolved, "Already finalized");
-        require(block.timestamp < effectiveResolutionTime(), "Staking ended");
+        _requireStakingOpen();
         require(amount > 0, "Amount must be > 0");
-        // Genesis 只负责募资；正式市场激活后才允许资本参与结果共识。
-        // 同一笔毕业交易完成绑定和激活，交易与质押因此在同一状态切换后开放。
-        require(
-            permissionlessCreator == address(0)
-                || (market != address(0) && ITopicMarket(market).isFormalMarket()),
-            "Staking not open"
-        );
-
         StakeInfo storage info = _stakeOf[actor];
         (Side currentSide, bool hasPosition) = sideOf(actor);
         require(!hasPosition || currentSide == side, "Position is locked to one side");
@@ -331,8 +459,56 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         _setSideAmount(info, side, newAmount);
         _totalStakeBySide[index] += amount;
         _totalPrincipal += amount;
-        _updateMarketFeeDebt(actor, info);
         emit Staked(actor, side, amount, newAmount);
+    }
+
+    function previewExitStake(address user) public view override returns (uint256 refund, uint256 penalty) {
+        uint256 principal = _userPrincipal(_stakeOf[user]);
+        penalty = Math.ceilDiv(principal, 10);
+        refund = principal - penalty;
+    }
+
+    /// @notice 仅全仓退出。本金90%直接退回；罚没部分留池，不投票，也不再叠加项目提现费草稿。
+    function exitStake() external override nonReentrant returns (uint256 refund, uint256 penalty) {
+        _requireStakingOpen();
+        address user = _actor();
+        StakeInfo storage info = _stakeOf[user];
+        uint256 principal = _userPrincipal(info);
+        require(principal > 0, "No stake");
+        (Side side,) = sideOf(user);
+        _checkpointMarketFees(user, info);
+        _forfeitUserFees(user);
+        (refund, penalty) = previewExitStake(user);
+        _totalStakeBySide[uint256(side)] -= principal;
+        _participantCountBySide[uint256(side)] -= 1;
+        _totalPrincipal -= principal;
+        _totalParticipants -= 1;
+        exitPenaltyPool += penalty;
+        delete _stakeOf[user];
+        delete _feeHistory[user];
+        _claimed[user] = false;
+        _marketFeeClaimed[user] = false;
+        if (refund > 0) stakeToken.safeTransfer(msg.sender, refund);
+        _assertVaultSolvent();
+        emit StakeExited(user, side, principal, refund, penalty);
+    }
+
+    function _addForfeited(uint256 index, uint256 whole, uint256 fraction) private {
+        uint256 fractions = forfeitedFeeRemainders[index] + fraction;
+        forfeitedMarketFees[index] += whole + fractions / FEE_INDEX_PRECISION;
+        forfeitedFeeRemainders[index] = fractions % FEE_INDEX_PRECISION;
+    }
+
+    function _forfeitUserFees(address user) private {
+        FeeHistory storage history = _feeHistory[user];
+        // 三个结果账互斥：只在终局选择其中一个，绝不能把三套放弃金额相加当真钱。
+        _addForfeited(0, _pendingYesFees[user], history.yesRemainder);
+        _addForfeited(1, _pendingNoFees[user], history.noRemainder);
+        _addForfeited(2, _pendingInvalidFees[user], history.invalidRemainder);
+        emit FeeHistoryForfeited(user, _pendingYesFees[user], _pendingNoFees[user], _pendingInvalidFees[user]);
+        delete _pendingYesFees[user];
+        delete _pendingNoFees[user];
+        delete _pendingInvalidFees[user];
     }
 
     /**
@@ -343,6 +519,7 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
     function depositMarketFee(uint256 amount) external override nonReentrant {
         require(msg.sender == market || isAuthorizedMarket[msg.sender], "Only market");
         require(!resolved && block.timestamp < effectiveResolutionTime(), "Fee accrual ended");
+        _requirePendingProcessed();
         if (amount == 0) return;
 
         uint256 balanceBefore = stakeToken.balanceOf(address(this));
@@ -373,21 +550,14 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         _assertVaultSolvent();
     }
 
-    function donate(uint256 amount) external override nonReentrant {
-        require(!resolved, "Already finalized");
-        require(block.timestamp < effectiveResolutionTime(), "Staking ended");
-        require(amount > 0, "Amount must be > 0");
-        require(_totalPrincipal > 0, "No principal");
-        uint256 balanceBefore = stakeToken.balanceOf(address(this));
-        stakeToken.safeTransferFrom(msg.sender, address(this), amount);
-        require(stakeToken.balanceOf(address(this)) - balanceBefore == amount, "Transfer mismatch");
-        totalDonations += amount;
-        emit Donated(msg.sender, amount);
-    }
-
     function finalize() external override nonReentrant {
         require(!resolved, "Already finalized");
         require(block.timestamp >= originalResolutionTime, "Staking not ended");
+        // 申请窗口早于原截止，且窗口后所有变权操作被锁。必须先处理这一更早的快照，
+        // 不能由晚执行regular finalize的Keeper抹去原已成立的提前终止。
+        if (pendingBondEscrow != 0) {
+            if (_processEarlyRequest()) return;
+        }
         _finalizeNow();
     }
 
@@ -438,9 +608,15 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         uint256 marketFeePayout = _claimSelectedMarketFees(actor, userSide);
         emit MarketFeesClaimed(actor, marketFeePayout);
         uint256 payout = principalPayout + marketFeePayout;
-        if (payout > 0) stakeToken.safeTransfer(msg.sender, payout);
+        _payWithdrawal(actor, msg.sender, payout);
         _assertVaultSolvent();
         emit Withdrawn(actor, principalPayout, marketFeePayout);
+    }
+
+    // 原有结算出金不叠加提现费；中途退出罚金在exitStake独立计算。
+    function _payWithdrawal(address, address recipient, uint256 gross) private returns (uint256) {
+        if (gross > 0) stakeToken.safeTransfer(recipient, gross);
+        return gross;
     }
 
     function claimEmptySettlement() external override nonReentrant returns (uint256 amount) {
@@ -473,10 +649,10 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         require(_isMarketFeeEligible(userSide), "Not fee eligible");
 
         _checkpointMarketFees(user, info);
-        amount = _claimSelectedMarketFees(user, userSide);
-        if (amount > 0) stakeToken.safeTransfer(user, amount);
+        uint256 gross = _claimSelectedMarketFees(user, userSide);
+        amount = _payWithdrawal(user, user, gross);
         _assertVaultSolvent();
-        emit MarketFeesClaimed(user, amount);
+        emit MarketFeesClaimed(user, gross);
     }
 
     function claimOfficialMarketFees() external override nonReentrant returns (uint256 amount) {
@@ -496,7 +672,7 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         require(resolved && settlementReady, "Settlement not ready");
         require(
             remainingSettlementPool == 0 && marketFeeUserPoolRemaining == 0
-                && officialMarketFeesClaimable == 0,
+                && officialMarketFeesClaimable == 0 && totalEarlyBondRefunds == 0,
             "Outstanding liabilities"
         );
         amount = stakeToken.balanceOf(address(this));
@@ -513,34 +689,45 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         returns (uint256 yesFees, uint256 noFees, uint256 invalidFees)
     {
         StakeInfo storage info = _stakeOf[user];
-        yesFees = _pendingYesFees[user]
-            + Math.mulDiv(info.yes, accYesFeePerStake, FEE_INDEX_PRECISION) - _yesFeeDebt[user];
-        noFees = _pendingNoFees[user] + Math.mulDiv(info.no, accNoFeePerStake, FEE_INDEX_PRECISION)
-            - _noFeeDebt[user];
-        uint256 eligibleStake = info.yes + info.no;
-        invalidFees = _pendingInvalidFees[user]
-            + Math.mulDiv(eligibleStake, accInvalidFeePerStake, FEE_INDEX_PRECISION)
-            - _invalidFeeDebt[user];
+        FeeHistory storage history = _feeHistory[user];
+        (uint256 earnedYes,) = _feeGrowth(info.yes, accYesFeePerStake - history.yesIndex, history.yesRemainder);
+        (uint256 earnedNo,) = _feeGrowth(info.no, accNoFeePerStake - history.noIndex, history.noRemainder);
+        (uint256 earnedInvalid,) = _feeGrowth(
+            info.yes + info.no, accInvalidFeePerStake - history.invalidIndex, history.invalidRemainder
+        );
+        return (_pendingYesFees[user] + earnedYes, _pendingNoFees[user] + earnedNo,
+            _pendingInvalidFees[user] + earnedInvalid);
     }
 
     function claimableMarketFees(address user) external view override returns (uint256 amount) {
         if (!resolved || !settlementReady || _marketFeeClaimed[user]) return 0;
         (Side userSide, bool hasPosition) = sideOf(user);
         if (!hasPosition || !_isMarketFeeEligible(userSide)) return 0;
-        // 本金池和手续费奖励池遵循同一尘埃规则：最后一名合格领取者
-        // 收走该奖励池的全部剩余值，避免把用户奖励的整数除法尘埃误归协议。
+        // 保留原尾差规则：最后一名合格领取者收走剩余手续费，不转给项目方。
+        // 非最后者仍严格按已修复的历史权益领取，合计不会超过实收池。
         if (remainingMarketFeeClaims == 1) return marketFeeUserPoolRemaining;
         (uint256 yesFees, uint256 noFees, uint256 invalidFees) = conditionalMarketFees(user);
-        if (outcome == Outcome.YES) return yesFees;
-        if (outcome == Outcome.NO) return noFees;
-        if (outcome == Outcome.INVALID) return invalidFees;
+        uint256 bonus = _feeBonus(user);
+        if (outcome == Outcome.YES) return yesFees + bonus;
+        if (outcome == Outcome.NO) return noFees + bonus;
+        if (outcome == Outcome.INVALID) return invalidFees + bonus;
         return 0;
+    }
+
+    function _feeBonus(address user) private view returns (uint256) {
+        if (forfeitedBonusPool == 0) return 0;
+        uint256 denominator = outcome == Outcome.INVALID
+            ? _totalStakeBySide[0] + _totalStakeBySide[1]
+            : _totalStakeBySide[outcome == Outcome.YES ? 0 : 1];
+        if (denominator == 0) return 0;
+        return Math.mulDiv(forfeitedBonusPool, _userPrincipal(_stakeOf[user]), denominator);
     }
 
     function _snapshotSettlement() private {
         require(!settlementReady, "Settlement ready");
         uint256 balance = stakeToken.balanceOf(address(this));
-        require(balance >= totalMarketFeesAccrued, "Reward escrow missing");
+        require(pendingBondEscrow == 0, "EARLY_ESCROW_PENDING");
+        require(balance >= totalMarketFeesAccrued + totalEarlyBondRefunds, "Reward escrow missing");
         marketFeesInSettlementPool = totalMarketFeesAccrued;
 
         uint256 selectedDistributedFees;
@@ -555,16 +742,31 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
             remainingMarketFeeClaims = _participantCountBySide[0] + _participantCountBySide[1];
         }
         require(selectedDistributedFees <= totalMarketFeesAccrued, "Invalid reward ledger");
+        uint256 forfeited = forfeitedMarketFees[uint256(outcome) - 1];
+        require(forfeited <= selectedDistributedFees, "Invalid forfeited ledger");
+        // 放弃的费用来自原手续费池，独立分成按最终本金比例分配的bonus；不重复加钱。
+        // INVALID的费用只属于YES/NO，罚没本金/失败bond则属于所有剩余本金。
+        if (remainingMarketFeeClaims == 0) {
+            selectedDistributedFees = 0;
+            forfeited = 0;
+        }
         marketFeeUserPoolRemaining = selectedDistributedFees;
+        historicalFeePoolRemaining = selectedDistributedFees - forfeited;
+        forfeitedBonusPool = forfeited;
+        forfeitedBonusPoolRemaining = forfeited;
         officialMarketFeesClaimable = totalMarketFeesAccrued - selectedDistributedFees;
+        settledPenaltyAmount = exitPenaltyPool + failedProposalBondPool;
+        exitPenaltyPool = 0;
+        failedProposalBondPool = 0;
+        uint256 principalFunds = balance - totalMarketFeesAccrued - totalEarlyBondRefunds;
 
         if (_totalPrincipal == 0) {
-            emptySettlementClaimable = balance - totalMarketFeesAccrued;
+            emptySettlementClaimable = principalFunds;
             settlementPool = 0;
             remainingSettlementPool = emptySettlementClaimable;
             remainingEligibleClaims = 0;
         } else {
-            settlementPool = balance - totalMarketFeesAccrued;
+            settlementPool = principalFunds;
             remainingSettlementPool = settlementPool;
             remainingEligibleClaims = outcome == Outcome.INVALID
                 ? _totalParticipants
@@ -573,6 +775,7 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
         settlementReady = true;
         _assertVaultSolvent();
         emit SettlementReady(settlementPool, totalMarketFeesAccrued);
+        emit ForfeitedBonusSnapshotted(outcome, historicalFeePoolRemaining, forfeitedBonusPool);
     }
 
     function _claimSelectedMarketFees(address user, Side userSide)
@@ -586,12 +789,23 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
 
         if (remainingMarketFeeClaims == 1) {
             payout = marketFeeUserPoolRemaining;
+            historicalFeePoolRemaining = 0;
+            forfeitedBonusPoolRemaining = 0;
         } else if (outcome == Outcome.YES) {
             payout = _pendingYesFees[user];
         } else if (outcome == Outcome.NO) {
             payout = _pendingNoFees[user];
         } else {
             payout = _pendingInvalidFees[user];
+        }
+
+        if (remainingMarketFeeClaims > 1) {
+            require(payout <= historicalFeePoolRemaining, "Historical reward exceeds pool");
+            historicalFeePoolRemaining -= payout;
+            uint256 bonus = _feeBonus(user);
+            require(bonus <= forfeitedBonusPoolRemaining, "Bonus exceeds pool");
+            forfeitedBonusPoolRemaining -= bonus;
+            payout += bonus;
         }
 
         require(payout <= marketFeeUserPoolRemaining, "Reward exceeds pool");
@@ -609,33 +823,44 @@ contract OCPVault is ReentrancyGuard, IOCPVault {
             || (outcome == Outcome.INVALID && userSide != Side.INVALID);
     }
 
-    function _checkpointMarketFees(address user, StakeInfo storage info) private {
-        uint256 accumulatedYes = Math.mulDiv(info.yes, accYesFeePerStake, FEE_INDEX_PRECISION);
-        uint256 accumulatedNo = Math.mulDiv(info.no, accNoFeePerStake, FEE_INDEX_PRECISION);
-        uint256 accumulatedInvalid =
-            Math.mulDiv(info.yes + info.no, accInvalidFeePerStake, FEE_INDEX_PRECISION);
-        _pendingYesFees[user] += accumulatedYes - _yesFeeDebt[user];
-        _pendingNoFees[user] += accumulatedNo - _noFeeDebt[user];
-        _pendingInvalidFees[user] += accumulatedInvalid - _invalidFeeDebt[user];
-        _yesFeeDebt[user] = accumulatedYes;
-        _noFeeDebt[user] = accumulatedNo;
-        _invalidFeeDebt[user] = accumulatedInvalid;
+    /// @dev 完整精度计算本段收益，再合并同一用户已赚的小数；本金追加前调用。
+    /// mulDiv/mulmod避免stake*indexDelta溢出；全体本段缩放收益不超过实收费用。
+    function _feeGrowth(uint256 principal, uint256 indexDelta, uint256 oldRemainder)
+        private pure returns (uint256 earned, uint256 remainder)
+    {
+        earned = Math.mulDiv(principal, indexDelta, FEE_INDEX_PRECISION);
+        uint256 fractions = mulmod(principal, indexDelta, FEE_INDEX_PRECISION) + oldRemainder;
+        earned += fractions / FEE_INDEX_PRECISION;
+        remainder = fractions % FEE_INDEX_PRECISION;
     }
 
-    function _updateMarketFeeDebt(address user, StakeInfo storage info) private {
-        _yesFeeDebt[user] = Math.mulDiv(info.yes, accYesFeePerStake, FEE_INDEX_PRECISION);
-        _noFeeDebt[user] = Math.mulDiv(info.no, accNoFeePerStake, FEE_INDEX_PRECISION);
-        _invalidFeeDebt[user] =
-            Math.mulDiv(info.yes + info.no, accInvalidFeePerStake, FEE_INDEX_PRECISION);
+    function _checkpointMarketFees(address user, StakeInfo storage info) private {
+        FeeHistory storage history = _feeHistory[user];
+        uint256 earned;
+        (earned, history.yesRemainder) =
+            _feeGrowth(info.yes, accYesFeePerStake - history.yesIndex, history.yesRemainder);
+        _pendingYesFees[user] += earned;
+        (earned, history.noRemainder) =
+            _feeGrowth(info.no, accNoFeePerStake - history.noIndex, history.noRemainder);
+        _pendingNoFees[user] += earned;
+        (earned, history.invalidRemainder) = _feeGrowth(
+            info.yes + info.no, accInvalidFeePerStake - history.invalidIndex, history.invalidRemainder
+        );
+        _pendingInvalidFees[user] += earned;
+        history.yesIndex = accYesFeePerStake;
+        history.noIndex = accNoFeePerStake;
+        history.invalidIndex = accInvalidFeePerStake;
     }
 
     function _assertVaultSolvent() private view {
         uint256 required;
         if (settlementReady) {
             required =
-                remainingSettlementPool + marketFeeUserPoolRemaining + officialMarketFeesClaimable;
+                remainingSettlementPool + marketFeeUserPoolRemaining + officialMarketFeesClaimable
+                    + totalEarlyBondRefunds;
         } else {
-            required = _totalPrincipal + totalDonations + totalMarketFeesAccrued;
+            required = _totalPrincipal + totalMarketFeesAccrued + exitPenaltyPool + failedProposalBondPool
+                + pendingBondEscrow + totalEarlyBondRefunds;
         }
         require(stakeToken.balanceOf(address(this)) >= required, "Vault insolvent");
     }

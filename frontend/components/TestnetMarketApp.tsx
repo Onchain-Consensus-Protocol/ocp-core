@@ -34,6 +34,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   const reader = useMemo(() => configured
     ? createChainClient(new JsonRpcProvider(config.rpcUrl), factoryAddress) : null,
   [configured, factoryAddress]);
+  const [earlyReason,setEarlyReason] = useState('');
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [market, setMarket] = useState<MarketState | null>(null);
@@ -169,12 +170,13 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     finally {pending.current = false;setBusy(false);}
   }
 
+  const earlyDue = !!market?.early && (market.early.due || market.early.requestId > 0n && now >= Number(market.early.processAfter));
   const genesis = market?.phase === 0;
   const genesisOpen = !!market && genesis && now < Number(market.genesisCutoff);
-  const formalOpen = !!market && market.phase === 1 && now < Number(market.formalCutoff);
-  const coreOpen = !!market && [1, 2].includes(market.phase) && now < Number(market.coreCutoff) && !market.vaultResolved;
+  const formalOpen = !!market && market.phase === 1 && now < Number(market.formalCutoff) && !market.vaultResolved && !earlyDue;
+  const coreOpen = !!market && [1, 2].includes(market.phase) && now < Number(market.coreCutoff) && !market.vaultResolved && !earlyDue;
   const terminal = !!market && [3, 4].includes(market.phase);
-  const quoteKey = `${selected}:${tab}:${mode}:${side}:${amount}:${market?.phase}`;
+  const quoteKey = `${selected}:${tab}:${mode}:${side}:${amount}:${market?.phase}:${wallet?.address}`;
   useEffect(() => {
     let cancelled = false;
     setQuote(null);setQuoteError('');
@@ -192,15 +194,15 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
           cash = await reader.quoteFormalBuy(market.address, side === 0, quantity);
           limit = (cash * 101n + 99n) / 100n;
         } else {
-          const result = genesis ? await reader.quoteGenesisSell(market.address, quantity)
-            : await reader.quoteFormalSell(market.address, side === 0, quantity);
+          const result = genesis ? await reader.quoteGenesisSell(market.address, quantity, wallet?.address)
+            : await reader.quoteFormalSell(market.address, side === 0, quantity, wallet?.address);
           cash = result.seller;limit = cash * 99n / 100n;
         }
         if (!cancelled) setQuote({key: quoteKey, quantity, cash, limit});
       } catch (error) {if (!cancelled) setQuoteError(errorText(error));}
     }, 250);
     return () => {cancelled = true;window.clearTimeout(timer);};
-  }, [reader, market, stock, amount, tab, mode, side, genesis, quoteKey]);
+  }, [reader, market, stock, amount, tab, mode, side, genesis, quoteKey, wallet?.address]);
 
   let coreAmount = 0n;
   try {if (stock && amount) coreAmount = parseUnits(amount, stock.decimals);} catch {/* The input remains editable. */}
@@ -260,6 +262,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
       }}>
         <h2 className="text-xl font-display font-bold">{t('0本金发射你的市场', 'Launch your market with zero principal')}</h2>
         <label className="block text-sm">{t('底池股票代币', 'Pool stock token')}<select className={field} value={stockAddress} onChange={event => setStockAddress(event.target.value)}>{enabledStocks.map(asset => <option key={asset.address} value={asset.address}>{asset.symbol} · {short(asset.address)}</option>)}</select></label>
+        {directory?.fixedTestTargets && creationStock?.fixedRTarget !== undefined && <p className="text-xs text-text-muted">{t('固定测试毕业门槛', 'Fixed test graduation targets')}: R {units(creationStock.fixedRTarget,18)} TSLA / B {units(creationStock.fixedBTarget,18)} TSLA</p>}
         {creationStock?.snapshotError && <p role="alert" className="text-xs text-danger">{t('该股票价格快照暂不可用，暂不能创建市场。请刷新或联系资产配置管理员。', 'This stock price snapshot is unavailable. Refresh or contact the asset administrator before creating a market.')}</p>}
         <label className="block text-sm">{t('话题内容', 'Market question')}<textarea className={field} required rows={2} maxLength={300} value={topic.topic} onChange={event => setTopic(value => ({...value, topic: event.target.value}))}/></label>
         {(['yesRule', 'noRule', 'invalidRule'] as const).map((key, i) => <label key={key} className="block text-sm">{['YES', 'NO', 'INVALID'][i]} {t('判定条件', 'resolution criteria')}<textarea className={field} required rows={2} maxLength={1000} value={topic[key]} onChange={event => setTopic(value => ({...value, [key]: event.target.value}))}/></label>)}
@@ -305,12 +308,32 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
               {genesis && <p className="text-xs text-text-muted">{t('触发毕业后 gToken 转为 LP 权益，持仓价值可能低于成本。', 'Graduation converts gTokens into LP rights; their value may be below cost.')}</p>}
             </>}
             {terminal && <Button className="w-full" disabled={!canAct} onClick={() => void transact(client => client.claimMarket(market.address))}>{t('领取市场结算款', 'Claim market payout')}</Button>}
+            {market.early && <div className={`${box} text-xs space-y-3`}>
+              <strong>{t('Core 退出与提前终止', 'Core exit and early resolution')}</strong>
+              {coreOpen && market.early.refund !== undefined && market.early.penalty !== undefined && market.early.refund + market.early.penalty > 0n && <>
+                {row(t('退出退回本金', 'Exit refund'), `${units(market.early.refund,stock.decimals)} ${stock.symbol}`)}
+                {row(t('留池罚没本金', 'Principal retained as penalty'), `${units(market.early.penalty,stock.decimals)} ${stock.symbol}`)}
+                <p>{t('退出放弃累计手续费；罚没资金在终局按规则分配。', 'Exit forfeits accrued fees. Retained funds are distributed at settlement.')}</p>
+                <Button disabled={!canAct} variant="outline" onClick={() => void transact(client => client.exitCore(market.address))}>{t('退出全部 Core 质押', 'Exit all Core stake')}</Button>
+              </>}
+              {row(t('固定申请保证金（创建时500U等值）', 'Fixed proposal bond (500 USD at creation)'), `${units(market.early.bond,stock.decimals)} ${stock.symbol}`)}
+              {market.early.requestId > 0n ? <>
+                {row(t('申请结果', 'Requested outcome'), ['—','YES','NO'][market.early.requestedOutcome])}
+                {row(t('窗口结束', 'Window ends'), date(market.early.processAfter))}
+                <Button disabled={!canAct || now < Number(market.early.processAfter)} onClick={() => void transact(client => client.processEarlyTermination(market.address))}>{t('处理提前终止申请', 'Process early request')}</Button>
+              </> : coreOpen && now + 3600 < Number(market.coreCutoff) && market.early.bond > 0n && <>
+                <label className="block">{t('提前终止原因', 'Reason for early resolution')}<input className={field} value={earlyReason} onChange={event=>setEarlyReason(event.target.value)} disabled={busy}/></label>
+                <p>{t('上方选择 YES 或 NO。窗口1小时；结果匹配退保证金，否则罚没并继续交易。原因仅在链上保存哈希。', 'Select YES or NO above. The window is 1 hour. A match refunds the bond; otherwise it is forfeited and trading resumes. Only the reason hash is stored onchain.')}</p>
+                {(market.position?.vaultAllowance ?? 0n) < market.early.bond ? <Button disabled={!canAct} onClick={() => void transact(client => client.approveStock(market.address,'vault',market.early!.bond))}>{t('授权申请保证金', 'Approve proposal bond')}</Button> : <Button disabled={!canAct || side === 2 || !earlyReason.trim() || (market.position?.balance ?? 0n) < market.early.bond} onClick={() => void transact(client => client.proposeEarlyTermination(market.address, side === 0 ? 1 : 2, earlyReason))}>{t('提交提前终止申请', 'Propose early resolution')}</Button>}
+              </>}
+              {(market.early.bondRefund ?? 0n)>0n && <Button disabled={!canAct} onClick={() => void transact(client => client.claimEarlyBond(market.address))}>{t('领取退还的保证金', 'Claim refunded bond')}</Button>}
+            </div>}
             {market.vaultResolved && <Button className="w-full" disabled={!canAct || !market.vaultSettlementReady} onClick={() => void transact(client => client.claimCore(market.address))}>{t('领取 Core 结算款', 'Claim Core payout')}</Button>}
           </div>
           <div className="p-4 sm:p-6 md:w-2/3 space-y-5">
             <div className="flex items-start justify-between gap-3"><h2 className="text-xl font-display font-bold break-words">{market.topic}</h2><span className="shrink-0 px-2 py-1 text-xs rounded-full border border-accent/50 text-accent bg-accent/10">{phaseLabel}</span></div>
             <div className="space-y-2 text-xs">{(['yesRule', 'noRule', 'invalidRule'] as const).map((key, i) => <p key={key} className="whitespace-pre-wrap break-words"><strong>{['YES', 'NO', 'INVALID'][i]}: </strong>{market[key]}</p>)}</div>
-            <div className={`${box} text-xs`}>{row('Genesis', date(market.genesisCutoff))}{row('Formal', date(market.formalCutoff))}{row(t('Core／最终截止', 'Core / final deadline'), date(market.coreCutoff))}</div>
+            <div className={`${box} text-xs`}>{row('Genesis', date(market.genesisCutoff))}{row('Formal', date(market.formalCutoff))}{row(t('Core／最终截止', 'Core / final deadline'), date(market.early?.effectiveCutoff ?? market.coreCutoff))}</div>
             <div className="grid sm:grid-cols-2 gap-3">
               <div className={`${box} text-xs`}><h3 className="font-bold mb-2 flex items-center gap-2"><LayoutDashboard className="w-4 h-4"/>{t('我的持仓', 'My holdings')}</h3>{row('gToken', units(market.position?.genesisShares, 11))}{row('YES', units(market.position?.yes))}{row('NO', units(market.position?.no))}{row('LP', units(market.position?.lp))}{row('B', units(market.position?.b))}</div>
               <div className={`${box} text-xs`}><h3 className="font-bold mb-2">{t('我的 Core 质押', 'My Core stake')} ({stock.symbol})</h3>{row('YES', units(market.position?.coreYes, stock.decimals))}{row('NO', units(market.position?.coreNo, stock.decimals))}{row('INVALID', units(market.position?.coreInvalid, stock.decimals))}<p className="text-text-muted mt-2">{t('最终结果', 'Final result')}: {market.vaultResolved ? ['—', 'YES', 'NO', 'INVALID'][market.vaultOutcome] : t('尚未结算', 'Pending')}</p></div>
@@ -318,7 +341,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
             <div className={`${box} text-xs`}>{row(t('Genesis 曲线资金 R', 'Genesis curve funds R'), `${units(market.R, stock.decimals)} ${stock.symbol}`)}{row(t('风险资金 B', 'Risk funds B'), `${units(market.B, stock.decimals)} ${stock.symbol}`)}<p className="text-text-muted mt-2">{t('链上状态来自统一工厂；资产停用只阻止新建市场。', 'State is read from the shared factory. Disabling an asset only prevents new markets.')}</p></div>
             <div className="flex flex-wrap gap-2">
               {market.phase === 0 && now >= Number(market.genesisCutoff) || market.phase === 1 && now >= Number(market.formalCutoff) ? <Button disabled={!canAct} variant="outline" onClick={() => void transact(client => client.closeExpired(market.address))}>{t('推进已截止阶段', 'Close expired stage')}</Button> : null}
-              {[1, 2].includes(market.phase) && now >= Number(market.coreCutoff) && <Button disabled={!canAct} variant="outline" onClick={() => void transact(client => client.finalizeMarket(market.address))}>{t('执行最终结算', 'Finalize settlement')}</Button>}
+              {[1, 2].includes(market.phase) && (now >= Number(market.coreCutoff) || market.vaultResolved) && <Button disabled={!canAct} variant="outline" onClick={() => void transact(client => client.finalizeMarket(market.address))}>{t('执行最终结算', 'Finalize settlement')}</Button>}
               <a className="text-xs text-accent underline self-center" href={`https://explorer.testnet.chain.robinhood.com/address/${market.address}`} target="_blank" rel="noreferrer">{t('查看合约', 'View contract')} · {short(market.address)}</a>
             </div>
           </div>

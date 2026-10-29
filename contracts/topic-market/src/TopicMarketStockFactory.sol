@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {IUsdCollateralSnapshot} from "./TopicMarketPriceSnapshot.sol";
 import {TopicMarket,IToken6,ITopicMarketCore} from "./TopicMarket.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -67,6 +68,7 @@ contract TopicMarketStockFactory is Ownable2Step {
         require(address(oracle_).code.length > 0, "CONFIG");
         require(k_ >= 1e12 && k_ <= 1e24, "PARAMS");
         require(forwarder_.code.length > 0, "FORWARDER");
+        require(forwarder_ != protocol, "FEE_RECIPIENT_FORWARDER");
         require(IStockRouterBinding(forwarder_).factory() == address(this), "ROUTER_BINDING");
         require(IStockOracleUnits(address(oracle_)).unit() == 10 ** decimals_, "ORACLE_UNITS");
         stocks[stock] = StockConfig(oracle_, forwarder_, k_, decimals_, true);
@@ -97,9 +99,10 @@ contract TopicMarketStockFactory is Ownable2Step {
         _length(topic, 512); _length(yesRule, 2048); _length(noRule, 2048); _length(invalidRule, 2048);
         require(block.timestamp <= type(uint64).max - 4 hours, "TIME");
         require(uint256(coreEnd) > block.timestamp + 4 hours, "DEADLINES");
-        uint256 price = config.priceOracle.ethPrice6();
-        require(price > 0 && price <= (1e30 / (10 ** (18-config.decimals))) / 4, "PRICE");
-        VaultCoreAdapter createdCore = coreDeployer.deploy(token, msg.sender, protocol, coreEnd);
+        uint256 price = _graduationBasis(stock, config);
+        require(price <= (1e30 / (10 ** (18-config.decimals))) / 4, "PRICE");
+        VaultCoreAdapter createdCore = coreDeployer.deploy(token, msg.sender, protocol, coreEnd,
+            IUsdCollateralSnapshot(address(config.priceOracle)).collateralForUsd(500e18));
         coreDeployer.configureCore(createdCore, config.trustedForwarder);
         TopicMarket createdMarket = marketDeployer.deploy(token, ITopicMarketCore(address(createdCore)), msg.sender,
             protocol, coreEnd, price, config.k);
@@ -114,6 +117,13 @@ contract TopicMarketStockFactory is Ownable2Step {
         markets.push(market);
         _emitCreated(market);
     }
+    /// @dev Production basis is the real ETH/collateral snapshot. Testnet profiles override only this hook.
+    function _graduationBasis(address, StockConfig memory config) internal view virtual returns (uint256) {
+        uint256 value = config.priceOracle.ethPrice6();
+        require(value > 0, "PRICE");
+        return value;
+    }
+
     function _emitCreated(address market) private {
         MarketRecord storage r = records[market];
         emit MarketCreated(market, r.creator, r.adapter, r.vault, r.createdAt,

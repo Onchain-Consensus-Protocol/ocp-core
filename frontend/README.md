@@ -2,11 +2,13 @@
 
 主市场 `/`（market域名）及 `/explore.html` 默认保留原有邮箱登录、数据库模拟市场和Simulation完整交互；不由VITE_MARKET_MODE切成链上模式。独立入口 `/testnet.html` 接入46630测试网，两页导航互相链接。已有模拟数据和交易逻辑不变。下方先前的默认testnet入口描述由本节取代。
 
-## 2026-10-29 Robinhood 测试网接入
+## 2026-10-29 最新测试网部署
 
-`VITE_MARKET_MODE=testnet` 启用钱包链上入口，固定链46630；`VITE_TOPIC_MARKET_FACTORY` 使用已部署的统一Factory `0x21210a6213D7B1c6D83f393488F0aFC0913EBEd5`。未设置testnet模式时保留原数据库模拟入口。所有写交易显式绑定46630；授权与业务交易分别等待回执。客户端使用frontend/testnet/abi下对应的导出ABI，不调用历史Factory接口。
+独立入口为 `https://market.ocp-protocol.org/testnet.html`，固定链46630；普通市场入口仍为模拟。公开配置 `VITE_TOPIC_MARKET_FACTORY=0xB5C08A89F11D18A62361b87Dc963379281CA6D82` 由Vercel构建环境提供；`.env.testnet`只用于本地testnet构建，不控制默认页面模式。
 
-本地将robinhood-testnet.env.example的公开配置放入.env.testnet，然后运行npm run build:testnet；生产网站由GitHub main推送触发构建，项目环境变量选择testnet。当前工厂已部署，股票登记、测试价格源及USDG兑换配置仍待明确，不展示模拟股票为链上资产。浏览器源码验证尚未成功，不等同部署失败。部署记录见contracts/topic-market/deployments/46630.json。
+TSLA和官方测试USDG使用已有真实V3池，匹配带deadline的兑换适配器。R=.0036及B=.0006 TSLA双门槛；固定测试价400USD/TSLA仅用于500U保证金换算（1.25 TSLA），不提供假ETH行情。独立提前终止模块每市场创建并固定绑定。已真实验证0.1USDG路由买入、原生TSLA毕业、Core质押及90%退出；不会把分叉中的完整结算测试描述为测试网上已到期结算。
+
+部署记录见contracts/topic-market/deployments/46630.json；源码验证状态独立记录，提交成功不等于已经验证。
 
 # OCP Market
 

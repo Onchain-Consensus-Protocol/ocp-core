@@ -21,7 +21,8 @@ contract RegisterTopicMarketStock is Script {
         require(stable.code.length>0 && address(exchange).code.length>0 && stable!=address(stock),"CONFIG");
         vm.startBroadcast(deployer);
         TopicMarketStockPriceSnapshot oracle=new TopicMarketStockPriceSnapshot(vm.envAddress("TOPIC_MARKET_ETH_USD_FEED"),vm.envAddress("TOPIC_MARKET_STOCK_USD_FEED"),stock.decimals(),vm.envUint("TOPIC_MARKET_ETH_HEARTBEAT"),vm.envUint("TOPIC_MARKET_STOCK_HEARTBEAT"),vm.envAddress("TOPIC_MARKET_SEQUENCER_FEED"),vm.envUint("TOPIC_MARKET_SEQUENCER_GRACE"));
-        oracle.ethPrice6();
+        if(block.chainid==46630) oracle.collateralForUsd(500e18);
+        else oracle.ethPrice6();
         address[] memory stablecoins=new address[](1);stablecoins[0]=stable;
         TopicMarketAssetRouter router=new TopicMarketAssetRouter(ITopicMarketRouterRegistry(address(factory)),exchange,stablecoins);
         factory.registerStock(stock,vm.envUint("TOPIC_MARKET_STOCK_K_WAD"),oracle,address(router));

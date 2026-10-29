@@ -7,13 +7,14 @@ import {TopicMarket, IToken6, ITopicMarketCore} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
 import {ITopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
 import {MockUSDC} from "./TopicMarketBase.sol";
-import {OCPVault} from "ocp/core/OCPVault.sol";
-import {IOCPVault} from "ocp/interfaces/IOCPVault.sol";
+import {OCPCore} from "ocp/core/OCPCore.sol";
+import {IOCPCore} from "ocp/interfaces/IOCPCore.sol";
 
 contract FactoryPriceMock is ITopicMarketPriceSnapshot {
     uint256 public price = 1e6;
     function set(uint256 value) external { price = value; }
     function ethPrice6() external view returns (uint256) { return price; }
+    function collateralForUsd(uint256 usdWad) external pure returns(uint256){return usdWad / 1e12;}
 }
 contract TopicMarketFactoryTest is Test {
     struct CreatedPayload {address adapter;address vault;uint64 createdAt;uint64 genesis;uint64 formal;uint64 core;uint64 topic;uint256 snapshot;}
@@ -42,13 +43,13 @@ contract TopicMarketFactoryTest is Test {
         factory = new TopicMarketFactory(usd, protocol, 1e18, oracle, coreDeployer, marketDeployer);
         assertEq(address(factory), predicted);
     }
-    function create() internal returns (TopicMarket market, VaultCoreAdapter adapter, OCPVault vault) {
+    function create() internal returns (TopicMarket market, VaultCoreAdapter adapter, OCPCore vault) {
         vm.prank(alice);
         (address m, address a, address v) = factory.createMarket("Will this launch?", "YES definition", "NO definition", "INVALID definition", uint64(block.timestamp + 6 hours));
-        return (TopicMarket(m), VaultCoreAdapter(a), OCPVault(v));
+        return (TopicMarket(m), VaultCoreAdapter(a), OCPCore(v));
     }
     function testZeroPrincipalAtomicCreateAndMetadata() public {
-        (TopicMarket m, VaultCoreAdapter a, OCPVault v) = create();
+        (TopicMarket m, VaultCoreAdapter a, OCPCore v) = create();
         assertEq(usd.balanceOf(alice), 0); assertEq(usd.balanceOf(address(m)), 0);
         assertEq(m.creator(), alice); assertEq(m.protocol(), protocol);
         assertEq(address(m.token()), address(usd)); assertEq(address(m.core()), address(a));
@@ -66,12 +67,12 @@ contract TopicMarketFactoryTest is Test {
         assertEq(r.noRule, "NO definition"); assertEq(r.invalidRule, "INVALID definition");
     }
     function testCoreCannotStakeUntilGraduationThenOpensAtomically() public {
-        (TopicMarket m, VaultCoreAdapter a, OCPVault v) = create();
+        (TopicMarket m, VaultCoreAdapter a, OCPCore v) = create();
         usd.mint(alice, 20e6); vm.startPrank(alice);
         usd.approve(address(v), type(uint256).max); usd.approve(address(m), type(uint256).max);
-        vm.expectRevert("Staking not open"); v.stake(IOCPVault.Side.YES, 1e6);
+        vm.expectRevert("Staking not open"); v.stake(IOCPCore.Side.YES, 1e6);
         m.genesisBuy(14e6, 0, type(uint64).max, 0);
-        v.stake(IOCPVault.Side.YES, 1e6); vm.stopPrank();
+        v.stake(IOCPCore.Side.YES, 1e6); vm.stopPrank();
         assertEq(a.openedAt(), block.timestamp); assertEq(a.deadline(), m.coreCutoff());
     }
     function testSnapshotIsFixedPerMarket() public {
@@ -97,7 +98,7 @@ contract TopicMarketFactoryTest is Test {
         assertEq(factory.marketCount(), 0);
     }
     function testCarriersOnlyAllowFactory() public {
-        vm.expectRevert("ONLY_FACTORY"); coreDeployer.deploy(usd, alice, protocol, uint64(block.timestamp + 6 hours));
+        vm.expectRevert("ONLY_FACTORY"); coreDeployer.deploy(usd, alice, protocol, uint64(block.timestamp + 6 hours), 500e6);
         vm.expectRevert("ONLY_FACTORY"); coreDeployer.bindCore(VaultCoreAdapter(address(1)), address(2));
         vm.expectRevert("ONLY_FACTORY"); marketDeployer.deploy(usd, ITopicMarketCore(address(1)), alice, protocol, uint64(block.timestamp + 6 hours), 1e6, 1e18);
     }

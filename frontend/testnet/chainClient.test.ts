@@ -24,6 +24,28 @@ function transactionFixture(){
   return {writer,wallet,sendTransaction};
 }
 describe('testnet transaction boundary',()=>{
+  it('reads fixed TSLA targets without requiring an ETH price feed',async()=>{
+    const stock='0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E';
+    const abi=new Interface([...factoryAbi,
+      'function fixedTestnetGraduation() view returns(bool)',
+      'function symbol() view returns(string)','function decimals() view returns(uint8)',
+      'function collateralForUsd(uint256) view returns(uint256)',
+      'function ethPrice6() view returns(uint256)']);
+    const calls:string[]=[];
+    const p={...provider(46630n),getBlock:vi.fn(async()=>({number:42,timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
+      const fragment=abi.getFunction(tx.data.slice(0,10))!;calls.push(fragment.name);
+      if(fragment.name==='ethPrice6')throw new Error('ETH feed unavailable');
+      const results:Record<string,unknown[]>={owner:[factory],stockCount:[1n],marketCount:[0n],
+        fixedTestnetGraduation:[true],stockTokens:[stock],stocks:[market,market,1n,18,true],
+        symbol:['TSLA'],decimals:[18],collateralForUsd:[2n*10n**18n]};
+      return abi.encodeFunctionResult(fragment,results[fragment.name]);
+    })};
+    const directory=await createChainClient(p as unknown as Provider,factory).readDirectory();
+    expect(directory.fixedTestTargets).toBe(true);
+    expect(directory.stocks[0]).toMatchObject({fixedRTarget:3600000000000000n,fixedBTarget:600000000000000n});
+    expect(directory.stocks[0].snapshotError).toBeUndefined();
+    expect(calls).toContain('collateralForUsd');expect(calls).not.toContain('ethPrice6');
+  });
   it('rejects a missing factory before creating a client',()=>{
     expect(()=>nonzeroAddress('0x0000000000000000000000000000000000000000')).toThrow('未配置');
     expect(()=>createChainClient({} as Provider,'')).toThrow();
@@ -53,12 +75,21 @@ describe('testnet transaction boundary',()=>{
     await writer.finalizeMarket(market);
     await writer.claimMarket(market);
     await writer.claimCore(market);
+    await writer.exitCore(market);
+    await writer.proposeEarlyTermination(market,1,'public outcome evidence');
+    await writer.processEarlyTermination(market);
+    await writer.claimEarlyBond(market);
     await writer.createMarket({stock:market,topic:'t',yesRule:'y',noRule:'n',invalidRule:'i',coreEnd:20000n});
     await writer.approveStock(market,'market',1n);
     await writer.approveRouterAsset(market,market,1n);
     await writer.executeRouter({market,action:RouterAction.GenesisBuy,paymentAsset:market,inputAmount:1n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0});
-    expect(sendTransaction).toHaveBeenCalledTimes(10);
+    expect(sendTransaction).toHaveBeenCalledTimes(14);
     for(const [request] of sendTransaction.mock.calls) expect(request).toMatchObject({chainId:46630n});
+  });
+  it('requires a reason before preparing an early proposal signature',async()=>{
+    const {writer,sendTransaction}=transactionFixture();
+    expect(()=>writer.proposeEarlyTermination(market,1,'   ')).toThrow('原因');
+    expect(sendTransaction).not.toHaveBeenCalled();
   });
   it('catches a wallet chain switch after asynchronous factory reads',async()=>{
     const {writer,wallet,sendTransaction}=transactionFixture();

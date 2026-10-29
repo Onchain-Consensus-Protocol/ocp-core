@@ -33,11 +33,19 @@ contract TopicMarketStockPriceSnapshot is ITopicMarketPriceSnapshot {
         require(uint256(answer)<=type(uint256).max/factor,"RANGE");
         return uint256(answer)*factor;
     }
-    function ethPrice6() external view returns(uint256 value) {
+    function collateralForUsd(uint256 usdWad) external view returns(uint256) {
+        // 与毕业价格相同的feed状态/时效约束，按股票代币价格而非一股价格换算。
+        _checkSequencer();
+        return Math.mulDiv(usdWad, unit, _read(stockUsd,stockHeartbeat,stockFactor), Math.Rounding.Ceil);
+    }
+    function _checkSequencer() private view {
         if(address(sequencer)!=address(0)) {
             (,int256 answer,uint256 start,uint256 update,)=sequencer.latestRoundData();
             require(answer==0 && start>0 && start<=block.timestamp && update>=start && update<=block.timestamp && block.timestamp-start>grace,"SEQUENCER_DOWN");
         }
+    }
+    function ethPrice6() external view returns(uint256 value) {
+        _checkSequencer();
         value=Math.mulDiv(_read(ethUsd,ethHeartbeat,ethFactor),unit,_read(stockUsd,stockHeartbeat,stockFactor));
         require(value>0 && value<=maximum,"PRICE");
     }

@@ -2,11 +2,23 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
+import {TopicMarketDeployer,TopicMarketCoreDeployer} from "../src/TopicMarketFactory.sol";
+import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 
 /// @notice Independent byte-for-byte check of the constructor's word-copy code stores.
 contract TopicMarketCodeStoreReadbackTest is Test {
+    function testCoreCreationCodeStoresRoundTripExactHash() public {
+        TopicMarketCoreDeployer deployer=new TopicMarketCoreDeployer(address(0xFA));
+        bytes memory expected=type(VaultCoreAdapter).creationCode;
+        uint256 first=deployer.lengthA();uint256 second=deployer.lengthB();
+        address a=deployer.codeA();address b=deployer.codeB();
+        assertEq(first+second,expected.length);assertLe(a.code.length,24576);assertLe(b.code.length,24576);
+        assertEq(uint256(uint8(a.code[0])),0);assertEq(uint256(uint8(b.code[0])),0);
+        bytes memory recovered=new bytes(first+second);
+        assembly {extcodecopy(a,add(recovered,32),1,first) extcodecopy(b,add(add(recovered,32),first),1,second)}
+        assertEq(keccak256(recovered),keccak256(expected));assertLe(address(deployer).code.length,24576);
+    }
     function testCreationCodeReadbackExactLengthStopAndHash() public {
         TopicMarketDeployer deployer = new TopicMarketDeployer(address(0xFA));
         bytes memory expected = type(TopicMarket).creationCode;

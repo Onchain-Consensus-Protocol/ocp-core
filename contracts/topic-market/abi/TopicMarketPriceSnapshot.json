@@ -40,6 +40,25 @@
   },
   {
     "type": "function",
+    "name": "collateralForUsd",
+    "inputs": [
+      {
+        "name": "usdWad",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "ethHeartbeat",
     "inputs": [],
     "outputs": [

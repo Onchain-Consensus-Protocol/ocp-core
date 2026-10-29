@@ -1,0 +1,60 @@
+{
+  "chainId": 46630,
+  "deployed": true,
+  "sourceVerification": "native submissions accepted; forge watch returned Unknown UID; final verification not confirmed",
+  "tests": {
+    "contractPassed": 256,
+    "frontendPassed": 214,
+    "frontendSkipped": 9,
+    "types": "passed",
+    "build": "passed"
+  },
+  "liveSmoke": {
+    "stableBuy": "0x7859c8a2f6c5c7fa9d34d3aff4e40fccda2d53ee495b239b2230948957bda003",
+    "exited": true,
+    "phase": 1,
+    "r": "0",
+    "b": "641269411763089",
+    "exitPenalty": "100000000000000",
+    "stockBalance": "4935411084273463005",
+    "stableBalance": "3873139"
+  },
+  "factory": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
+  "market": {
+    "address": "0xBe0d01292Df5cef376A40be7433C9b5B0C398857",
+    "record": [
+      "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+      "0xC1A0ca08B564c6E4aB88610d0Cd5Dfbd06f38ACa",
+      "0xaf18a2379AD5D5462A8218c07F56546CbcB8A2d0",
+      "1793278833",
+      "1793361629",
+      "1793365229",
+      "1793365229",
+      "0",
+      "TSLA \u6d4b\u8bd5\u7f51\u8054\u8c03\uff1a\u5b8c\u6574\u751f\u547d\u5468\u671f",
+      "Core YES \u4e25\u683c\u591a\u6570",
+      "Core NO \u4e25\u683c\u591a\u6570",
+      "\u5176\u4f59\u60c5\u51b5 Invalid"
+    ],
+    "core": "0xaf18a2379AD5D5462A8218c07F56546CbcB8A2d0",
+    "adapter": "0xC1A0ca08B564c6E4aB88610d0Cd5Dfbd06f38ACa",
+    "module": "0x3d0486e0f4bF82f448916CE3E7C5BeB70F0fdB7D",
+    "cutoff": "1793365229"
+  },
+  "sha256": {
+    "contracts/topic-market/src/TopicMarketPriceSnapshot.sol": "627252f384540bd8b30c976b76d1a941698328e8a8679094a44888bc5d26656d",
+    "contracts/topic-market/src/TopicMarketTestnetStockFactory.sol": "8db400ecf85b45fc0d80fdb55bf092506e1377989629a8c72fd079b95d37178e",
+    "contracts/topic-market/src/TopicMarketTestnetStockPriceSnapshot.sol": "ec5c3ce3fd8f6880d43db98a31279a83a88212f3c9823d591185f9bf45bf5865",
+    "contracts/topic-market/src/TopicMarketRightsToken.sol": "e24bdb0ea524aa22c32ba4f520a69f83d6fc284e4600d368294391df487a7838",
+    "contracts/topic-market/src/TopicMarket.sol": "17f60fc579b247342dbd66824219532b3835d99b09ca7fcde011a293113aae20",
+    "contracts/topic-market/src/TopicMarketFactory.sol": "064e199782f9a2af27d79b08b608fb06ec767d01f965ee626aaeeeb57335337c",
+    "contracts/topic-market/src/TopicMarketEarlyTerminationModule.sol": "103559f775e0427320134cbfbffd7fa90bb892a92af7edc1f01551de910706d7",
+    "contracts/topic-market/src/TopicMarketStockFactory.sol": "bd35508d128d782006724780306db1bac66cc40830c9bb73525b2c97db1f23aa",
+    "contracts/topic-market/src/VaultCoreAdapter.sol": "0f3038e18a22f6326dbcaddd914b80278df01675ac48cf850ad0c68528e29079",
+    "contracts/topic-market/src/TopicMarketStockPriceSnapshot.sol": "fd0b0ce4306f9914e31fdf71a4a3ee58c812e79ef28c734749bdc98246851b47",
+    "contracts/topic-market/src/TopicMarketMath.sol": "fb91c608d3dfb64bd4008c8dbd617694d2b28ebc1414d7066285c433f0e60c9d",
+    "contracts/topic-market/src/TopicMarketV3Exchange.sol": "c036be65a7ad6adee414d3ad265682a5ed8fa865521379557235902ecad3d492",
+    "contracts/topic-market/src/TopicMarketV3Router02Exchange.sol": "3803ff2fab717958400c3ba3976251e4fdedd2653c76d2d1f3ba6679e03d7c18",
+    "contracts/topic-market/src/TopicMarketAssetRouter.sol": "1bf5117a0f206ca7fd49e6b0645f57bd06e357c62f4ab714e5dc5741142396da"
+  }
+}
