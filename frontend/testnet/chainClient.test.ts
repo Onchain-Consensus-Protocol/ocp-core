@@ -21,7 +21,7 @@ function transactionFixture(){
   })};
   const wallet=provider(46630n);const sendTransaction=vi.fn(async(tx:unknown)=>({hash:'0x01',request:tx}));
   const writer=createChainClient(p as unknown as Provider,factory).withSigner({provider:wallet,sendTransaction} as unknown as Signer);
-  return {writer,wallet,sendTransaction};
+  return {writer,wallet,sendTransaction,readerProvider:p};
 }
 describe('testnet transaction boundary',()=>{
   it('reads fixed TSLA targets without requiring an ETH price feed',async()=>{
@@ -85,6 +85,23 @@ describe('testnet transaction boundary',()=>{
     await writer.executeRouter({market,action:RouterAction.GenesisBuy,paymentAsset:market,inputAmount:1n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0});
     expect(sendTransaction).toHaveBeenCalledTimes(14);
     for(const [request] of sendTransaction.mock.calls) expect(request).toMatchObject({chainId:46630n});
+  });
+  it('blocks a stale wallet session after asynchronous registry reads and before signing',async()=>{
+    const {readerProvider,wallet,sendTransaction}=transactionFixture();
+    const client=createChainClient(readerProvider as unknown as Provider,factory).withSigner(
+      {provider:wallet,sendTransaction} as unknown as Signer,()=>{throw new Error('Wallet session changed');});
+    await expect(client.claimMarket(market)).rejects.toThrow('Wallet session changed');
+    expect(readerProvider.call).toHaveBeenCalled();expect(sendTransaction).not.toHaveBeenCalled();
+  });
+  it('delivers escrowed LP only to the connected signer on testnet',async()=>{
+    const {readerProvider,wallet,sendTransaction}=transactionFixture();
+    const account='0x0000000000000000000000000000000000009999';
+    const client=createChainClient(readerProvider as unknown as Provider,factory).withSigner(
+      {provider:wallet,sendTransaction,getAddress:async()=>account} as unknown as Signer);
+    await client.materializeLP(market);
+    const [request]=sendTransaction.mock.calls[0] as [{to:string;data:string;chainId:bigint}];
+    expect(request).toMatchObject({to:market,chainId:46630n});
+    expect(new Interface(marketAbi).decodeFunctionData('materializeLP',request.data)[0]).toBe(account);
   });
   it('requires a reason before preparing an early proposal signature',async()=>{
     const {writer,sendTransaction}=transactionFixture();

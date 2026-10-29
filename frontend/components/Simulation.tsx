@@ -9,6 +9,7 @@ import {genesisTokens,genesisShares,genesisPrice} from './genesisDisplay';
 import type {Language} from '../types';
 import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalBuy,topicMarketFormalSell,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalBuy,topicMarketQuoteFormalSell,topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketClaim,topicMarketClaimCore,topicMarketClaimPreview,topicMarketRedeemPairs,topicMarketPrices,type TopicMarketState,type TopicMarketTradeQuote,type Side,type Outcome} from './topicMarketDemoModel';
 export interface RemoteSimulation {
+ chain?:{controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
  input:{tab:'MARKET'|'PROTOCOL';mode:'BUY'|'SELL';amount:number;useStable:boolean};state:TopicMarketState;assetSymbol:string;balanceUSD:number;topic:{title:string;YES:string;NO:string;INVALID:string};pending:boolean;
  prices:{genesis:number;probability:[number,number]|null};preview:ReturnType<typeof topicMarketClaimPreview>;
  genesisPnl:number;lpBEstimates:{outcome:Outcome;lp:number;B:number}[];outstanding:[number,number];
@@ -27,7 +28,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const zh=lang==='zh';
  const [assetIndex,setAssetIndex]=useState(0),[useStable,setUseStable]=useState(true),[localStableWallets,setStableWallets]=useState([5000,5000,5000]);
  const stableWallets=remote?[remote.balanceUSD]:localStableWallets;
- const asset=remote?STOCK_DEMO_ASSETS.find(a=>a.symbol===remote.assetSymbol)!:STOCK_DEMO_ASSETS[assetIndex];
+ const asset=remote?.chain?{symbol:remote.chain.stockSymbol,price:0}:remote?STOCK_DEMO_ASSETS.find(a=>a.symbol===remote.assetSymbol)!:STOCK_DEMO_ASSETS[assetIndex];
  const t=(cn:string,en:string)=>(zh?cn:en).replaceAll('dUSDC',asset.symbol);
  const [localState,setS]=useState<TopicMarketState>(()=>createStockDemo(STOCK_DEMO_ASSETS[0].price));
  const s=remote?.state??localState;
@@ -60,6 +61,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  useEffect(()=>{if(remote||!running||!ticking)return;const timer=window.setInterval(()=>setS(v=>topicMarketAdvanceTime(v,Math.min(v.TC,v.now+1))),1000);return()=>window.clearInterval(timer)},[running,ticking]);
  useEffect(()=>{if(!ticking)setRunning(false)},[ticking]);
  useEffect(()=>{remote?.onInput({tab,mode,amount,useStable});},[tab,mode,amount,useStable,remote?.onInput]);
+ useEffect(()=>{remote?.chain?.onTabChange?.(tab);},[tab,remote?.chain?.onTabChange]);
  const reset=()=>{try{setS(createStockDemo(asset.price,snapshot,depth));setCoreDateTime(defaultDeadlineLocal());setCreateNow(Date.now());setStableWallets([5000,5000,5000]);setRunning(false);setNotice('');setId(0);setTab('MARKET');setMode('BUY');setAmount(10)}catch{setNotice(t('请检查创建参数。','Check creation parameters.'))}};
  const paymentAmount=useStable?amount/asset.price:amount;
  const spendable=useStable?stableWallets[id]/asset.price:a.wallet;
@@ -88,7 +90,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const totalVolume=s.formalVolume??0,vaultFees=s.core.feeTotal,feeRoi=totalStake?vaultFees/totalStake*100:0;
  const formatAmount=num,sideTextColor=(side:Outcome)=>side==='YES'?'text-success':side==='NO'?'text-danger':'text-yellow-700';
  const primaryActionTitle=corePending?t('Core未开启','Core not open'):terminal?t('领取结算资金','Claim settlement'):activeTab==='MARKET'?(gen?t('交易gToken','Trade gToken'):t('交易','Trade')):t('选择方向并质押','Choose a side and stake');
- const primaryActionDescription=corePending?t('等待Genesis毕业。','Waiting for Genesis graduation.'):activeTab==='MARKET'?t('输入数量，查看成交报价与价格影响。','Enter an amount to preview execution and price impact.'):t('选择方向后只能同侧追加，资金锁定至结算。','Once selected, add only to the same side until settlement.');
+ const primaryActionDescription=corePending?t('等待Genesis毕业。','Waiting for Genesis graduation.'):activeTab==='MARKET'?t('输入数量，查看成交报价与价格影响。','Enter an amount to preview execution and price impact.'):remote?.chain?t('选择方向质押；可按规则退出并放弃累计手续费。','Choose a side and stake; exits forfeit accrued fees.'):t('选择方向后只能同侧追加，资金锁定至结算。','Once selected, add only to the same side until settlement.');
  const MIN_STAKE=0.01;
  const stake=(side:Outcome)=>{if(remote){if(remote.input.amount!==amount||remote.input.tab!==tab||remote.input.useStable!==useStable)return false;remote.stake(side);return true}if(paymentAmount<MIN_STAKE){setNotice(t('低于最小质押数量。','Below minimum stake.'));return false}return act(v=>topicMarketCoreStake(v,id,side,paymentAmount))};
  const trade=(side:Side)=>execute(gen?'G':side);
@@ -141,9 +143,9 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
       <div className="px-4 py-5 sm:p-6 md:w-1/3 border-b md:border-b-0 md:border-r border-border bg-transparent flex flex-col gap-4 sm:gap-6 relative z-10">
         {!isWalletConnected && (
           <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-2 text-xs font-mono text-accent flex items-center justify-between gap-3">
-            <span>{remote?t("验证邮箱后即可交易。","Sign in with email to trade."):(zh ? "连接模拟钱包后执行操作。" : "Connect the demo wallet to act.")}</span>
+            <span>{remote?.chain?t("连接钱包后即可交易。","Connect your wallet to trade."):remote?t("验证邮箱后即可交易。","Sign in with email to trade."):(zh ? "连接模拟钱包后执行操作。" : "Connect the demo wallet to act.")}</span>
             <Button onClick={connectWallet} variant="outline" size="sm" className="shrink-0 border-accent/40 text-accent">
-              {remote?t("登录","Sign in"):(zh ? "连接" : "Connect")}
+              {remote?.chain?t("连接钱包","Connect wallet"):remote?t("登录","Sign in"):(zh ? "连接" : "Connect")}
             </Button>
           </div>
         )}
@@ -187,6 +189,10 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
 
         {!remote&&<label className="flex justify-between items-center text-xs font-mono text-text-muted">{t("当前账户","Account")}<select aria-label={t("当前模拟账户","Demo account")} value={id} onChange={e=>{setId(Number(e.target.value));setNotice('')}} className="border border-border rounded-lg p-2 bg-white">{names.map((n,i)=><option key={n} value={i}>{n}</option>)}</select></label>}
 
+        {remote?.chain ? <>
+          {remote.chain.controls}
+          {activeTab==='PROTOCOL'&&remote.chain.coreActions}
+        </> : <>
         {routePanel}
         {corePending&&<div className={box+' text-sm text-text-muted'} data-testid="core-pending">{s.phase==='FAILED'?t('Genesis未毕业，Core未开启。','Genesis failed; Core did not open.'):t('Genesis毕业后，Core与正式市场同时开启。当前尚不能质押。','Core opens together with the market after Genesis graduates. Staking is not available yet.')}</div>}
         {!corePending && phase === "STAKING" && activeTab === "PROTOCOL" && (
@@ -300,7 +306,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
                   >
                     <span className={`font-bold text-xs font-display tracking-wider ${sideTextColor(side)}`}>{gen?(mode==="BUY"?t("买入gToken","Buy gToken"):t("卖出gToken","Sell gToken")):side}</span>
                     <span className="text-text-muted text-[10px] font-mono mt-0.5">
-                      {gen?genesisPrice(s.phase==='FAILED'?2*s.k*s.failedSupply:px.genesis):(side === "YES" ? yesPrice : noPrice).toFixed(2)}
+                      {gen?genesisPrice(s.phase==='FAILED'&&!remote?.chain?2*s.k*s.failedSupply:px.genesis):(side === "YES" ? yesPrice : noPrice).toFixed(2)}
                     </span>
                   </button>
                 ))}
@@ -381,8 +387,9 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
             {zh ? "时间快进10分钟" : "Advance time by 10 minutes"}
           </Button>
         )}
+        </>}
         <div role="status" aria-live="polite" className={`rounded-lg border p-3 text-[10px] leading-relaxed font-mono ${notice ? "border-accent/40 bg-accent/5 text-text" : "border-border text-text-muted"}`}>
-          {notice || (remote?t("多人共享市场，成交与余额由服务器确认。","Shared market; trades and balances are confirmed by the server."):zh ? "这是本地机制模拟，不会发起链上交易。" : "Local demo only; no chain transactions.")}
+          {notice || remote?.chain?.status || (remote?t("多人共享市场，成交与余额由服务器确认。","Shared market; trades and balances are confirmed by the server."):zh ? "这是本地机制模拟，不会发起链上交易。" : "Local demo only; no chain transactions.")}
         </div>
       </div>
 
@@ -416,11 +423,11 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
         </div>
 
         <div className="space-y-3 sm:space-y-4 mb-5 sm:mb-8 animate-fade-in">
-          {activeTab === "MARKET" && (gen||s.phase==='FAILED') ? <div data-testid="genesis-price" className="space-y-4"><h3 className="text-xs font-bold">{t("Genesis gToken 价格","Genesis gToken price")}</h3><strong className="text-2xl text-accent">{genesisPrice(s.phase==='FAILED'?2*s.k*s.failedSupply:px.genesis)} <span className="text-xs">{asset.symbol}／{t("枚","token")}</span></strong><GenesisPriceChart history={remote?.chart} events={s.events} supply={s.phase==='FAILED'?s.failedSupply:s.S} k={s.k} zh={zh} unit={asset.symbol}/><div className="border border-border rounded-xl p-4 space-y-3 text-xs"><div className="flex justify-between"><strong>{t("双池毕业进度","Graduation progress")}</strong><span>3.6 / 0.6 ETH</span></div>{[['R',s.R,s.rTarget],['B',s.B,s.bTarget]].map(([label,v,target])=><div key={String(label)}><div className="flex justify-between mb-1"><span>{label}</span><strong>{num(Number(v),4)} / {num(Number(target),4)} {asset.symbol}</strong></div><div className="h-2 bg-gray-100 rounded overflow-hidden"><div className={label==='R'?'h-full bg-purple-500':'h-full bg-accent'} style={{width:`${Math.min(100,Number(v)/Number(target)*100)}%`}}/></div></div>)}</div><p className="text-[10px] text-text-muted">{s.phase==='FAILED'?t("筹资未达标，未开启正式市场。请领取清算款。","Funding failed; the market did not open. Claim your refund."):t("双池达标立即毕业，后面一笔卖出也可能触发。","Both pools trigger graduation; a later sell can be the trigger.")}</p></div> : activeTab === "MARKET" && s.phase==='SETTLED' ? (
+          {activeTab === "MARKET" && (gen||s.phase==='FAILED') ? <div data-testid="genesis-price" className="space-y-4"><h3 className="text-xs font-bold">{t("Genesis gToken 价格","Genesis gToken price")}</h3><strong className="text-2xl text-accent">{genesisPrice(s.phase==='FAILED'&&!remote?.chain?2*s.k*s.failedSupply:px.genesis)} <span className="text-xs">{asset.symbol}／{t("枚","token")}</span></strong><GenesisPriceChart history={remote?.chart} source={remote?.chain?"chain":undefined} events={s.events} supply={s.phase==='FAILED'?s.failedSupply:s.S} k={s.k} zh={zh} unit={asset.symbol}/><div className="border border-border rounded-xl p-4 space-y-3 text-xs"><div className="flex justify-between"><strong>{t("双池毕业进度","Graduation progress")}</strong><span>{remote?.chain?t("测试网固定门槛","Fixed testnet targets"):"3.6 / 0.6 ETH"}</span></div>{[['R',s.R,s.rTarget],['B',s.B,s.bTarget]].map(([label,v,target])=><div key={String(label)}><div className="flex justify-between mb-1"><span>{label}</span><strong>{num(Number(v),4)} / {num(Number(target),4)} {asset.symbol}</strong></div><div className="h-2 bg-gray-100 rounded overflow-hidden"><div className={label==='R'?'h-full bg-purple-500':'h-full bg-accent'} style={{width:`${Math.min(100,Number(v)/Number(target)*100)}%`}}/></div></div>)}</div><p className="text-[10px] text-text-muted">{s.phase==='FAILED'?t("筹资未达标，未开启正式市场。请领取清算款。","Funding failed; the market did not open. Claim your refund."):t("双池达标立即毕业，后面一笔卖出也可能触发。","Both pools trigger graduation; a later sell can be the trigger.")}</p></div> : activeTab === "MARKET" && s.phase==='SETTLED' ? (
             <div className="rounded-xl border border-border p-5 space-y-3" data-testid="settled-market-result"><h3 className="text-xs text-text-muted">{t("最终结果","Final result")}</h3><strong className={`text-2xl ${sideTextColor(s.result??'INVALID')}`}>{s.result??'—'}</strong><p className="text-xs text-text-muted">{t("市场已结算，以下为每份兑付金额，不再显示交易赔率。","Settled. These are payouts per share, not trading odds.")}</p><Row label="YES" value={`${s.result==='YES'?'1':s.result==='NO'?'0':'0.5'} ${asset.symbol}`}/><Row label="NO" value={`${s.result==='NO'?'1':s.result==='YES'?'0':'0.5'} ${asset.symbol}`}/></div>
-          ) : activeTab === "MARKET" ? (
+          ) : activeTab === "MARKET" && remote?.chain && !px.probability ? <p className="text-xs text-text-muted">{t("正在读取链上行情…","Reading on-chain odds…")}</p> : activeTab === "MARKET" ? (
             <div className="space-y-4" data-testid="formal-chart">
-              {remote&&<div className="rounded-lg border border-border p-3 text-xs" data-testid="market-depth"><Row label={t("市场深度 b","Market depth b")} value={`${num(s.b,4)} ${asset.symbol} ≈ ${num(s.b*asset.price)} USD`}/><p className="mt-1 text-[10px] text-text-muted">{s.config.depthPolicy==='GRADUATION_CAPITAL'?t("按毕业启动资金确定，毕业后固定。","Set from launch capital at graduation, then fixed."):t("原有市场深度。","Legacy market depth.")}</p></div>}
+              {remote&&<div className="rounded-lg border border-border p-3 text-xs" data-testid="market-depth"><Row label={t("市场深度 b","Market depth b")} value={`${num(s.b,4)} ${asset.symbol}${remote?.chain?"":` ≈ ${num(s.b*asset.price)} USD`}`}/><p className="mt-1 text-[10px] text-text-muted">{s.config.depthPolicy==='GRADUATION_CAPITAL'?t("按毕业启动资金确定，毕业后固定。","Set from launch capital at graduation, then fixed."):t("原有市场深度。","Legacy market depth.")}</p></div>}
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5 text-text-muted font-display">
                   {zh ? "市场行情" : "Market odds"}
@@ -470,7 +477,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
               {activeTab === "MARKET" ? (zh ? "市场总交易量" : "Market total volume") : (zh ? "总质押本金" : "Total principal")}
             </div>
             <div className="text-sm text-text font-bold font-mono">
-              {formatAmount(activeTab === "MARKET" ? totalVolume : totalStake)} {asset.symbol}
+              {activeTab === "MARKET" && remote?.chain && !remote.chain.volumeAvailable ? "—" : formatAmount(activeTab === "MARKET" ? totalVolume : totalStake)} {asset.symbol}
             </div>
           </div>
           <div className={`border rounded-xl p-4 ${phase === "FINALIZED" ? "border-success/30 bg-success/5" : "border-border"}`}>
@@ -503,13 +510,13 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
         <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto">
           <div className="flex justify-between gap-3">
             <span>{zh ? "做市风险准备金" : "Market-making risk reserve"}</span>
-            <strong className="text-text">{num(terminal?s.bBudget:s.B)} {asset.symbol}</strong>
+            <strong className="text-text">{num(terminal?s.bBudget:s.B,remote?.chain?8:2)} {asset.symbol}</strong>
           </div>
           <div className="flex justify-between gap-3 mt-1.5">
             <span>{zh ? "LP代币 / B代币" : "LP tokens / B tokens"}</span>
-            <strong className="text-text">{num(a.lp,4)} / {num(a.z,4)}</strong>
+            <strong className="text-text">{remote?.chain&&!isWalletConnected?"—":num(a.lp,4)} / {remote?.chain&&!isWalletConnected?"—":num(a.z,4)}</strong>
           </div>
-          {terminal&&lpBValuePanel}
+          {terminal&&!remote?.chain?.readOnlyMetrics&&lpBValuePanel}
 
         </div>
         )}

@@ -39,3 +39,12 @@ Real PostgreSQL integration tests run only when `PAPER_TEST_DATABASE_URL` points
 ## Hosting
 
 Deploy `frontend/` as a Vite project. Build with `npm run build` and publish `dist/`; the server API is `api/paper.ts`. The included Vercel configuration serves `explore.html` at the Market hostname root. Set authentication and database variables in the hosting environment.
+
+
+### Testnet interface (2026-10-30)
+
+`testnet.html` reuses the simulation detail layout with chain-backed balances, prices, and event history. The default paper market stays available separately. Core unstaking and early-resolution requests have separate controls; market trading selects YES/NO in a dropdown.
+
+The payment selector supports registered USDG through the existing stock/USDG V3 pool and AssetRouter. Quotes use the matching QuoterV2 and pinned-block pool checks, never the fixed test collateral oracle. Formal buying swaps the entire displayed maximum USDG budget; unused stock is refunded as stock. Approvals and execution are separate wallet confirmations, pinned to chain 46630.
+
+Receiving escrowed LP tokens transfers the token to the wallet without withdrawing pool collateral. LP payout requires settlement; B payout requires settlement or failed Genesis. No-principal Core cannot accept an early request; ties/INVALID with principal do not prohibit a YES/NO request, but an unmatched outcome after the window forfeits the bond.

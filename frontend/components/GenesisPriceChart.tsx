@@ -2,10 +2,10 @@ import React, { useState } from "react";
 import { genesisPrice } from "./genesisDisplay";
 import type { TopicMarketEvent } from "./topicMarketDemoModel";
 
-interface Props { history?:{price:number;at:number;kind:string}[]; events: TopicMarketEvent[]; supply: number; k: number; zh: boolean; unit?:string }
+interface Props { source?:"chain"; history?:{price:number;at:number;kind:string}[]; events: TopicMarketEvent[]; supply: number; k: number; zh: boolean; unit?:string }
 const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: 4 });
 
-export function GenesisPriceChart({ history, events, supply, k, zh, unit="dUSDC" }: Props) {
+export function GenesisPriceChart({ history, events, supply, k, zh, unit="dUSDC", source }: Props) {
   const [hovered, setHovered] = useState<number | null>(null);
   const trades = events.filter(e => (e.kind === "GENESIS_BUY" || e.kind === "GENESIS_SELL") && e.quantity !== undefined);
   // 从当前真实供应倒推窗口起点；事件窗口截断后也不伪造从零开始的历史。
@@ -16,6 +16,7 @@ export function GenesisPriceChart({ history, events, supply, k, zh, unit="dUSDC"
     runningSupply = Math.max(0, runningSupply + delta(e));
     localPoints.push({ price: 2 * k * runningSupply, at: e.at, kind: e.kind });
   }
+  if(source==='chain'&&!history?.length)return <div className="border-t border-border pt-3" data-testid="genesis-price-chart"><strong className="text-xs">{zh?'Genesis价格走势':'Genesis price history'}</strong><p role="status" className="text-xs text-text-muted mt-3">{zh?'链上价格历史尚未加载。':'On-chain price history has not loaded.'}</p></div>;
   const points=history?.length?history:localPoints;
   const tradeCount=history?Math.max(0,history.length-1):trades.length;
   const w = 680, h = 218, left = 62, right = 18, top = 18, bottom = 36;
@@ -48,6 +49,6 @@ export function GenesisPriceChart({ history, events, supply, k, zh, unit="dUSDC"
       <span><span className="text-success">● {zh ? "买入" : "Buy"}</span>　<span className="text-danger">● {zh ? "卖出" : "Sell"}</span></span>
       <span>{selectedIndex === 0 ? (zh ? "窗口起点" : "Window start") : `${zh ? "第" : "Trade "}${selectedIndex}${zh ? "笔" : ""}`} · <strong className="text-text">{genesisPrice(selected.price)} {unit}</strong></span>
     </div>
-    <p className="mt-2 text-[10px] leading-5 text-text-muted">{tradeCount ? (zh ? "按成交顺序连接真实模拟价格；悬停或点选圆点查看。" : "Actual simulated prices in trade order. Hover or select a point to inspect.") : (zh ? "暂无成交。买入或卖出后，价格走势会实时更新。" : "No trades yet. Buy or sell to build the price history.")}</p>
+    <p className="mt-2 text-[10px] leading-5 text-text-muted">{source==="chain" ? (zh ? "按链上成交顺序展示；悬停或点选圆点查看。" : "On-chain trades in order. Hover or select a point.") : tradeCount ? (zh ? "按成交顺序连接真实模拟价格；悬停或点选圆点查看。" : "Actual simulated prices in trade order. Hover or select a point to inspect.") : (zh ? "暂无成交。买入或卖出后，价格走势会实时更新。" : "No trades yet. Buy or sell to build the price history.")}</p>
   </div>;
 }
