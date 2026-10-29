@@ -1,3 +1,9 @@
+## 2026-10-29 Robinhood 测试网接入
+
+`VITE_MARKET_MODE=testnet` 启用钱包链上入口，固定链46630；`VITE_TOPIC_MARKET_FACTORY` 使用已部署的统一Factory `0x21210a6213D7B1c6D83f393488F0aFC0913EBEd5`。未设置testnet模式时保留原数据库模拟入口。所有写交易显式绑定46630；授权与业务交易分别等待回执。客户端使用frontend/testnet/abi下对应的导出ABI，不调用历史Factory接口。
+
+本地将robinhood-testnet.env.example的公开配置放入.env.testnet，然后运行npm run build:testnet；生产网站由GitHub main推送触发构建，项目环境变量选择testnet。当前工厂已部署，股票登记、测试价格源及USDG兑换配置仍待明确，不展示模拟股票为链上资产。浏览器源码验证尚未成功，不等同部署失败。部署记录见contracts/topic-market/deployments/46630.json。
+
 # OCP Market
 
 React/Vite frontend and PostgreSQL-backed multiplayer paper-trading server. All balances and trades in the public application are simulated.

@@ -1,17 +1,20 @@
-/** 当前仅发布模拟演示；历史部署与构建环境变量不再启用链上入口。 */
+/** 当前合约测试网入口仅在显式testnet模式启用，避免激活历史链上入口。 */
+const env=(import.meta as ImportMeta & {env:Record<string,string|undefined>}).env;
+const testnetMode=env.VITE_MARKET_MODE === "testnet";
+const testnetFactory=testnetMode ? (env.VITE_TOPIC_MARKET_FACTORY ?? "") : "";
 export const config = {
   apiBase: "",
   factoryAddress: "",
   depositTokenAddress: "",
-  marketFactoryAddress: "",
-  chainId: 0,
-  rpcUrl: "",
-  explorer: "",
-  marketEnabled: false,
+  marketFactoryAddress: testnetFactory,
+  chainId: testnetMode ? 46630 : 0,
+  rpcUrl: testnetMode ? "https://rpc.testnet.chain.robinhood.com" : "",
+  explorer: testnetMode ? "https://explorer.testnet.chain.robinhood.com" : "",
+  marketEnabled: testnetMode && /^0x[0-9a-fA-F]{40}$/.test(testnetFactory) && !/^0x0{40}$/.test(testnetFactory),
   isLocalDev: false,
-  chainName: "",
-  nativeCurrencyName: "",
-  nativeCurrencySymbol: "",
+  chainName: testnetMode ? "Robinhood Chain Testnet" : "",
+  nativeCurrencyName: testnetMode ? "Ether" : "",
+  nativeCurrencySymbol: testnetMode ? "ETH" : "",
 };
 
 export const VAULT_ABI = [

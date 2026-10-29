@@ -1,18 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {TopicMarket,IToken6,ITopicMarketCore} from "./TopicMarket.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {VaultCoreAdapter} from "./VaultCoreAdapter.sol";
 import {TopicMarketCoreDeployer,TopicMarketDeployer} from "./TopicMarketFactory.sol";
 import {ITopicMarketPriceSnapshot} from "./TopicMarketPriceSnapshot.sol";
 interface IStockRouterBinding { function factory() external view returns (address); }
 interface IStockOracleUnits { function unit() external view returns (uint256); }
-/// @notice One immutable collateral configuration and router per factory.
-contract TopicMarketStockFactory {
-    address public immutable trustedForwarder;
-    IToken6 public immutable token;
+/// @notice Shared factory with append-only stock configurations and independent markets.
+contract TopicMarketStockFactory is Ownable2Step {
+    struct StockConfig {
+        ITopicMarketPriceSnapshot priceOracle;
+        address trustedForwarder;
+        uint256 k;
+        uint8 decimals;
+        bool enabled;
+    }
+    mapping(address => StockConfig) public stocks;
+    address[] public stockTokens;
+    mapping(address => address) public marketCollateral;
+    event StockRegistered(address indexed stock, address indexed oracle, address indexed router, uint256 k);
+    event StockEnabled(address indexed stock, bool enabled);
     address public immutable protocol;
-    uint256 public immutable k;
-    ITopicMarketPriceSnapshot public immutable priceOracle;
     TopicMarketCoreDeployer public immutable coreDeployer;
     TopicMarketDeployer public immutable marketDeployer;
     uint256 private entered = 1;
@@ -34,40 +44,65 @@ contract TopicMarketStockFactory {
     address[] public markets;
     event MarketCreated(address indexed market, address indexed creator, address adapter,
         address vault, uint64 createdAt, uint64 genesisCutoff, uint64 formalCutoff, uint64 coreCutoff, uint64 topicCutoff, uint256 snapshot);
-    constructor(IToken6 token_, address protocol_, uint256 k_,
-        ITopicMarketPriceSnapshot oracle_, TopicMarketCoreDeployer coreDeployer_, TopicMarketDeployer marketDeployer_, address forwarder_)
+    constructor(address owner_, address protocol_, TopicMarketCoreDeployer coreDeployer_,
+        TopicMarketDeployer marketDeployer_) Ownable(owner_)
     {
-        require(address(token_).code.length > 0 && token_.decimals() >= 6 && token_.decimals() <= 18, "TOKEN");
-        require(protocol_ != address(0) && address(oracle_).code.length > 0, "CONFIG");
-        require(k_ >= 1e12 && k_ <= 1e24, "PARAMS");
+        require(protocol_ != address(0), "CONFIG");
         require(address(coreDeployer_).code.length > 0 && address(marketDeployer_).code.length > 0, "DEPLOYERS");
         require(coreDeployer_.factory() == address(this) && marketDeployer_.factory() == address(this), "FACTORY_BINDING");
+        protocol = protocol_; coreDeployer = coreDeployer_; marketDeployer = marketDeployer_;
+    }
+    modifier nonReentrant() { require(entered == 1, "REENTER"); entered = 2; _; entered = 1; }
+
+    /// @notice Register once. Owner must independently verify token, feeds and V3 route provenance.
+    function registerStock(IToken6 token_, uint256 k_, ITopicMarketPriceSnapshot oracle_, address forwarder_)
+        external onlyOwner nonReentrant
+    {
+        address stock = address(token_);
+        // 配置只追加、不覆盖；重新启用也沿用原配置，避免改变历史资产身份。
+        require(address(stocks[stock].priceOracle) == address(0), "REGISTERED");
+        require(stock.code.length > 0, "TOKEN");
+        uint8 decimals_ = token_.decimals();
+        require(decimals_ >= 6 && decimals_ <= 18, "TOKEN");
+        require(address(oracle_).code.length > 0, "CONFIG");
+        require(k_ >= 1e12 && k_ <= 1e24, "PARAMS");
         require(forwarder_.code.length > 0, "FORWARDER");
         require(IStockRouterBinding(forwarder_).factory() == address(this), "ROUTER_BINDING");
-        require(IStockOracleUnits(address(oracle_)).unit() == 10 ** token_.decimals(), "ORACLE_UNITS");
-        trustedForwarder = forwarder_;
-        token = token_; protocol = protocol_; k = k_; priceOracle = oracle_;
-        coreDeployer = coreDeployer_; marketDeployer = marketDeployer_;
+        require(IStockOracleUnits(address(oracle_)).unit() == 10 ** decimals_, "ORACLE_UNITS");
+        stocks[stock] = StockConfig(oracle_, forwarder_, k_, decimals_, true);
+        stockTokens.push(stock);
+        emit StockRegistered(stock, address(oracle_), forwarder_, k_);
+        emit StockEnabled(stock, true);
     }
+    function setStockEnabled(address stock, bool enabled) external onlyOwner nonReentrant {
+        require(address(stocks[stock].priceOracle) != address(0), "UNKNOWN_STOCK");
+        // 下架仅限制新市场；不删除市场登记、不改变旧市场路由和领取权限。
+        stocks[stock].enabled = enabled;
+        emit StockEnabled(stock, enabled);
+    }
+    function stockCount() external view returns (uint256) { return stockTokens.length; }
     function isMarket(address market) external view returns (bool) { return records[market].creator != address(0); }
     function marketCount() external view returns (uint256) { return markets.length; }
     function marketRecord(address market) external view returns (MarketRecord memory) { return records[market]; }
     function _length(string calldata value, uint256 maximum) private pure {
         require(bytes(value).length > 0 && bytes(value).length <= maximum, "METADATA_LENGTH");
     }
-    function createMarket(string calldata topic, string calldata yesRule, string calldata noRule,
-        string calldata invalidRule, uint64 coreEnd) external returns (address market, address adapter, address vault)
+    function createMarket(address stock, string calldata topic, string calldata yesRule, string calldata noRule,
+        string calldata invalidRule, uint64 coreEnd) external nonReentrant returns (address market, address adapter, address vault)
     {
-        require(entered == 1, "REENTER"); entered = 2;
+        StockConfig memory config = stocks[stock];
+        require(config.enabled, "STOCK_DISABLED");
+        IToken6 token = IToken6(stock);
+        require(token.decimals() == config.decimals, "TOKEN_DECIMALS");
         _length(topic, 512); _length(yesRule, 2048); _length(noRule, 2048); _length(invalidRule, 2048);
         require(block.timestamp <= type(uint64).max - 4 hours, "TIME");
         require(uint256(coreEnd) > block.timestamp + 4 hours, "DEADLINES");
-        uint256 price = priceOracle.ethPrice6();
-        require(price > 0 && price <= (1e30 / (10 ** (18-token.decimals()))) / 4, "PRICE");
+        uint256 price = config.priceOracle.ethPrice6();
+        require(price > 0 && price <= (1e30 / (10 ** (18-config.decimals))) / 4, "PRICE");
         VaultCoreAdapter createdCore = coreDeployer.deploy(token, msg.sender, protocol, coreEnd);
-        coreDeployer.configureCore(createdCore, trustedForwarder);
+        coreDeployer.configureCore(createdCore, config.trustedForwarder);
         TopicMarket createdMarket = marketDeployer.deploy(token, ITopicMarketCore(address(createdCore)), msg.sender,
-            protocol, coreEnd, price, k);
+            protocol, coreEnd, price, config.k);
         market = address(createdMarket); adapter = address(createdCore); vault = address(createdCore.vault());
         coreDeployer.bindCore(createdCore, market);
         MarketRecord storage record = records[market];
@@ -75,9 +110,9 @@ contract TopicMarketStockFactory {
         record.createdAt = uint64(block.timestamp); record.formalCutoff = coreEnd - 1 hours;
         record.coreCutoff = coreEnd; record.topicCutoff = coreEnd; record.snapshot = price;
         record.topic = topic; record.yesRule = yesRule; record.noRule = noRule; record.invalidRule = invalidRule;
+        marketCollateral[market] = stock;
         markets.push(market);
         _emitCreated(market);
-        entered = 1;
     }
     function _emitCreated(address market) private {
         MarketRecord storage r = records[market];

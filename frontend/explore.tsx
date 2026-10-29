@@ -7,6 +7,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import { Shield, AlertTriangle } from "lucide-react";
 import { useSiteTheme } from "./components/ThemeToggle";
+import { TestnetMarketApp } from "./components/TestnetMarketApp";
 import { PaperMarketApp } from "./components/paper/PaperMarketApp";
 import {ClerkProvider,useAuth,useClerk} from "@clerk/react";
 import { OCPMenu } from "./components/OCPMenu";
@@ -35,6 +36,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+const testnetMode=(import.meta as ImportMeta & {env:Record<string,string>}).env.VITE_MARKET_MODE === "testnet";
 const publicKey=(import.meta as ImportMeta & {env:Record<string,string>}).env.VITE_CLERK_PUBLISHABLE_KEY;
 function AuthenticatedMarket({lang}:{lang:"zh"|"en"}) {
  const {isLoaded,isSignedIn,getToken}=useAuth();const clerk=useClerk();
@@ -60,7 +62,7 @@ function ExploreStandalone() {
       </nav>
       <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          {publicKey?<ClerkProvider publishableKey={publicKey} appearance={{variables:{colorBackground:theme === 'dark' ? '#15181d' : '#ffffff',colorForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorMutedForeground:theme === 'dark' ? '#9ba3b1' : '#64748b',colorInput:theme === 'dark' ? '#1b1f26' : '#ffffff',colorInputForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorPrimary:theme === 'dark' ? '#ff9454' : '#ea580c'},elements:{socialButtonsBlock:{display:"none"},socialButtons:{display:"none"},dividerRow:{display:"none"}}}}><AuthenticatedMarket lang={lang}/></ClerkProvider>:<PaperMarketApp lang={lang} authLoaded signedIn={false} getToken={noToken} onLogin={()=>{}} onLogout={()=>{}} authAvailable={false}/>}
+          {testnetMode?<TestnetMarketApp lang={lang}/>:publicKey?<ClerkProvider publishableKey={publicKey} appearance={{variables:{colorBackground:theme === 'dark' ? '#15181d' : '#ffffff',colorForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorMutedForeground:theme === 'dark' ? '#9ba3b1' : '#64748b',colorInput:theme === 'dark' ? '#1b1f26' : '#ffffff',colorInputForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorPrimary:theme === 'dark' ? '#ff9454' : '#ea580c'},elements:{socialButtonsBlock:{display:"none"},socialButtons:{display:"none"},dividerRow:{display:"none"}}}}><AuthenticatedMarket lang={lang}/></ClerkProvider>:<PaperMarketApp lang={lang} authLoaded signedIn={false} getToken={noToken} onLogin={()=>{}} onLogout={()=>{}} authAvailable={false}/>}
         </div>
       </main>
       <footer className="py-6 border-t border-border bg-surface">
@@ -73,7 +75,7 @@ function ExploreStandalone() {
             <a href="/about.html" className="underline hover:text-accent">{lang === "zh" ? "应用介绍" : "About OCP Market"}</a>
             <a href="/privacy.html" className="underline hover:text-accent">{lang === "zh" ? "隐私政策" : "Privacy policy"}</a>
           </div>
-          <span className="text-text-muted text-xs font-mono">{lang === "zh" ? "多人模拟 · 仅使用虚拟资金" : "Multiplayer simulation · Virtual funds only."}</span>
+          <span className="text-text-muted text-xs font-mono">{testnetMode?(lang === "zh" ? "Robinhood 测试网 · 测试资产" : "Robinhood Testnet · Test assets"):(lang === "zh" ? "多人模拟 · 仅使用虚拟资金" : "Multiplayer simulation · Virtual funds only.")}</span>
         </div>
       </footer>
     </div>

@@ -1,0 +1,11 @@
+**/.env
+**/.env.*
+**/node_modules
+**/.git
+**/.local
+**/broadcast
+**/cache
+**/out
+**/.aws
+**/*.pem
+**/*keystore*

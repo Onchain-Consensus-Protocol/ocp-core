@@ -56,8 +56,9 @@ contract RHMainnetForkTest is Test {
         address[] memory stable=new address[](1);stable[0]=USDG;
         TopicMarketAssetRouter router=new TopicMarketAssetRouter(ITopicMarketRouterRegistry(predicted),exchange,stable);
         TopicMarketCoreDeployer cd=new TopicMarketCoreDeployer(predicted);TopicMarketDeployer md=new TopicMarketDeployer(predicted);
-        TopicMarketStockFactory factory=new TopicMarketStockFactory(IToken6(stock),address(0xF0),1e18,oracle,cd,md,address(router));
-        vm.prank(alice);(address mm,address aa,address vv)=factory.createMarket("fork only", "yes", "no", "invalid", uint64(block.timestamp + 6 hours));
+        TopicMarketStockFactory factory=new TopicMarketStockFactory(address(this),address(0xF0),cd,md);
+        factory.registerStock(IToken6(stock),1e18,oracle,address(router));
+        vm.prank(alice);(address mm,address aa,address vv)=factory.createMarket(stock,"fork only", "yes", "no", "invalid", uint64(block.timestamp + 6 hours));
         TopicMarket m=TopicMarket(mm);OCPVault vault=OCPVault(vv);
         vm.prank(alice);IERC20(USDG).approve(address(router),type(uint256).max);
         TopicMarketAssetRouter.Request memory r=request(mm,TopicMarketAssetRouter.Action.GenesisBuy);r.inputAmount=15000e6;r.minCollateral=14e18;

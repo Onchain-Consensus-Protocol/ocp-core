@@ -1,3 +1,5 @@
+> 2026-10-29 测试网状态：统一股票Factory已部署到Robinhood测试网46630，地址 `0x21210a6213D7B1c6D83f393488F0aFC0913EBEd5`；网页新增显式testnet钱包入口。资产登记仍待配置，源码验证尚未成功。详见frontend/README.md和contracts/topic-market/deployments/46630.json。主网未部署。
+
 # OCP — OnChain Consensus Protocol
 
 OCP combines capital-based consensus with topic markets: launch a topic, trade during Genesis, and unlock market trading and Core staking at graduation.
