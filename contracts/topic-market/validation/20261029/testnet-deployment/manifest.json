@@ -56,5 +56,30 @@
     "contracts/topic-market/src/TopicMarketV3Exchange.sol": "c036be65a7ad6adee414d3ad265682a5ed8fa865521379557235902ecad3d492",
     "contracts/topic-market/src/TopicMarketV3Router02Exchange.sol": "3803ff2fab717958400c3ba3976251e4fdedd2653c76d2d1f3ba6679e03d7c18",
     "contracts/topic-market/src/TopicMarketAssetRouter.sol": "1bf5117a0f206ca7fd49e6b0645f57bd06e357c62f4ab714e5dc5741142396da"
+  },
+  "postcheck": {
+    "chainId": 46630,
+    "factory": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
+    "stockCount": "1",
+    "marketCount": "1",
+    "owner": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+    "market": "0xBe0d01292Df5cef376A40be7433C9b5B0C398857",
+    "core": "0xaf18a2379AD5D5462A8218c07F56546CbcB8A2d0",
+    "module": "0x3d0486e0f4bF82f448916CE3E7C5BeB70F0fdB7D",
+    "cloneBytes": 45,
+    "phase": "1",
+    "bond": "1250000000000000000",
+    "exitPenalty": "100000000000000",
+    "marketInvariant": true,
+    "coreAccounting": true,
+    "ethBalance": "0.00939574657"
+  },
+  "website": {
+    "url": "https://market.ocp-protocol.org/testnet.html",
+    "commit": "b8e830bd9732995725142349c2edeb2b0c10e1db",
+    "deploymentId": "dpl_9USuvfmVaE6ntngyUUNhcQgPudTe",
+    "state": "READY",
+    "defaultSimulationPreserved": true,
+    "browserChecks": "New factory, TSLA market, Formal phase, 1.25 TSLA bond and early request controls visible; default root displays virtual funds simulation"
   }
 }

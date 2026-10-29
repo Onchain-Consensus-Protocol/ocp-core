@@ -1,3 +1,5 @@
+> 2026-10-29: Latest OCPCore/module release is deployed on Robinhood testnet 46630 with fixed TSLA test targets and a separate testnet website. Live 0.1 USDG routing, graduation and Core exit passed. Some source verification is confirmed and some remains pending; see deployments/46630.json. Historical local-only notes below are superseded for this testnet deployment. No mainnet deployment.
+
 # Topic Market contracts
 
 Development implementation of Genesis, a stock-collateral binary market, LP/B rights, Core staking and V3 asset routing. Not publicly deployed or independently audited.

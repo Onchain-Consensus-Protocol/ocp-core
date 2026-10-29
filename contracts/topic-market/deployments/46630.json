@@ -10,7 +10,7 @@
         "0xB5C08A89F11D18A62361b87Dc963379281CA6D82"
       ],
       "constructorArgs": "000000000000000000000000b5c08a89f11d18a62361b87dc963379281ca6d82",
-      "sourceVerification": "pending"
+      "sourceVerification": "submitted; not yet confirmed verified"
     },
     "TopicMarketDeployer": {
       "address": "0xaaC1107E6FebDbA424A3477DfEEe9D8d3A58cBB7",
@@ -20,7 +20,7 @@
         "0xB5C08A89F11D18A62361b87Dc963379281CA6D82"
       ],
       "constructorArgs": "000000000000000000000000b5c08a89f11d18a62361b87dc963379281ca6d82",
-      "sourceVerification": "pending"
+      "sourceVerification": "submitted; not yet confirmed verified"
     },
     "TopicMarketTestnetStockFactory": {
       "address": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
@@ -33,7 +33,7 @@
         "0xaaC1107E6FebDbA424A3477DfEEe9D8d3A58cBB7"
       ],
       "constructorArgs": "0000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be70000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be700000000000000000000000019bf21294ffbcaa2a83adbbb84e1b6d6af5eb715000000000000000000000000aac1107e6febdba424a3477dfeee9d8d3a58cbb7",
-      "sourceVerification": "pending"
+      "sourceVerification": "submitted; not yet confirmed verified"
     },
     "TopicMarketTestnetStockPriceSnapshot": {
       "address": "0x7Dce9f918bcaDB559035449599764D75eb3BaE4B",
@@ -41,7 +41,7 @@
       "source": "TopicMarketTestnetStockPriceSnapshot.sol:TopicMarketTestnetStockPriceSnapshot",
       "args": [],
       "constructorArgs": "",
-      "sourceVerification": "pending"
+      "sourceVerification": "verified"
     },
     "TopicMarketV3Exchange": {
       "address": "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300",
@@ -54,7 +54,7 @@
         3000
       ],
       "constructorArgs": "0000000000000000000000001b32f47434a7ef83e97d0675c823e547f9266725000000000000000000000000c9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e0000000000000000000000007e955252e15c84f5768b83c41a71f9eba181802f0000000000000000000000000000000000000000000000000000000000000bb8",
-      "sourceVerification": "pending"
+      "sourceVerification": "verified"
     },
     "TopicMarketAssetRouter": {
       "address": "0x1DA3854B8138f8fFd99061393d3fD938c05539de",
@@ -68,7 +68,7 @@
         ]
       ],
       "constructorArgs": "000000000000000000000000b5c08a89f11d18a62361b87dc963379281ca6d820000000000000000000000003b277dfda0851bbb2888d07d1ec4bd059b805300000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000007e955252e15c84f5768b83c41a71f9eba181802f",
-      "sourceVerification": "pending"
+      "sourceVerification": "verified"
     }
   },
   "transactions": [
@@ -260,7 +260,36 @@
   "network": "Robinhood Chain Testnet",
   "owner": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
   "coreFallbackRecipient": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
-  "status": "deployed and TSLA registered; live 0.1 USDG route, graduation and Core exit smoke passed; source verification submitted, awaiting confirmation",
+  "status": "Latest contracts deployed; TSLA registered; live router, graduation and Core exit checks passed. Default website remains simulation.",
   "sourceVerificationStatus": "Submitted to Blockscout; final verification not confirmed (Unknown UID on Foundry watch)",
-  "website": "https://market.ocp-protocol.org/testnet.html"
+  "website": "https://market.ocp-protocol.org/testnet.html",
+  "sourceVerificationSummary": {
+    "verified": [
+      "TopicMarketTestnetStockPriceSnapshot",
+      "TopicMarketV3Exchange",
+      "TopicMarketAssetRouter",
+      "OCPCore",
+      "TopicMarket",
+      "LPToken",
+      "BToken",
+      "TopicMarketEarlyTerminationModule"
+    ],
+    "notConfirmed": [
+      "TopicMarketCoreDeployer",
+      "TopicMarketDeployer",
+      "TopicMarketTestnetStockFactory",
+      "coreCodeA",
+      "coreCodeB",
+      "marketCodeA",
+      "marketCodeB",
+      "VaultCoreAdapter"
+    ]
+  },
+  "websiteRelease": {
+    "repository": "https://github.com/Onchain-Consensus-Protocol/ocp-core",
+    "commit": "b8e830bd9732995725142349c2edeb2b0c10e1db",
+    "deploymentId": "dpl_9USuvfmVaE6ntngyUUNhcQgPudTe",
+    "state": "READY",
+    "url": "https://market.ocp-protocol.org/testnet.html"
+  }
 }
