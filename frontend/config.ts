@@ -1,6 +1,7 @@
+import {isTestnetMarketPage} from "./shared/marketPageMode";
 /** 当前合约测试网入口仅在显式testnet模式启用，避免激活历史链上入口。 */
 const env=(import.meta as ImportMeta & {env:Record<string,string|undefined>}).env;
-const testnetMode=env.VITE_MARKET_MODE === "testnet";
+const testnetMode=typeof window !== "undefined" && isTestnetMarketPage(window.location.pathname, window.location.search);
 const testnetFactory=testnetMode ? (env.VITE_TOPIC_MARKET_FACTORY ?? "") : "";
 export const config = {
   apiBase: "",

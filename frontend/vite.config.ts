@@ -135,7 +135,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
-        input: ['index.html', 'explore.html', 'explore/vault.html', 'admin.html', 'how.html', 'permissionless.html'],
+        input: ['index.html', 'explore.html', 'testnet.html', 'explore/vault.html', 'admin.html', 'how.html', 'permissionless.html'],
       },
     },
     plugins: [{name:'paper-api',configureServer(server){

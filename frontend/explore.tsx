@@ -7,6 +7,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import { Shield, AlertTriangle } from "lucide-react";
 import { useSiteTheme } from "./components/ThemeToggle";
+import { isTestnetMarketPage } from "./shared/marketPageMode";
 import { TestnetMarketApp } from "./components/TestnetMarketApp";
 import { PaperMarketApp } from "./components/paper/PaperMarketApp";
 import {ClerkProvider,useAuth,useClerk} from "@clerk/react";
@@ -36,7 +37,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
-const testnetMode=(import.meta as ImportMeta & {env:Record<string,string>}).env.VITE_MARKET_MODE === "testnet";
+const testnetMode=isTestnetMarketPage(window.location.pathname, window.location.search);
 const publicKey=(import.meta as ImportMeta & {env:Record<string,string>}).env.VITE_CLERK_PUBLISHABLE_KEY;
 function AuthenticatedMarket({lang}:{lang:"zh"|"en"}) {
  const {isLoaded,isSignedIn,getToken}=useAuth();const clerk=useClerk();
@@ -55,6 +56,7 @@ function ExploreStandalone() {
           <div className="flex items-center justify-between h-16">
             <OCPMenu lang={lang} suffix="MARKET" />
             <div className="flex items-center gap-4">
+              <a className="text-xs font-bold text-text-muted hover:text-accent" href={`${testnetMode ? '/' : '/testnet.html'}?lang=${lang}`}>{testnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '测试网入口' : 'Testnet')}</a>
               <LanguageToggle lang={lang} setLang={setLang} />
             </div>
           </div>

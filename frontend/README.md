@@ -1,3 +1,7 @@
+## 2026-10-29 模拟默认入口与独立测试网入口
+
+主市场 `/`（market域名）及 `/explore.html` 默认保留原有邮箱登录、数据库模拟市场和Simulation完整交互；不由VITE_MARKET_MODE切成链上模式。独立入口 `/testnet.html` 接入46630测试网，两页导航互相链接。已有模拟数据和交易逻辑不变。下方先前的默认testnet入口描述由本节取代。
+
 ## 2026-10-29 Robinhood 测试网接入
 
 `VITE_MARKET_MODE=testnet` 启用钱包链上入口，固定链46630；`VITE_TOPIC_MARKET_FACTORY` 使用已部署的统一Factory `0x21210a6213D7B1c6D83f393488F0aFC0913EBEd5`。未设置testnet模式时保留原数据库模拟入口。所有写交易显式绑定46630；授权与业务交易分别等待回执。客户端使用frontend/testnet/abi下对应的导出ABI，不调用历史Factory接口。
