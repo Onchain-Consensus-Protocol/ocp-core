@@ -1,3 +1,4 @@
+import {LEGACY_TESTNET_FACTORY} from '../shared/testnetDeployment';
 import {readCoreHistory,type CoreHistory} from '../testnet/coreHistory';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {BrowserProvider, JsonRpcProvider, Interface, ZeroAddress, formatUnits, isAddress, parseUnits} from 'ethers';
@@ -391,7 +392,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   </div>:null;
 
   return <div className="max-w-7xl mx-auto text-text" data-testid="testnet-market-app">
-    <div className="flex flex-wrap justify-between items-center gap-3 mb-5"><span className="text-xs font-bold text-accent">{t('Robinhood 测试网 · 仅使用测试资产','Robinhood Testnet · Test assets only')}</span><div className="flex items-center gap-3 text-sm"><button className={small} disabled={busy} onClick={()=>void connect()}>{wallet?short(wallet.address):t('连接钱包','Connect wallet')}</button><button className={small} disabled={busy||!configured} aria-label={t('刷新','Refresh')} onClick={()=>{setHistoryRetry(value=>value+1);void refresh().catch(e=>setNotice(errorText(e,zh)));}}><RefreshCw size={15}/></button></div></div>
+    <div className="flex flex-wrap justify-between items-center gap-3 mb-5"><span className="text-xs font-bold text-accent">{t('Robinhood 测试网 · 仅使用测试资产','Robinhood Testnet · Test assets only')}</span><div className="flex items-center gap-3 text-sm"><a className="text-xs text-text-muted underline" href={`/testnet.html?lang=${lang}${factoryAddress.toLowerCase()===LEGACY_TESTNET_FACTORY.toLowerCase()?'':'&deployment=legacy'}`}>{factoryAddress.toLowerCase()===LEGACY_TESTNET_FACTORY.toLowerCase()?t('返回新版','Current markets'):t('旧版市场','Legacy markets')}</a><button className={small} disabled={busy} onClick={()=>void connect()}>{wallet?short(wallet.address):t('连接钱包','Connect wallet')}</button><button className={small} disabled={busy||!configured} aria-label={t('刷新','Refresh')} onClick={()=>{setHistoryRetry(value=>value+1);void refresh().catch(e=>setNotice(errorText(e,zh)));}}><RefreshCw size={15}/></button></div></div>
     {!configured&&<p className={box}>{t('测试网合约尚未配置','Testnet contracts are not configured')}</p>}
     {pollError&&<p role="status" className="text-sm text-orange-500 mb-4">{t('链上状态自动更新失败，请点击刷新确认最新申请状态。','Automatic state refresh failed. Refresh to check the latest request status.')}</p>}
     {notice&&<div role="status" className="rounded-xl border border-border p-3 text-sm mb-4 break-words">{notice}{txHash&&<a className="ml-2 text-accent underline" href={config.explorer+'/tx/'+txHash} target="_blank" rel="noreferrer">{t('查看交易','View transaction')}</a>}</div>}
