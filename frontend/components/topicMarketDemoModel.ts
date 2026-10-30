@@ -9,7 +9,7 @@ export interface TopicMarketAccount {
   coreSide: Outcome | null; coreStake: number; coreRewards: [number, number, number]; claimed: boolean; coreClaimed: boolean; paid: number; received: number;
 }
 export interface TopicMarketPayout { outcomes: number; lp: number; B: number; failed: number; total: number }
-export interface TopicMarketEvent { id: number; at: number; kind: string; actor?: number; amount?: number; quantity?: number; detail?: string }
+export interface TopicMarketEvent { id: number; at: number; kind: string; actor?: number; amount?: number; quantity?: number; detail?: string; wallet?: string; transactionHash?: string; source?: "MARKET" | "CORE"; timestamp?: number; side?: string }
 export interface TopicMarketLiquidityReference { lpSupply:number; basis:number; b:number; cash:number; lpFees:number; inventory:[number,number] }
 export interface TopicMarketAddQuote { lp:number; money:number; cash:number; lpFee:number; yes:number; no:number; basis:number; b:number; restart:boolean }
 export interface TopicMarketState {

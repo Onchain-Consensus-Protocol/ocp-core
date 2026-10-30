@@ -13,6 +13,7 @@ export interface TestnetSimulationProps {
   /** Confirmed chain history only. Prices are collateral per INTERNAL share, before display scaling. */
   history?:{price:number;at:number;kind:string}[];
   activity?:TopicMarketEvent[];
+  coreActivity?:TopicMarketEvent[];
 }
 const emptyInput:RemoteSimulation['input']={tab:'MARKET',mode:'BUY',amount:0,useStable:false};
 const noop=()=>{};
@@ -62,7 +63,7 @@ export function buildTestnetRemote(
     result,cover:0,lpBudget:money(m.lpBudgetRemaining),bBudget:money(m.bBudgetRemaining),outcomeBudget:0,
     lpClaimSupply:0,bClaimSupply:0,lpBudgetInitial:0,bBudgetInitial:0,failedSupply:0,failedBudgetInitial:0,
     failedBudget:0,coreBudget:0,coreOfficialBudget:0,payouts:null,corePayouts:p?.corePayout===undefined?[]:[money(p.corePayout)],
-    events:props.activity??[],config:{creatorAccount:-1,protocolAccount:-1,depthPolicy:'GRADUATION_CAPITAL'},
+    events:[...(props.activity??[]),...(props.coreActivity??[])],config:{creatorAccount:-1,protocolAccount:-1,depthPolicy:'GRADUATION_CAPITAL'},
   };
   const genesisPrice=m.phase===4&&props.history?.length?props.history[props.history.length-1].price:p?.genesisPrice===undefined
     ?wad(2n*m.k*m.S/10n**18n) // Same current-state derivative as the contract; no fabricated history.
