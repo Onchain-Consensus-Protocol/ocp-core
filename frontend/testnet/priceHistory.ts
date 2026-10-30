@@ -79,12 +79,26 @@ export function replayMarketPriceHistory(
   return {genesis,events,creationBlock:initial.blockNumber,latestBlock,complete:true,formalVolume};
 }
 
-async function getLogsInChunks(provider:Provider, address:string, from:number, to:number, topics?:string[]) {
-  const logs:Log[]=[];
-  for(let start=from;start<=to;start+=LOG_CHUNK){
-    logs.push(...await provider.getLogs({address,fromBlock:start,toBlock:Math.min(to,start+LOG_CHUNK-1),topics}));
+export async function getLogsInChunks(provider:Provider, address:string, from:number, to:number, topics?:string[]) {
+  const chunks:Log[][]=[];let next=from;
+  async function read(start:number,end:number,attempt=0):Promise<Log[]>{
+    try{return await provider.getLogs({address,fromBlock:start,toBlock:end,topics});}
+    catch(error){
+      const message=String((error as {message?:string})?.message??error);
+      if(/block range|range.*(limit|large|wide)|too many (logs|results)|response size|query returned more/i.test(message)&&start<end){
+        const middle=Math.floor((start+end)/2);
+        return [...await read(start,middle),...await read(middle+1,end)];
+      }
+      if(attempt>=2)throw error;
+      await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)));
+      return read(start,end,attempt+1);
+    }
   }
-  return logs;
+  // 保持单次2000区块上限，最多4路并发；失败不得伪装为空日志。
+  await Promise.all(Array.from({length:Math.min(4,Math.ceil((to-from+1)/LOG_CHUNK))},async()=>{
+    while(next<=to){const start=next;next+=LOG_CHUNK;chunks.push(await read(start,Math.min(to,start+LOG_CHUNK-1)));}
+  }));
+  return chunks.flat();
 }
 
 /** Locate creation by the factory's timestamp AND indexed event, then read a bounded market-only log range. */

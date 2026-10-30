@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {Interface, type Log, type Provider} from 'ethers';
 import factoryAbi from './abi/TopicMarketStockFactory.json';
 import marketAbi from './abi/TopicMarket.json';
-import {readChainPriceHistory,replayMarketPriceHistory} from './priceHistory';
+import {getLogsInChunks,readChainPriceHistory,replayMarketPriceHistory} from './priceHistory';
 
 const WAD=10n**18n;
 const FACTORY='0x1111111111111111111111111111111111111111';
@@ -111,5 +111,30 @@ describe('bounded chain history discovery',()=>{
   it('rejects a log whose block hash no longer matches the canonical header',async()=>{
     const {provider}=providerFixture({reorg:true});
     await expect(readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD)).rejects.toThrow('重组');
+  });
+});
+
+
+describe('bounded parallel event reads',()=>{
+  it('covers every block once with at most four requests in flight',async()=>{
+    let active=0,peak=0;const ranges:{fromBlock:number;toBlock:number}[]=[];
+    const provider={getLogs:async(r:{fromBlock:number;toBlock:number})=>{
+      ranges.push(r);peak=Math.max(peak,++active);await Promise.resolve();active--;return [];
+    }} as unknown as Provider;
+    await getLogsInChunks(provider,MARKET,5,20005);
+    expect(peak).toBe(4);const sorted=ranges.sort((a,b)=>a.fromBlock-b.fromBlock);
+    expect(sorted[0].fromBlock).toBe(5);expect(sorted.at(-1)?.toBlock).toBe(20005);
+    for(let i=0;i<sorted.length;i++){
+      expect(sorted[i].toBlock-sorted[i].fromBlock).toBeLessThan(2000);
+      if(i)expect(sorted[i].fromBlock).toBe(sorted[i-1].toBlock+1);
+    }
+  });
+  it('splits rejected ranges without dropping any logs or returning a fake zero',async()=>{
+    const provider={getLogs:async(r:{fromBlock:number;toBlock:number})=>{
+      if(r.toBlock>r.fromBlock)throw new Error('block range limit exceeded');
+      return [{blockNumber:r.fromBlock} as Log];
+    }} as unknown as Provider;
+    const logs=await getLogsInChunks(provider,MARKET,10,13);
+    expect(logs.map(l=>l.blockNumber)).toEqual([10,11,12,13]);
   });
 });

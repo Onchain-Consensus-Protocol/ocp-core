@@ -43,13 +43,14 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     ? createChainClient(new JsonRpcProvider(config.rpcUrl), factoryAddress) : null,
   [configured, factoryAddress]);
   const [earlyReason,setEarlyReason] = useState('');
-  const [history,setHistory]=useState<ChainPriceHistory|null>(null);
+  const [historyRecord,setHistoryRecord]=useState<{market:string;value:ChainPriceHistory}|null>(null);
   const [historyError,setHistoryError]=useState('');
   const walletEpoch=useRef(0);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [market, setMarket] = useState<MarketState | null>(null);
   const [selected, setSelected] = useState(() => {const value=new URLSearchParams(window.location.search).get('market');return value&&isAddress(value)?value:'';});
+  const history=historyRecord?.market===selected?historyRecord.value:null;
   const [stockAddress, setStockAddress] = useState('');
   const [creating, setCreating] = useState(false);
   const [category, setCategory] = useState(()=>new URLSearchParams(window.location.search).get('stock')||'all');
@@ -217,7 +218,17 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     finally {pending.current = false;setBusy(false);}
   }
 
-  useEffect(()=>{let cancelled=false;setHistory(null);setHistoryError('');if(!reader||!selected)return;void reader.readPriceHistory(selected).then(value=>{if(!cancelled)setHistory(value);}).catch(()=>{if(!cancelled)setHistoryError(t('成交历史暂不可用，可继续交易。','Activity history is unavailable; trading remains available.'));});return()=>{cancelled=true;};},[reader,selected,confirmedRevision]);
+  const [historyRetry,setHistoryRetry]=useState(0);
+  useEffect(()=>{
+    let cancelled=false;let retry:ReturnType<typeof setTimeout>|undefined;
+    setHistoryError('');if(!reader||!selected)return;
+    void reader.readPriceHistory(selected).then(value=>{if(!cancelled)setHistoryRecord({market:selected,value});}).catch(()=>{
+      if(cancelled)return;
+      setHistoryError(t('成交统计暂不可用，正在重试；已有数据保留上次已验证结果。','Activity statistics unavailable. Retrying; any existing data remains at its last verified block.'));
+      retry=setTimeout(()=>{if(!cancelled)setHistoryRetry(value=>value+1);},15000);
+    });
+    return()=>{cancelled=true;clearTimeout(retry);};
+  },[reader,selected,confirmedRevision,historyRetry]);
 
   useEffect(()=>{let cancelled=false;setPaymentRoute(null);setRouteError('');if(!reader||!selected)return;void reader.readPaymentRoute(selected,wallet?.address).then(route=>{if(!cancelled)setPaymentRoute(route);}).catch(()=>{if(!cancelled)setRouteError(t('USDG 路由读取失败，可继续使用股票交易。','USDG route unavailable. Stock trading remains available.'));});return()=>{cancelled=true;};},[reader,selected,wallet?.address,confirmedRevision]);
   const usingStable=payAsset==='STABLE';
@@ -361,7 +372,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   </div>:null;
 
   return <div className="max-w-7xl mx-auto text-text" data-testid="testnet-market-app">
-    <div className="flex flex-wrap justify-between items-center gap-3 mb-5"><span className="text-xs font-bold text-accent">{t('Robinhood 测试网 · 仅使用测试资产','Robinhood Testnet · Test assets only')}</span><div className="flex items-center gap-3 text-sm"><button className={small} disabled={busy} onClick={()=>void connect()}>{wallet?short(wallet.address):t('连接钱包','Connect wallet')}</button><button className={small} disabled={busy||!configured} aria-label={t('刷新','Refresh')} onClick={()=>void refresh().catch(e=>setNotice(errorText(e,zh)))}><RefreshCw size={15}/></button></div></div>
+    <div className="flex flex-wrap justify-between items-center gap-3 mb-5"><span className="text-xs font-bold text-accent">{t('Robinhood 测试网 · 仅使用测试资产','Robinhood Testnet · Test assets only')}</span><div className="flex items-center gap-3 text-sm"><button className={small} disabled={busy} onClick={()=>void connect()}>{wallet?short(wallet.address):t('连接钱包','Connect wallet')}</button><button className={small} disabled={busy||!configured} aria-label={t('刷新','Refresh')} onClick={()=>{setHistoryRetry(value=>value+1);void refresh().catch(e=>setNotice(errorText(e,zh)));}}><RefreshCw size={15}/></button></div></div>
     {!configured&&<p className={box}>{t('测试网合约尚未配置','Testnet contracts are not configured')}</p>}
     {pollError&&<p role="status" className="text-sm text-orange-500 mb-4">{t('链上状态自动更新失败，请点击刷新确认最新申请状态。','Automatic state refresh failed. Refresh to check the latest request status.')}</p>}
     {notice&&<div role="status" className="rounded-xl border border-border p-3 text-sm mb-4 break-words">{notice}{txHash&&<a className="ml-2 text-accent underline" href={config.explorer+'/tx/'+txHash} target="_blank" rel="noreferrer">{t('查看交易','View transaction')}</a>}</div>}
@@ -369,7 +380,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
       <div className="flex justify-between items-center gap-3 mb-4"><button className={small+' inline-flex gap-2 items-center'} disabled={busy} onClick={()=>chooseMarket('')}><ArrowLeft size={15}/>{category==='all'?t('全部市场','All markets'):t(`返回 ${category} 话题`,`${category} topics`)}</button><button className={small+' inline-flex gap-2 items-center'} onClick={()=>void navigator.clipboard.writeText(window.location.href).then(()=>setNotice(t('话题链接已复制','Topic link copied')))}><Share2 size={15}/>{t('分享话题','Share topic')}</button></div>
       {market?.early&&market.early.requestId>0n&&!market.vaultResolved&&<EarlyTerminationNotice request={market.early} now={now} lang={lang} connected={!!wallet} busy={busy} onConnect={()=>void connect()} onProcess={()=>void transact(c=>c.processEarlyTermination(market.address))}/>}
       {market&&stock?<TestnetSimulation key={market.address} market={displayMarket!} stock={stock} lang={lang} now={now} walletAddress={wallet?.address} busy={busy} onConnect={()=>void connect()} controls={tradeControls} coreActions={coreActions} status={notice||t('链上报价与持仓 · 每笔交易需要钱包确认','On-chain quotes and holdings · Wallet confirmation required')} onTabChange={onDetailTab} history={historyPoints} activity={activity}/>:<p className="p-10 text-center text-text-muted">{t('正在读取链上市场…','Loading on-chain market…')}</p>}
-      {historyError&&<p role="status" className="text-xs text-text-muted mt-3">{historyError}</p>}
+      {historyError&&<p role="status" className="text-xs text-text-muted mt-3">{historyError} <button className="underline" onClick={()=>setHistoryRetry(value=>value+1)}>{t('重试成交统计','Retry statistics')}</button></p>}{history&&<p className="text-[10px] text-text-muted mt-2">{t('成交统计截至区块','Statistics through block')} {history.latestBlock}</p>}
       {market&&<a className="inline-block mt-4 text-xs text-accent underline" href={config.explorer+'/address/'+market.address} target="_blank" rel="noreferrer">{t('查看合约','View contract')} · {short(market.address)}</a>}
     </>:<>
       {category==='all'?<section className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-slate-50 p-6 sm:p-10 mb-6"><div className="text-xs tracking-widest font-bold text-accent mb-3">OCP MARKET</div><div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6"><div><h1 className="text-4xl sm:text-5xl font-bold tracking-tight">{t('围绕你关注的股票发起话题，参与交易。','Ticker. Topic. Trade.')}</h1><p className="text-sm text-text-muted mt-4">Every stock has a story. Trade &amp; Pump it.</p></div><button className={small+' bg-accent text-white inline-flex items-center gap-2'} disabled={busy} onClick={()=>setCreating(true)}><Plus size={16}/>{t('发起话题','Create topic')}</button></div></section>:<div className="flex items-center justify-between gap-4 mb-5"><h1 className="text-2xl font-bold">{category}</h1><button className={small+' bg-accent text-white'} onClick={()=>setCreating(true)}>{t('发起话题','Create topic')}</button></div>}
