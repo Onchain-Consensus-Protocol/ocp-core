@@ -24,9 +24,12 @@ type Directory = Awaited<ReturnType<ReturnType<typeof createChainClient>['readDi
 type Wallet = {provider: BrowserProvider; address: string; chainId: number};
 type Quote = {key: string; quantity: bigint; cash: bigint; limit: bigint; shares?:bigint;route?:RouterRequest};
 
-function errorText(error: unknown): string {
+function errorText(error: unknown, zh = true): string {
   const value = error as {shortMessage?: string; reason?: string; message?: string};
-  return value?.reason || value?.shortMessage || value?.message || String(error);
+  const message=value?.reason || value?.shortMessage || value?.message || String(error);
+  if(/\bINVENTORY\b/.test(message))return zh?'可买份额不足，请减少数量。':'Not enough shares available. Reduce the buy amount.';
+  if(/\bCAPACITY\b/.test(message))return zh?'卖出数量超出可用范围，请减少数量。':'Sell amount exceeds the available range. Reduce the amount.';
+  return message;
 }
 
 /** Real testnet actions are initiated only by a user click, through the injected wallet. */
@@ -110,7 +113,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
 
   useEffect(() => {
     setMarket(null);
-    void refresh().catch(error => setNotice(errorText(error)));
+    void refresh().catch(error => setNotice(errorText(error,zh)));
     return () => {readSequence.current++;};
   }, [refresh]);
   useEffect(() => {
@@ -178,7 +181,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
       if (chainId !== CHAIN_ID) throw new Error(t('请切换到测试网 46630。', 'Switch to testnet 46630.'));
       setWallet({provider, chainId, address: await (await provider.getSigner()).getAddress()});
       setNotice('');
-    } catch (error) {setNotice(errorText(error));}
+    } catch (error) {setNotice(errorText(error,zh));}
   }
 
   async function signedClient() {
@@ -208,9 +211,9 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
         await refresh();
         setNotice(t('交易已确认，链上状态已更新。', 'Transaction confirmed. On-chain state updated.'));
       } catch (error) {
-        setNotice(t('交易已确认，但状态刷新失败，请手动刷新：', 'Transaction confirmed, but refresh failed. Refresh manually: ') + errorText(error));
+        setNotice(t('交易已确认，但状态刷新失败，请手动刷新：', 'Transaction confirmed, but refresh failed. Refresh manually: ') + errorText(error,zh));
       }
-    } catch (error) {setNotice(errorText(error));}
+    } catch (error) {setNotice(errorText(error,zh));}
     finally {pending.current = false;setBusy(false);}
   }
 
@@ -261,7 +264,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   });
   const sideQuotes=quoteState.expired?{}:quoteState.data?.sides??{};
   const stakeRouteQuote=quoteState.expired?undefined:quoteState.data?.stake;
-  const sideErrors:Partial<Record<0|1,string>>=quoteState.error?{[tab==='CORE'||genesis?0:tradeSide]:errorText(quoteState.error)}:{};
+  const sideErrors:Partial<Record<0|1,string>>=quoteState.error?{[tab==='CORE'||genesis?0:tradeSide]:errorText(quoteState.error,zh)}:{};
 
   let coreAmount = 0n;
   try {if (stock && amount) coreAmount = parseUnits(amount, payDecimals);} catch {/* The input remains editable. */}
@@ -321,7 +324,6 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   }
   const tradeControls=market&&stock?<div className="space-y-4 animate-fade-in" data-testid="chain-trade-controls">
     <div className={box+' space-y-2 text-xs'} data-testid="stock-route-panel"><strong>{stock.symbol} {t('股票代币底池','stock-token pool')}</strong><label className="flex justify-between items-center gap-2">{t('支付／收款资产','Pay / receive')}<select aria-label="Payment asset" className="border border-border rounded p-2 bg-white" value={payAsset} disabled={busy} onChange={e=>{setPayAsset(e.target.value as 'STOCK'|'STABLE');}}><option value="STOCK">{stock.symbol}</option>{paymentRoute&&<option value="STABLE">{paymentRoute.stableSymbol}</option>}</select></label>{row(t('可用余额','Available balance'),`${units(payBalance,payDecimals)} ${paySymbol}`)}<p className="text-text-muted">{usingStable?t('通过现有池兑换，使用真实 USDG 支付和收款。','Swap through the existing pool to pay and receive USDG.'):t('使用钱包中的测试股票支付和收款。','Pay and receive test stock tokens in your wallet.')}</p>{routeError&&<p className="text-text-muted">{routeError}</p>}</div>
-    {quoteEnabled&&quoteState.loading&&!quoteState.data&&<p role="status" className="text-xs text-text-muted">{t('正在读取链上兑换报价…','Loading on-chain quote…')}</p>}
     {quoteEnabled&&(quoteState.error||quoteState.expired)&&<div role="status" className="text-xs text-danger">{quoteState.expired?t('报价已过期，请刷新后操作。','Quote expired. Refresh before proceeding.'):t('报价读取失败，请重试。','Quote unavailable. Please retry.')} <button type="button" className="underline" onClick={quoteState.refresh}>{t('刷新报价','Refresh quote')}</button></div>}
     {wallet&&tab==='CORE'&&coreAmount>0n&&!balanceEnough&&<p role="status" className="text-xs text-danger">{t('余额不足','Insufficient balance')} · {paySymbol}</p>}
     {wallet&&tab==='MARKET'&&mode==='BUY'&&quoteFor(genesis?0:tradeSide)&&!canSubmit(genesis?0:tradeSide)&&!earlyDue&&(genesis?genesisOpen:formalOpen)&&(payBalance??0n)<(quoteFor(genesis?0:tradeSide)!.route?.inputAmount??quoteFor(genesis?0:tradeSide)!.limit)&&<p role="status" className="text-xs text-danger">{t('余额不足','Insufficient balance')} · {paySymbol}</p>}
@@ -337,6 +339,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
       <label className="flex justify-between text-xs text-text-muted font-bold"><span>{genesis&&mode==='BUY'?`${t('金额','Amount')} (${paySymbol})`:genesis?t('gToken数量','gToken amount'):t('份额','Shares')}</span><span className="text-accent">{genesis?'1%':'2%'} {t('手续费','fee')}</span></label>
       {!genesis&&<label className="block text-xs font-bold text-text-muted">{t('方向','Side')}<select aria-label={t('买卖方向','Trade side')} className={field} value={tradeSide} disabled={busy} onChange={e=>setTradeSide(Number(e.target.value) as 0|1)}><option value={0}>YES</option><option value={1}>NO</option></select></label>}
       <div className="flex items-stretch gap-2"><input className="min-w-0 w-0 flex-1 h-11 bg-transparent border border-border rounded-lg px-3 py-2 font-mono" inputMode="decimal" aria-label={t('交易金额或份额','Trade amount or tokens')} value={amount} disabled={busy} onChange={e=>setAmount(e.target.value)} placeholder="0"/><div className={'grid '+'grid-cols-1 gap-2 flex-1 min-w-0'}>{(genesis?[0]:[tradeSide]).map(value=>{const i=value as 0|1;return <button type="button" key={i} disabled={!canSubmit(i)} onClick={()=>void submitSide(i)} className={'flex flex-col items-center justify-center border rounded-lg h-11 px-2 py-1 disabled:opacity-50 '+(i===0?'bg-success/10 border-success/30 text-success':'bg-danger/10 border-danger/30 text-danger')}><span className="font-bold text-xs">{!wallet?t('连接钱包','Connect wallet'):needsSideApproval(i)?t('授权 ','Approve '):mode==='BUY'?t('买入 ','Buy '):t('卖出 ','Sell ')}{genesis?'gToken':i===0?'YES':'NO'}</span><span className="text-[10px]">{genesis?(quoteFor(i)?Number(formatUnits(quoteFor(i)!.cash,payDecimals)).toPrecision(4)+' '+paySymbol:'—'):market.presentation?.priceYes===undefined?'—':((i===0?Number(market.presentation.priceYes):1e18-Number(market.presentation.priceYes))/1e18).toFixed(2)}</span></button>})}</div></div>
+      {quoteEnabled&&quoteState.loading&&!quoteState.data&&<p role="status" className="text-xs text-text-muted" data-testid="trade-quote-loading">{t('正在读取链上兑换报价…','Loading on-chain quote…')}</p>}
       <div className="text-[10px] text-text-muted" data-testid="my-trade-holdings">{row(t('我的份额','My shares'),genesis?`${units(market.position?.genesisShares,11)} gToken`:`YES ${units(market.position?.yes)} · NO ${units(market.position?.no)}`)}{!genesis&&<>{row(t('我的LP份额','My LP shares'),units(market.position?.lp))}{row(t('我的B份额','My B shares'),units(market.position?.b))}</>}</div>
       <div className={'grid '+'grid-cols-1 gap-2 text-[10px]'}>{(genesis?[0]:[tradeSide]).map(value=>{const i=value as 0|1,q=quoteFor(i);return <div key={i} className="rounded-lg border border-border p-2.5"><strong className={i===0?'text-success':'text-danger'}>{genesis?'Genesis':i===0?'YES':'NO'}</strong>{row(mode==='BUY'?t('预计支付','Est. payment'):t('预计到账','Est. receipt'),q?`${units(q.cash,payDecimals)} ${paySymbol}`:'—')}{row(genesis&&mode==='BUY'?t('最低获得 gToken','Minimum gToken'):mode==='BUY'?t('最大支付','Max payment'):t('最低到账','Min receipt'),q?`${units(q.limit,genesis&&mode==='BUY'?11:payDecimals)} ${genesis&&mode==='BUY'?'gToken':paySymbol}`:'—')}{sideErrors[i]&&<p className="text-danger break-words">{sideErrors[i]}</p>}</div>})}</div>
       {usingStable&&!genesis&&mode==='BUY'&&<p className="text-[10px] text-text-muted">{t('按最多支付USDG兑换股票后买入；多余股票退回钱包。','Swap the maximum USDG payment, then buy shares. Unspent stock is returned to your wallet.')}</p>}
@@ -358,7 +361,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   </div>:null;
 
   return <div className="max-w-7xl mx-auto text-text" data-testid="testnet-market-app">
-    <div className="flex flex-wrap justify-between items-center gap-3 mb-5"><span className="text-xs font-bold text-accent">{t('Robinhood 测试网 · 仅使用测试资产','Robinhood Testnet · Test assets only')}</span><div className="flex items-center gap-3 text-sm"><button className={small} disabled={busy} onClick={()=>void connect()}>{wallet?short(wallet.address):t('连接钱包','Connect wallet')}</button><button className={small} disabled={busy||!configured} aria-label={t('刷新','Refresh')} onClick={()=>void refresh().catch(e=>setNotice(errorText(e)))}><RefreshCw size={15}/></button></div></div>
+    <div className="flex flex-wrap justify-between items-center gap-3 mb-5"><span className="text-xs font-bold text-accent">{t('Robinhood 测试网 · 仅使用测试资产','Robinhood Testnet · Test assets only')}</span><div className="flex items-center gap-3 text-sm"><button className={small} disabled={busy} onClick={()=>void connect()}>{wallet?short(wallet.address):t('连接钱包','Connect wallet')}</button><button className={small} disabled={busy||!configured} aria-label={t('刷新','Refresh')} onClick={()=>void refresh().catch(e=>setNotice(errorText(e,zh)))}><RefreshCw size={15}/></button></div></div>
     {!configured&&<p className={box}>{t('测试网合约尚未配置','Testnet contracts are not configured')}</p>}
     {pollError&&<p role="status" className="text-sm text-orange-500 mb-4">{t('链上状态自动更新失败，请点击刷新确认最新申请状态。','Automatic state refresh failed. Refresh to check the latest request status.')}</p>}
     {notice&&<div role="status" className="rounded-xl border border-border p-3 text-sm mb-4 break-words">{notice}{txHash&&<a className="ml-2 text-accent underline" href={config.explorer+'/tx/'+txHash} target="_blank" rel="noreferrer">{t('查看交易','View transaction')}</a>}</div>}
