@@ -19,7 +19,15 @@ export interface ChainGenesisPoint {
 }
 export interface ChainPriceHistory {
   genesis:ChainGenesisPoint[];events:ChainActivity[];creationBlock:number;latestBlock:number;
-  complete:true;formalVolume:bigint;
+  complete:true;formalVolume:bigint;checkpoint?:HistoryCheckpoint;cacheStatus?:'local'|'updated';
+}
+export interface HistoryCheckpoint {version:1;factory:string;market:string;createdAt:string;k:string;creation:TimestampedMarketLog;logs:TimestampedMarketLog[];latestBlock:number;latestHash:string}
+export function replayCheckpoint(v:HistoryCheckpoint,factory:string,market:string):ChainPriceHistory {
+ if(v.version!==1||getAddress(v.factory)!==getAddress(factory)||getAddress(v.market)!==getAddress(market)||!Number.isSafeInteger(v.latestBlock)||v.latestBlock<v.creation.log.blockNumber||v.logs.length>100000)throw Error('Invalid cache');
+ for(const x of [v.creation,...v.logs]){const l=x.log;if(!Number.isSafeInteger(l.blockNumber)||l.blockNumber<v.creation.log.blockNumber||l.blockNumber>v.latestBlock||!Number.isSafeInteger(x.timestamp)||!/^0x[0-9a-fA-F]{64}$/.test(l.blockHash)||!/^0x[0-9a-fA-F]{64}$/.test(l.transactionHash)||!Number.isSafeInteger(l.index)||l.index<0)throw Error('Invalid cached log');}
+ if(getAddress(v.creation.log.address)!==getAddress(factory)||v.logs.some(x=>getAddress(x.log.address)!==getAddress(market)))throw Error('Cache address mismatch');
+ const e=factoryInterface.parseLog(v.creation.log);if(e?.name!=='MarketCreated'||getAddress(e.args.market)!==getAddress(market)||BigInt(v.creation.timestamp)!==BigInt(v.createdAt))throw Error('Invalid cache origin');
+ return {...replayMarketPriceHistory(v.creation,v.logs,BigInt(v.k),v.latestBlock),cacheStatus:'local'};
 }
 export interface TimestampedMarketLog {log:Log;timestamp:number}
 
@@ -103,7 +111,7 @@ export async function getLogsInChunks(provider:Provider, address:string, from:nu
 
 /** Locate creation by the factory's timestamp AND indexed event, then read a bounded market-only log range. */
 export async function readChainPriceHistory(
-  provider:Provider, factory:string, market:string, createdAt:bigint, k:bigint,
+  provider:Provider, factory:string, market:string, createdAt:bigint, k:bigint, checkpoint?:HistoryCheckpoint|null,
 ):Promise<ChainPriceHistory> {
   const latest=await provider.getBlock('latest');
   if(!latest || !latest.hash)throw new Error('无法读取历史区块头');
@@ -121,6 +129,16 @@ export async function readChainPriceHistory(
     }
     return entry;
   };
+  let creation:Log|undefined,creationHeader:{number:number;hash:string;timestamp:number}|undefined;
+  let prefix:TimestampedMarketLog[]=[];let scanFrom:number|undefined;let usedCache=false;
+  if(checkpoint){try{
+    replayCheckpoint(checkpoint,factory,market);
+    if(checkpoint.k===String(k)&&checkpoint.createdAt===String(createdAt)&&checkpoint.latestBlock<=latest.number){
+      const [anchor,start]=await Promise.all([header(checkpoint.latestBlock),header(checkpoint.creation.log.blockNumber)]);
+      if(anchor.hash===checkpoint.latestHash&&start.hash===checkpoint.creation.log.blockHash&&BigInt(start.timestamp)===createdAt){creation=checkpoint.creation.log;creationHeader=start;prefix=checkpoint.logs;scanFrom=checkpoint.latestBlock+1;usedCache=true;}
+    }
+  }catch{/* 缓存损坏/重组，回退全量；不得将部分日志视为完整结果。 */}}
+  if(!creation){
   // Binary search block headers, never scan logs from block zero. Multiple blocks may share one timestamp.
   const lowerBound=async(timestamp:bigint)=>{
     let low=1,high=latest.number+1;
@@ -143,15 +161,17 @@ export async function readChainPriceHistory(
       && getAddress(event.args.market)===getAddress(market);
   });
   if(matching.length!==1)throw new Error('无法唯一验证市场创建事件');
-  const creation=matching[0];
-  const creationHeader=await header(creation.blockNumber);
+  creation=matching[0];
+  creationHeader=await header(creation.blockNumber);
   if(creationHeader.hash!==creation.blockHash || BigInt(creationHeader.timestamp)!==createdAt){
     throw new Error('市场创建区块已变化，请重试');
   }
-  const logs=await getLogsInChunks(provider,getAddress(market),creation.blockNumber,latest.number);
+  }
+  if(!creation||!creationHeader)throw Error('Missing origin');
+  const logs=await getLogsInChunks(provider,getAddress(market),scanFrom??creation.blockNumber,latest.number);
   const blocks=[...new Set(logs.map(log=>log.blockNumber))];
   for(let start=0;start<blocks.length;start+=8){await Promise.all(blocks.slice(start,start+8).map(header));}
-  const timestamped:TimestampedMarketLog[]=[];
+  const timestamped:TimestampedMarketLog[]=[...prefix];
   for(const log of logs){
     const block=await header(log.blockNumber);
     if(block.hash!==log.blockHash)throw new Error('历史区块已重组，请重试');
@@ -159,5 +179,7 @@ export async function readChainPriceHistory(
   }
   const confirmedHead=await provider.getBlock(latest.number);
   if(!confirmedHead || confirmedHead.hash!==latest.hash)throw new Error('读取期间链头已重组，请重试');
-  return replayMarketPriceHistory({log:creation,timestamp:creationHeader.timestamp},timestamped,k,latest.number);
+  const plain=(x:TimestampedMarketLog):TimestampedMarketLog=>({timestamp:x.timestamp,log:{address:x.log.address,blockNumber:x.log.blockNumber,blockHash:x.log.blockHash,transactionHash:x.log.transactionHash,transactionIndex:x.log.transactionIndex,index:x.log.index,data:x.log.data,topics:[...x.log.topics],removed:false} as unknown as Log});
+  const origin=plain({log:creation,timestamp:creationHeader.timestamp});
+  return {...replayMarketPriceHistory(origin,timestamped,k,latest.number),cacheStatus:usedCache?'updated':undefined,checkpoint:{version:1,factory:getAddress(factory),market:getAddress(market),createdAt:String(createdAt),k:String(k),creation:origin,logs:timestamped.map(plain),latestBlock:latest.number,latestHash:latest.hash}};
 }

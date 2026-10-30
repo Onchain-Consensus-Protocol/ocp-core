@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {Interface, type Log, type Provider} from 'ethers';
 import factoryAbi from './abi/TopicMarketStockFactory.json';
 import marketAbi from './abi/TopicMarket.json';
-import {getLogsInChunks,readChainPriceHistory,replayMarketPriceHistory} from './priceHistory';
+import {getLogsInChunks,readChainPriceHistory,replayMarketPriceHistory,replayCheckpoint} from './priceHistory';
 
 const WAD=10n**18n;
 const FACTORY='0x1111111111111111111111111111111111111111';
@@ -137,4 +137,26 @@ describe('bounded parallel event reads',()=>{
     const logs=await getLogsInChunks(provider,MARKET,10,13);
     expect(logs.map(l=>l.blockNumber)).toEqual([10,11,12,13]);
   });
+});
+
+
+describe('checkpoint incremental reads',()=>{
+ it('reuses a validated checkpoint and scans only newer blocks, including empty blocks',async()=>{
+  const {provider,ranges}=providerFixture();const first=await readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD);
+  ranges.length=0;const oldGetBlock=provider.getBlock.bind(provider);
+  provider.getBlock=(async(tag:unknown)=>tag==='latest'?{number:8,timestamp:80,hash:hash(8)}:tag===8?{number:8,timestamp:80,hash:hash(8)}:oldGetBlock(tag as number)) as typeof provider.getBlock;
+  const read=provider.getLogs.bind(provider);provider.getLogs=(async(filter:any)=>filter.address.toLowerCase()===MARKET.toLowerCase()&&filter.fromBlock===7?(ranges.push(filter),[]):read(filter)) as typeof provider.getLogs;
+  const next=await readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD,first.checkpoint);
+  expect(next.cacheStatus).toBe('updated');expect(next.latestBlock).toBe(8);expect(next.events).toEqual(first.events);expect(ranges).toHaveLength(1);expect(ranges[0]).toMatchObject({fromBlock:7,toBlock:8});
+ });
+ it('invalidates a reorged checkpoint and repeats creation verification',async()=>{
+  const {provider,ranges}=providerFixture();const first=await readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD);ranges.length=0;
+  const next=await readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD,{...first.checkpoint!,latestHash:hash(999)});
+  expect(next.cacheStatus).toBeUndefined();expect(ranges[0].address).toBe(FACTORY);expect(next.events).toEqual(first.events);
+ });
+ it('replays cached display data locally and rejects other markets and malformed scope',async()=>{
+  const {provider}=providerFixture();const first=await readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD);
+  expect(replayCheckpoint(first.checkpoint!,FACTORY,MARKET).cacheStatus).toBe('local');
+  expect(()=>replayCheckpoint(first.checkpoint!,FACTORY,USER)).toThrow();
+ });
 });

@@ -48,3 +48,7 @@ Deploy `frontend/` as a Vite project. Build with `npm run build` and publish `di
 The payment selector supports registered USDG through the existing stock/USDG V3 pool and AssetRouter. Quotes use the matching QuoterV2 and pinned-block pool checks, never the fixed test collateral oracle. Formal buying swaps the entire displayed maximum USDG budget; unused stock is refunded as stock. Approvals and execution are separate wallet confirmations, pinned to chain 46630.
 
 Receiving escrowed LP tokens transfers the token to the wallet without withdrawing pool collateral. LP payout requires settlement; B payout requires settlement or failed Genesis. No-principal Core cannot accept an early request; ties/INVALID with principal do not prohibit a YES/NO request, but an unmatched outcome after the window forfeits the bond.
+
+
+### Local history cache
+Verified historical logs are persisted in browser IndexedDB, scoped to testnet chain, factory, market and schema. The UI labels cached statistics and refreshes new blocks in the background. Checkpoint/creation hashes and Genesis supply are checked before saving; a mismatch rebuilds history. SHA-256 detects accidental cache damage, not malicious local rewriting. Quotes, balances and transaction authorization never use this cache. Browser storage failure falls back to chain reads. First visits and cleared browser data require the initial scan.

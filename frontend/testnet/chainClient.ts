@@ -1,3 +1,4 @@
+import {loadHistoryCheckpoint,saveHistoryCheckpoint} from './historyCache';
 import { Contract, ZeroAddress, getAddress, id, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
 import factoryAbi from './abi/TopicMarketStockFactory.json';
 import marketAbi from './abi/TopicMarket.json';
@@ -6,7 +7,7 @@ import adapterAbi from './abi/VaultCoreAdapter.json';
 import routerAbi from './abi/TopicMarketAssetRouter.json';
 import oracleAbi from './abi/TopicMarketStockPriceSnapshot.json';
 import {quoteExchange as quoteV3Exchange} from './exchangeQuote';
-import {readChainPriceHistory, type ChainPriceHistory} from './priceHistory';
+import {readChainPriceHistory, replayCheckpoint, type ChainPriceHistory} from './priceHistory';
 
 export const TESTNET_CHAIN_ID = 46630n;
 const tokenAbi = ['function symbol() view returns(string)', 'function decimals() view returns(uint8)', 'function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'];
@@ -160,13 +161,23 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const base=await summary(marketAddress);
     const market=new Contract(base.address,marketAbi,provider);
     const k=await market.k();
-    const history=await readChainPriceHistory(provider,address,base.address,base.createdAt,k);
-    const blockTag=history.latestBlock;
-    const phase=Number(await market.phase({blockTag}));
-    // Failed claims reduce S after trading stops; failedSupply preserves the actual last curve state.
-    const expected=phase===4?await market.failedSupply({blockTag}):await market.S({blockTag});
-    if(history.genesis.at(-1)?.supply!==expected)throw new Error('Genesis历史与链上供应快照不一致，请重试');
+    const cached=await loadHistoryCheckpoint(address,base.address);
+    let history=await readChainPriceHistory(provider,address,base.address,base.createdAt,k,cached);
+    const supplyMatches=async(value:ChainPriceHistory)=>{
+      const blockTag=value.latestBlock,phase=Number(await market.phase({blockTag}));
+      const expected=phase===4?await market.failedSupply({blockTag}):await market.S({blockTag});
+      return value.genesis.at(-1)?.supply===expected;
+    };
+    if(!await supplyMatches(history)){
+      if(!cached)throw new Error('Genesis历史与链上供应快照不一致，请重试');
+      history=await readChainPriceHistory(provider,address,base.address,base.createdAt,k);
+      if(!await supplyMatches(history))throw new Error('Genesis历史与链上供应快照不一致，请重试');
+    }
+    if(history.checkpoint)await saveHistoryCheckpoint(history.checkpoint,history.cacheStatus==='updated'?undefined:cached?.latestHash);
     return history;
+  }
+  async function readCachedPriceHistory(marketAddress:string){
+    try{const cached=await loadHistoryCheckpoint(address,marketAddress);return cached?replayCheckpoint(cached,address,marketAddress):null;}catch{return null;}
   }
   async function quote(marketAddress:string,method:string,args:unknown[]) {
     await ready();const base=await summary(marketAddress);
@@ -239,7 +250,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       },
     };
   }
-  return {readDirectory,readMarket,readPriceHistory,readPaymentRoute,quotePaymentSwap,withSigner,
+  return {readDirectory,readMarket,readPriceHistory,readCachedPriceHistory,readPaymentRoute,quotePaymentSwap,withSigner,
     quoteGenesisBuy:(market:string,paid:bigint):Promise<bigint>=>quote(market,'quoteGenesisBuy',[paid]),
     async quoteGenesisSell(market:string,quantity:bigint,account?:string):Promise<{gross:bigint;seller:bigint}>{const r=await quote(market,'quoteGenesisSell',[quantity]);return {gross:r[0],seller:r[1]};},
     quoteFormalBuy:(market:string,isYes:boolean,quantity:bigint):Promise<bigint>=>quote(market,'quoteFormalBuy',[isYes,quantity]),
