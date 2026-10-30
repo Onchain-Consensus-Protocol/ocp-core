@@ -52,3 +52,7 @@ Receiving escrowed LP tokens transfers the token to the wallet without withdrawi
 
 ### Local history cache
 Verified historical logs are persisted in browser IndexedDB, scoped to testnet chain, factory, market and schema. The UI labels cached statistics and refreshes new blocks in the background. Checkpoint/creation hashes and Genesis supply are checked before saving; a mismatch rebuilds history. SHA-256 detects accidental cache damage, not malicious local rewriting. Quotes, balances and transaction authorization never use this cache. Browser storage failure falls back to chain reads. First visits and cleared browser data require the initial scan.
+
+## Fee source update (2026-10-30)
+
+The simulation model uses Genesis 0.7% creator / 0.3% protocol and Formal 0.5% LP / 0.5% B / 0.7% Core / 0.3% protocol. The new contract source attempts fixed-beneficiary payment during coordinated settlement. The website detects old immutable markets and keeps manual fee collection for them; publishing this UI does not upgrade the existing 46630 contracts. Addresses appear below their own Market/Core activity records.

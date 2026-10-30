@@ -25,6 +25,7 @@ interface ITopicMarketCore {
 /// Genesis/outcomes remain nontransferable internal ledgers; LP/B are market-specific ERC20s.
 contract TopicMarket {
     using Math for uint256;
+    bool public constant automaticFeePayout = true;
     address public immutable trustedForwarder;
     uint256 public SCALE; // collateral native units -> outcome WAD
     uint256 public LIMIT; // 1e12 whole collateral-token research bound
@@ -74,15 +75,11 @@ contract TopicMarket {
     uint256 public lpFees;
     uint256 public coreFeesSent;
     uint256 public formalBAccrued; // Formal只增加B资金，不增加Genesis Btoken权重
-    uint256 public mergedPairs; // collateral native units: AMM内部merge，双方各烧数量=本值*SCALE
     uint256 public redeemedPairs; // collateral native units: 用户主动完整组合赎回
     struct LiquidityReference {
         uint256 lp; uint256 basis; uint256 depth; uint256 y; uint256 n; uint256 money; uint256 fees;
     }
-    struct AddQuote {
-        uint256 money; uint256 cashIn; uint256 lpFeeIn; uint256 yesIn; uint256 noIn;
-        uint256 basisIn; uint256 depthIn; bool restart;
-    }
+
     LiquidityReference public restartLiquidity;
     bool public liquidityClosed;
     mapping(address => uint256) public yes;
@@ -201,15 +198,19 @@ contract TopicMarket {
         remainder = base - net - reserve - fee;
     }
 
-    function _accrueGen(uint256 reserve, uint256 fee, uint256 remainder) private {
+    function _accrueGen(uint256 base, uint256 reserve, uint256 fee, uint256 remainder) private {
         address user = _actor();
         B += reserve;
         contribution[user] += reserve;
         totalContribution += reserve;
         // 权重只来自实际进入Genesis B的抵押代币；Formal手续费或LP转让不产生新B权益。
         if (reserve > 0) bToken.mint(user, reserve * SCALE);
-        creatorFees += fee;
-        dust += remainder;
+        // 按同一gross独立向下取整0.7%/0.3%；剩余原始单位明确归dust。
+        uint256 creatorPart = Math.mulDiv(base, 7, 1000);
+        creatorFees += creatorPart;
+        uint256 protocolPart = Math.mulDiv(base, 3, 1000);
+        protocolFees += protocolPart;
+        dust += remainder + fee - creatorPart - protocolPart;
     }
 
     function _checkIntent(bool hit, uint8 intent) private pure {
@@ -241,7 +242,7 @@ contract TopicMarket {
         R += net;
         S += minted;
         shares[user] += minted;
-        _accrueGen(reserve, fee, rem);
+        _accrueGen(paid, reserve, fee, rem);
         emit GenesisTrade(user, true, paid, minted);
         if (hit) _graduate(true);
     }
@@ -268,7 +269,7 @@ contract TopicMarket {
         R -= gross;
         S -= quantity;
         shares[user] -= quantity;
-        _accrueGen(reserve, fee, rem);
+        _accrueGen(gross, reserve, fee, rem);
         if (S == 0) {
             dust += R; // isolate only when all Genesis supply has been burned
             R = 0;
@@ -278,10 +279,6 @@ contract TopicMarket {
         _send(msg.sender, Math.mulDiv(gross, 945, 1000));
     }
 
-    /// @notice 本版Demo无转让操作；筹资、LP均不开放转让，保留ABI以明确拒绝。
-    function transferShares(address, uint256) external pure {
-        revert("TRANSFER_NOT_IN_DEMO");
-    }
 
     function _graduate(bool buy) private {
         phase = Phase.FORMAL;
@@ -337,7 +334,7 @@ contract TopicMarket {
         net = Math.mulDiv(base, 98, 100);
         lpFee = base / 200;
         reserve = base / 200;
-        coreFee = base / 100;
+        coreFee = Math.mulDiv(base, 7, 1000);
         rem = base - net - lpFee - reserve - coreFee;
     }
 
@@ -370,7 +367,9 @@ contract TopicMarket {
         // 正式交易给原Genesis B持有人增加风险资金/余资收益，不为交易者新铸Btoken。
         B += reserve;
         formalBAccrued += reserve;
-        dust += rem;
+        uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
+        protocolFees += protocolPart;
+        dust += rem - protocolPart;
         if (isYes) {
             inventoryY -= amount;
             yes[user] += amount;
@@ -438,7 +437,9 @@ contract TopicMarket {
         // 正式交易给原Genesis B持有人增加风险资金/余资收益，不为交易者新铸Btoken。
         B += reserve;
         formalBAccrued += reserve;
-        dust += rem;
+        uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
+        protocolFees += protocolPart;
+        dust += rem - protocolPart;
         _sendCoreFee(coreFee);
         emit FormalTrade(user, false, isYes, amount, gross);
         _send(msg.sender, Math.mulDiv(gross, 98, 100));
@@ -462,39 +463,6 @@ contract TopicMarket {
         emit PairsRedeemed(user, amount6, burn);
         _send(msg.sender, amount6);
     }
-
-    /// @notice 研究原型公开核对资金桶和未终局完整组合覆盖，不替代全域数学审计。
-    function checkInvariants() external view returns (bool) {
-        require(token.balanceOf(address(this)) >= accountedBalance(), "ACCOUNTING");
-        if (phase == Phase.GENESIS) {
-            require(bToken.totalSupply() == totalContribution * SCALE, "B_SUPPLY");
-        }
-        if (phase == Phase.FORMAL || phase == Phase.WAIT_CORE || phase == Phase.SETTLED) {
-            require(lpToken.totalSupply() == liquiditySupply, "LP_SUPPLY");
-            require(lpToken.balanceOf(address(this)) >= unmaterializedLP, "LP_ESCROW");
-        }
-        if (phase == Phase.FORMAL || phase == Phase.WAIT_CORE) {
-            require(bToken.totalSupply() == totalContribution * SCALE, "B_SUPPLY");
-            require(B == totalContribution + formalBAccrued, "B_FUNDING");
-            require(mergedPairs == 0, "MERGE_DISABLED");
-            require(yesSupply == collateralCash * SCALE && noSupply == collateralCash * SCALE, "PAIR_SUPPLY");
-            require(collateralCash + mergedPairs + redeemedPairs == initialCollateral, "COLLATERAL_LEDGER");
-            require(inventoryY <= poolBasisWad && inventoryN <= poolBasisWad, "COORDINATES");
-            require(inventoryY <= yesSupply && inventoryN <= noSupply, "INVENTORY_SUPPLY");
-        }
-        return true;
-    }
-
-    /// @notice 同Demo本版不开放YES/NO转让，不引入额外资产行为。
-    function transferOutcome(address, bool, uint256) external pure {
-        revert("TRANSFER_NOT_IN_DEMO");
-    }
-
-    /// @notice 旧ABI明确关闭；中途只能转让LP ERC20，不能提取底层或新增LP。
-    function quoteAddLP(uint256) public pure returns (AddQuote memory) { revert("LP_LOCKED"); }
-    function addLP(uint256, uint256, uint256, uint256, uint64) external pure { revert("LP_LOCKED"); }
-    function quoteExit(uint256) public pure returns (uint256, uint256, uint256) { revert("LP_LOCKED"); }
-    function exitLP(uint256, uint256, uint256, uint256) external pure { revert("LP_LOCKED"); }
 
     /// @notice 任意人可代触发，但托管LP只交给原始筹资权益人，不能指定第三方收款。
     function materializeLP(address account) external lock returns (uint256 amount) {
@@ -529,6 +497,7 @@ contract TopicMarket {
             phase = Phase.WAIT_CORE;
         }
         emit Closed(phase);
+        if (phase == Phase.FAILED) _flushFees();
     }
 
     function _value(uint256 y, uint256 n, uint8 result) private view returns (uint256) {
@@ -567,6 +536,7 @@ contract TopicMarket {
         require(bSnapshotWad == totalContribution * SCALE, "B_SNAPSHOT");
         B = 0;
         emit Finalized(result, coverPaid, lpBudgetInitial, bBudgetInitial);
+        _flushFees();
     }
 
     function claimOutcome() external lock returns (uint256 pay) {
@@ -703,25 +673,55 @@ contract TopicMarket {
         require(hasRights, "CLAIMED");
     }
 
-    function claimFees() external lock {
-        address user = _actor();
-        uint256 projectPay;
-        uint256 creatorPay;
-        if (user == protocol) {
-            projectPay = protocolFees;
-            protocolFees = 0;
-        }
-        if (user == creator) {
-            creatorPay = creatorFees;
+    event FeePayout(address indexed recipient, uint256 amount, bool paid);
+    event DustCollected(uint256 amount);
+
+    /// @notice Permissionless retries; every payment goes to its immutable beneficiary.
+    function claimFees() external lock { _flushFees(); }
+    function flushFees() external lock { _flushFees(); }
+
+    function _flushFees() private {
+        // Insufficient optional payout gas leaves debts available for a separate retry.
+        if (gasleft() < 250000) return;
+        uint256 amount = creatorFees;
+        if (amount > 0) {
             creatorFees = 0;
+            try this.executeFeeTransfer{gas: 100000}(creator, amount) {
+                emit FeePayout(creator, amount, true);
+            } catch { creatorFees = amount; emit FeePayout(creator, amount, false); }
         }
-        require(projectPay + creatorPay > 0, "NO_FEES");
-        // 创建者及项目领取已记账的交易费，不叠加尚未采用的提现费。
-        _send(msg.sender, projectPay);
-        _send(msg.sender, creatorPay);
+        amount = protocolFees;
+        if (amount > 0) {
+            protocolFees = 0;
+            try this.executeFeeTransfer{gas: 100000}(protocol, amount) {
+                emit FeePayout(protocol, amount, true);
+            } catch { protocolFees = amount; emit FeePayout(protocol, amount, false); }
+        }
     }
 
-    /// @notice Retained liabilities, excluding unsolicited donations. No dust/surplus rescue exists.
+    /// @dev 独立子调用使false/revert/异常转账整体回滚，不能污染已冻结的结算账本。
+    function executeFeeTransfer(address recipient, uint256 amount) external {
+        require(msg.sender == address(this), "SELF_ONLY");
+        uint256 beforeBalance = token.balanceOf(address(this));
+        uint256 beforeRecipient = token.balanceOf(recipient);
+        require(token.transfer(recipient, amount), "FEE_TRANSFER");
+        require(token.balanceOf(address(this)) + amount == beforeBalance && token.balanceOf(recipient) == beforeRecipient + amount, "FEE_EXACT");
+    }
+
+    /// @notice Only after every transferable/internal player right has been burned may rounding
+    /// residues and unsolicited surplus become protocol funds. Unclaimed fees remain separate debts.
+    function collectDust() external lock returns (uint256 amount) {
+        require(phase == Phase.SETTLED || phase == Phase.FAILED, "PHASE");
+        require(bToken.totalSupply() == 0 && (phase == Phase.FAILED ? S == 0 : liquiditySupply == 0 && yesSupply == 0 && noSupply == 0), "OUTSTANDING_RIGHTS");
+        amount = token.balanceOf(address(this)) - creatorFees - protocolFees;
+        R = 0; B = 0; dust = 0; collateralCash = 0; cash = 0; lpFees = 0;
+        lpBudgetRemaining = 0; bBudgetRemaining = 0; failedRRemaining = 0;
+        protocolFees += amount;
+        emit DustCollected(amount);
+        _flushFees();
+    }
+
+    /// @notice Retained liabilities, excluding unsolicited donations. Player budgets and pending fee liabilities remain protected until all rights are burned.
     function accountedBalance() public view returns (uint256) {
         return R + B + protocolFees + creatorFees + dust + collateralCash + cash + lpFees + lpBudgetRemaining
             + bBudgetRemaining + failedRRemaining;

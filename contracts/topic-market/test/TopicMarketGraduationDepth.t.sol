@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase,MockCore} from "./TopicMarketBase.sol";
 import {TopicMarketStockCollateralTest,StockCollateralMock} from "./TopicMarketStockCollateral.t.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
@@ -60,11 +61,11 @@ contract TopicMarketDepthDecimalsTest is TopicMarketStockCollateralTest {
             uint256 unit=10**precisions[d];m.genesisBuy(14*unit,0,type(uint64).max,1);
             assertEq(m.bWad(),1323e16);assertEq(m.bWad(),m.initialCollateral()*m.SCALE());
             uint256 paid=m.quoteFormalBuy(true,1e18);m.formalBuy(true,1e18,paid,type(uint64).max);
-            assertEq(m.bWad(),1323e16);assertTrue(m.checkInvariants());
+            assertEq(m.bWad(),1323e16);assertTrue(checkMarketInvariants(m));
             vm.warp(m.coreCutoff());c.resolve(outcome);m.finalize();
             uint256 before=t.balanceOf(address(this));(uint256 y,uint256 lp,uint256 reserve,)=m.previewAccount(address(this),outcome);
             m.claimAll();assertEq(t.balanceOf(address(this))-before,y+lp+reserve);
-            assertEq(t.balanceOf(address(m)),m.accountedBalance());assertTrue(m.checkInvariants());
+            assertEq(t.balanceOf(address(m)),m.accountedBalance());assertTrue(checkMarketInvariants(m));
             assertEq(m.lpBudgetRemaining(),0);assertEq(m.bBudgetRemaining(),0);
         }
     }

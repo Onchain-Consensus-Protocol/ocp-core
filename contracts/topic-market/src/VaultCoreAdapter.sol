@@ -121,7 +121,29 @@ contract VaultCoreAdapter is ITopicMarketCore {
             v.finalize();
         }
         if (TopicMarket(market).phase() != TopicMarket.Phase.SETTLED) TopicMarket(market).finalize();
+        else TopicMarket(market).flushFees();
+        v.flushOfficialPayments();
         entered = 1;
+    }
+
+    /// @notice Anyone may retry fixed-beneficiary payments; no recipient parameter exists.
+    function claimFees() external {
+        require(entered == 1, "REENTER");
+        entered = 2;
+        TopicMarket(market).flushFees();
+        OCPCore(address(vault)).flushOfficialPayments();
+        entered = 1;
+    }
+
+    /// @notice One failed market never blocks another market's fee retry.
+    function batchClaimFees(address[] calldata adapters) external {
+        require(adapters.length <= 20, "BATCH_LIMIT");
+        for (uint256 i; i < adapters.length; ++i) {
+            if (gasleft() < 650000) break;
+            // Solidity对无代码地址的检查发生在try/catch之外；先跳过，防止一项污染整批。
+            if (adapters[i].code.length == 0) continue;
+            try VaultCoreAdapter(adapters[i]).claimFees{gas: 600000}() {} catch {}
+        }
     }
 
     function finalOutcome() external view returns (uint8) {

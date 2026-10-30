@@ -143,8 +143,8 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         uint256 originalProtocol = market.protocolFees();
         uint256 gross = market.quoteFormalBuy(true, 1e18);
         _formalBuy(alice, true, 1e18);
-        uint256 fee = gross / 100;
-        assertEq(market.protocolFees(), originalProtocol);
+        uint256 fee = gross * 7 / 1000;
+        assertEq(market.protocolFees(), originalProtocol + gross * 3 / 1000);
         assertEq(market.coreFeesSent(), fee);
         assertEq(vault.totalMarketFeesAccrued(), fee);
         assertEq(vault.totalPrincipal(), 140e6); // 手续费不能改变多数分母
@@ -254,7 +254,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         emit log_named_uint("liquiditySupplyWad",market.liquiditySupply()); emit log_named_uint("lpFees6",market.lpFees());
         emit log_named_uint("B6",market.B()); emit log_named_uint("coreFeesSent6",market.coreFeesSent());
         emit log_named_uint("coreFeesEscrow6",vault.totalMarketFeesAccrued());
-        emit log_named_uint("merged6",market.mergedPairs()); emit log_named_uint("redeemed6",market.redeemedPairs());
+        emit log_named_uint("merged6",0); emit log_named_uint("redeemed6",market.redeemedPairs());
         if(!market.liquidityClosed() && market.phase()!=TopicMarket.Phase.SETTLED){emit log_named_uint("priceYesWad",market.priceYes());}
         address[3] memory users=[alice,bob,carol];
         for(uint256 j;j<3;++j){
@@ -276,14 +276,14 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
   vm.startPrank(alice);market.bToken().transfer(carol,100e18);vm.stopPrank();_parityLog("transfer_b_100");
   vm.prank(carol);market.formalSell(true,30e18,0,type(uint64).max);_parityLog("sell_yes_30");
   _stake(bob,IOCPCore.Side.YES,100e6);
-  vm.warp(market.coreCutoff());vault.finalize();market.finalize();_parityLog("finalized");
+  vm.warp(market.coreCutoff());adapter.finalizeMarket();_parityLog("finalized");
   vm.prank(bob);market.claimLP(1e18);_parityLog("burn_lp_1");
   vm.prank(carol);market.claimB(50e18);_parityLog("burn_b_50");
   vm.startPrank(bob);market.lpToken().transfer(carol,2e18);vm.stopPrank();_parityLog("transfer_after_settle");
   _claimAll(alice);_claimAll(bob);_claimAll(carol);
   vm.prank(bob);vault.withdraw();
   vm.prank(bob);market.claimFees();
-  vm.prank(carol);vm.expectRevert("NO_FEES");market.claimFees();
+  vm.prank(carol);market.claimFees();
   if(vault.officialMarketFeesClaimable()>0)vault.claimOfficialMarketFees();
   _parityLog("all_claimed");
   assertEq(market.lpToken().totalSupply(),0);assertEq(market.bToken().totalSupply(),0);

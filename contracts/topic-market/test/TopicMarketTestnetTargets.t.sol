@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {IntegrationStock} from "./TopicMarketStockIntegration.t.sol";
 import {TopicMarketTestnetStockFactory} from "../src/TopicMarketTestnetStockFactory.sol";
-import {TopicMarketCoreDeployer,TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
-import {ITopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
+import {TopicMarketCoreDeployer} from "../src/deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "../src/deployers/TopicMarketDeployer.sol";
+import {ITopicMarketPriceSnapshot} from "../src/interfaces/ITopicMarketPriceSnapshot.sol";
 import {TopicMarket,IToken6} from "../src/TopicMarket.sol";
 import {OCPCore} from "ocp/core/OCPCore.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
@@ -47,7 +49,7 @@ contract TopicMarketTestnetTargetsTest is Test {
         assertGt(m.R(),m.rTarget());assertLt(m.B(),m.bTarget());assertEq(uint256(m.phase()),0);
         m.genesisBuy(8333333333333334,0,type(uint64).max,0);
         vm.stopPrank();assertEq(uint256(m.phase()),1);assertGe(m.B(),m.bTarget());assertGe(m.initialCollateral(),m.rTarget());
-        assertTrue(m.checkInvariants());
+        assertTrue(checkMarketInvariants(m));
     }
     function testProfileRejectsMainnetEvenWithCorrectBindings() public {
         vm.chainId(4663);

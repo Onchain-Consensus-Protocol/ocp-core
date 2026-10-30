@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ITopicMarketPriceSnapshot,ITopicMarketAggregator} from "./TopicMarketPriceSnapshot.sol";
+import {ITopicMarketPriceSnapshot,ITopicMarketAggregator} from "./interfaces/ITopicMarketPriceSnapshot.sol";
 
 /// @notice ETH/stock snapshot in collateral native units. Legacy ethPrice6 selector is retained only for compatibility.
 /// @dev Feed addresses/market-hours policy must be verified for each real asset; no token ticker is trusted.

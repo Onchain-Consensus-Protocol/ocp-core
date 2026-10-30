@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {TopicMarket, IToken6} from "../src/TopicMarket.sol";
 import {MockCore} from "./TopicMarketBase.sol";
@@ -36,9 +37,9 @@ contract TopicMarketStockCollateralTest is Test {
             m.genesisBuy(10*unit,referenceSupply,type(uint64).max,0);
             assertEq(m.R(),945*unit/100);
             assertEq(m.bToken().totalSupply(),45e16);
-            assertTrue(m.checkInvariants());
+            assertTrue(checkMarketInvariants(m));
             m.genesisSell(m.S(),0,type(uint64).max,0);
-            assertEq(m.S(),0); assertEq(m.R(),0); assertTrue(m.checkInvariants());
+            assertEq(m.S(),0); assertEq(m.R(),0); assertTrue(checkMarketInvariants(m));
         }
     }
     function testStock18GraduationFormalAndSettlement() public {
@@ -50,12 +51,12 @@ contract TopicMarketStockCollateralTest is Test {
         m.formalBuy(true,1e18,paid,type(uint64).max);
         assertEq(m.yes(address(this)),1e18);
         m.formalSell(true,5e17,0,type(uint64).max);
-        assertTrue(m.checkInvariants());
+        assertTrue(checkMarketInvariants(m));
         vm.warp(m.coreCutoff()); c.resolve(1); m.finalize();
         (uint256 a,uint256 b,uint256 cc,)=m.previewAccount(address(this),1);
         uint256 before=t.balanceOf(address(this)); m.claimAll();
         assertEq(t.balanceOf(address(this))-before,a+b+cc);
-        assertTrue(m.checkInvariants());
+        assertTrue(checkMarketInvariants(m));
     }
     function testStock18FailureAndFullRefundRights() public {
         (StockCollateralMock t,,TopicMarket m)=_market(18);
@@ -63,7 +64,7 @@ contract TopicMarketStockCollateralTest is Test {
         vm.warp(m.genesisCutoff());m.closeExpired();
         uint256 before=t.balanceOf(address(this)); m.claimAll();
         assertEq(t.balanceOf(address(this))-before,99e16);
-        assertTrue(m.checkInvariants());
+        assertTrue(checkMarketInvariants(m));
     }
     function testForwardedOwnershipAndRouterPayout() public {
         StockCollateralMock t=new StockCollateralMock(18);

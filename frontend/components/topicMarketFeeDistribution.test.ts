@@ -14,31 +14,31 @@ const drain=(state:State)=>{let s=state;for(let id=0;id<3;id++){
  expect(s.protocolFees).toBe(0);expect(topicMarketAccounting(s).reserves).toBeCloseTo(0,7);ledger(s);return s;};
 
 describe("TopicMarket v1.9 fee distribution and non-minting B capital income",()=>{
- it("assigns all one percent Genesis fees to creator on both directions",()=>{
+ it("assigns Genesis fees as 0.7 percent creator and 0.3 percent project on both directions",()=>{
   let s=topicMarketCreate(createTopicMarketDemo());const buy=topicMarketQuoteBuy(s,100);
   expect(buy.net).toBeCloseTo(94.5,8);expect(buy.B).toBeCloseTo(4.5,8);
-  expect(buy.creatorFee).toBeCloseTo(1,8);expect(buy.protocolFee).toBe(0);
+  expect(buy.creatorFee).toBeCloseTo(.7,8);expect(buy.protocolFee).toBeCloseTo(.3,8);
   s=topicMarketBuy(s,0,100);const sell=topicMarketQuoteSell(s,s.accounts[0].g),before=s;
-  expect(sell.creatorFee).toBeCloseTo(sell.gross*.01,8);expect(sell.protocolFee).toBe(0);
+  expect(sell.creatorFee).toBeCloseTo(sell.gross*.007,8);expect(sell.protocolFee).toBeCloseTo(sell.gross*.003,8);
   s=topicMarketSell(s,0,s.accounts[0].g);expect(before.R-s.R).toBeCloseTo(sell.gross,8);
-  expect(s.creatorFees).toBeCloseTo(1+sell.gross*.01,8);expect(s.protocolFees).toBe(0);ledger(s);
+  expect(s.creatorFees).toBeCloseTo(.7+sell.gross*.007,8);expect(s.protocolFees).toBeCloseTo(.3+sell.gross*.003,8);ledger(s);
  });
- it("splits Formal buy gross 100 as 98 trading, .5 LP, 1 Core and .5 B without minting z",()=>{
+ it("splits Formal buy gross 100 as 98 trading, .5 LP, .7 Core, .3 protocol and .5 B without minting z",()=>{
   let s=formal();const before=s,q=topicMarketQuoteFormalBuyBudget(s,"YES",100);
-  expect(q.net).toBeCloseTo(98,8);expect(q.lpFee).toBeCloseTo(.5,8);expect(q.coreFee).toBeCloseTo(1,8);
+  expect(q.net).toBeCloseTo(98,8);expect(q.lpFee).toBeCloseTo(.5,8);expect(q.coreFee).toBeCloseTo(.7,8);
   expect(q.B).toBeCloseTo(.5,8);expect(q.fees.B).toBeCloseTo(.5,8);expect(q.contribution).toBe(0);
-  expect(q.creatorFee+q.protocolFee).toBe(0);expect(q.fees.creator+q.fees.protocol).toBe(0);
+  expect(q.creatorFee).toBe(0);expect(q.protocolFee).toBeCloseTo(.3,8);expect(q.fees.protocol).toBeCloseTo(.3,8);
   s=topicMarketFormalBuyBudget(s,0,"YES",100);expect(s.cash-before.cash).toBeCloseTo(98,8);
-  expect(s.lpFees-before.lpFees).toBeCloseTo(.5,8);expect(s.core.fees-before.core.fees).toBeCloseTo(1,8);
+  expect(s.lpFees-before.lpFees).toBeCloseTo(.5,8);expect(s.core.fees-before.core.fees).toBeCloseTo(.7,8);
   expect(s.B-before.B).toBeCloseTo(.5,8);expect(s.accounts.map(a=>a.z)).toEqual(before.accounts.map(a=>a.z));
-  expect(s.creatorFees).toBe(before.creatorFees);expect(s.protocolFees).toBe(0);ledger(s);
+  expect(s.creatorFees).toBe(before.creatorFees);expect(s.protocolFees-before.protocolFees).toBeCloseTo(.3,8);ledger(s);
  });
  it("deducts full sell gross, pays 98 percent and partitions the remaining two percent exactly",()=>{
   let s=topicMarketFormalBuyBudget(formal(),0,"YES",100);const before=s,q=topicMarketQuoteFormalSell(s,"YES",s.accounts[0].yes/2);
   s=topicMarketFormalSell(s,0,"YES",q.quantity);
   expect(before.cash-s.cash).toBeCloseTo(q.gross,8);expect(s.accounts[0].wallet-before.accounts[0].wallet).toBeCloseTo(q.gross*.98,8);
-  expect(s.lpFees-before.lpFees).toBeCloseTo(q.gross*.005,8);expect(s.core.fees-before.core.fees).toBeCloseTo(q.gross*.01,8);
-  expect(s.B-before.B).toBeCloseTo(q.gross*.005,8);expect(q.net+q.lpFee+q.coreFee+q.B).toBeCloseTo(q.gross,8);
+  expect(s.lpFees-before.lpFees).toBeCloseTo(q.gross*.005,8);expect(s.core.fees-before.core.fees).toBeCloseTo(q.gross*.007,8);
+  expect(s.B-before.B).toBeCloseTo(q.gross*.005,8);expect(q.net+q.lpFee+q.coreFee+q.B+q.protocolFee).toBeCloseTo(q.gross,8);
   expect(s.accounts.map(a=>a.z)).toEqual(before.accounts.map(a=>a.z));expect(s.creatorFees).toBe(before.creatorFees);ledger(s);
  });
  it("makes no-loss Formal B income a gain for the existing fixed B token supply",()=>{
@@ -73,4 +73,17 @@ describe("TopicMarket v1.9 fee distribution and non-minting B capital income",()
   expect(s.cover).toBeCloseTo(cover,7);expect(s.bBudget+s.cover).toBeCloseTo(B,7);
   s=topicMarketClaimLP(s,0,s.accounts[0].lp/3);s=topicMarketClaimB(s,1,s.accounts[1].z/4);drain(s);
  });
+ it("automatically credits the fixed creator and protocol accounts once on settlement",()=>{
+  let s=topicMarketFormalBuyBudget(formal(),0,"YES",100);
+  const creator=s.config.creatorAccount,protocol=s.config.protocolAccount;
+  const cw=s.accounts[creator].wallet,pw=s.accounts[protocol].wallet;
+  const creatorDue=s.creatorFees,protocolDue=s.protocolFees+s.core.officialRewards[2];
+  s=finish(s);
+  expect(s.accounts[creator].wallet-cw).toBeCloseTo(creatorDue,8);
+  expect(s.accounts[protocol].wallet-pw).toBeCloseTo(protocolDue,8);
+  expect(s.creatorFees+s.protocolFees+s.coreOfficialBudget).toBe(0);
+  expect(()=>topicMarketClaimFees(s,"CREATOR",creator)).toThrow('NO_FEES');
+  expect(()=>topicMarketFinalize(s)).toThrow();ledger(s);
+ });
+
 });

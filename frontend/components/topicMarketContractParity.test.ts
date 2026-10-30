@@ -10,9 +10,10 @@ function compare(s: TopicMarketState, expected: any) {
   const check = (actual:number, raw:string, unit:"money"|"token"|"probability", field:string) => {
     const value=Number(raw)/(unit==="money"?1e6:1e18), error=Math.abs(actual-value);
     errors[unit]=Math.max(errors[unit],error);
-    // 单笔保留5micro界；终局账户合并多次burn和交易舍入，累计界8micro。
-    // 该序列实际最大约6.58micro，不将浮点结果冒充整数完全相等。
-    expect(error,`${expected.step}.${field}: ${actual} vs ${value}`).toBeLessThanOrEqual(unit==="probability"?1e-12:unit==="money"?(expected.step==="all_claimed"&&field.includes("wallet6")?8e-6:5e-6):1e-6);
+    // 单笔保留5micro界。原终局累计界8micro；两笔Formal新增独立协议费取整，
+    // 各至多增加1micro，故累计界8+2=10micro。自动付款从finalized开始进入钱包。
+    // 浮点演示不冒充合约的原始整数精度；该序列实际最大误差约8.234micro。
+    expect(error,`${expected.step}.${field}: ${actual} vs ${value}`).toBeLessThanOrEqual(unit==="probability"?1e-12:unit==="money"?(s.phase==="SETTLED"&&field.includes("wallet6")?10e-6:5e-6):1e-6);
   };
   for(const [key,value] of Object.entries(fields)) check(value,expected[key],key.endsWith("6")?"money":"token",key);
   check(s.redeemedPairs,String(BigInt(expected.merged6)+BigInt(expected.redeemed6)),"money","allBurnedPairs");
@@ -26,11 +27,11 @@ function compare(s: TopicMarketState, expected: any) {
 }
 
 it('matches real ERC20 LP/B transfers, partial burns, post-settlement transfer and final claims at 10 EVM checkpoints',()=>{
- let s=topicMarketCreate(createTopicMarketDemo());for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);
+ let s=topicMarketCreate(createTopicMarketDemo({depthPolicy:"GRADUATION_CAPITAL"}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);
  const rows=snapshots.tests.testDemoParityLockedTokensBurn;let i=0;const snap=()=>compare(s,rows[i++]);
  snap();s=topicMarketFormalBuy(s,2,'YES',80);snap();s=topicMarketTransferLP(s,0,1,10);snap();s=topicMarketTransferB(s,0,2,100);snap();
  s=topicMarketFormalSell(s,2,'YES',30);snap();s=topicMarketCoreStake(s,1,'YES',100);s=topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));snap();
  s=topicMarketClaimLP(s,1,1);snap();s=topicMarketClaimB(s,2,50);snap();s=topicMarketTransferLP(s,1,2,2);snap();
- for(let id=0;id<3;id++)s=topicMarketClaim(s,id);s=topicMarketClaimCore(s,1);s=topicMarketClaimFees(s,'CREATOR',1);if(s.protocolFees>0)s=topicMarketClaimFees(s,'PROTOCOL',2);
+ for(let id=0;id<3;id++)s=topicMarketClaim(s,id);s=topicMarketClaimCore(s,1);if(s.creatorFees>0)s=topicMarketClaimFees(s,'CREATOR',1);if(s.protocolFees>0)s=topicMarketClaimFees(s,'PROTOCOL',2);
  if(s.coreOfficialBudget>0)s=topicMarketClaimCoreOfficial(s,2);snap();expect(i).toBe(10);
 });

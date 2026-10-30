@@ -2,7 +2,8 @@
 pragma solidity ^0.8.20;
 import {Script,console2} from "forge-std/Script.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
-import {TopicMarketCoreDeployer,TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
+import {TopicMarketCoreDeployer} from "../src/deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "../src/deployers/TopicMarketDeployer.sol";
 import {TopicMarketTestnetStockFactory} from "../src/TopicMarketTestnetStockFactory.sol";
 import {TopicMarketStockFactory} from "../src/TopicMarketStockFactory.sol";
 /// @notice Deploy the shared factory once; use RegisterTopicMarketStock for each stock.

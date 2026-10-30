@@ -32,6 +32,19 @@
   },
   {
     "type": "function",
+    "name": "batchClaimFees",
+    "inputs": [
+      {
+        "name": "adapters",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "bind",
     "inputs": [
       {
@@ -55,6 +68,13 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "claimFees",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

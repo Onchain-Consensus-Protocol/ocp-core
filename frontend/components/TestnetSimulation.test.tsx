@@ -30,6 +30,7 @@ describe('chain data adapter for the shared Simulation view',()=>{
     expect(s.core.yes).toBe(3);expect(s.core.no).toBe(1);expect(s.core.invalid).toBe(2);
     expect(s.core.feeTotal).toBe(.12);expect(remote.prices.probability).toEqual([.6,.4]);
     expect(remote.outstanding).toEqual([3,1]);expect(remote.prices.genesis).toBe(18);
+    expect(remote.chain?.contractAddresses).toEqual({market:fixture().market.address,core:fixture().market.vault});
     expect(remote.chain?.poolBalances).toEqual({yes:'7.0',no:'9.0',stock:'—'});
     const props=fixture();props.market.poolStockBalance=1234567n;
     expect(buildTestnetRemote(props).chain?.poolBalances?.stock).toBe('1.234567');
@@ -71,12 +72,15 @@ describe('chain data adapter for the shared Simulation view',()=>{
     expect(html).toContain('vault-shell');expect(html).toContain('OCP Core');expect(html).toContain('Real transaction');
     expect(html).not.toContain('Real exit');expect(html).not.toContain('Sign in with email');
     expect(html).toContain('Connect your wallet');expect(html).not.toContain('virtual USD');
+    expect(html).toContain('Formal market contract address');expect(html).toContain(props.market.address);
+    expect(html.indexOf('Trade history')).toBeLessThan(html.indexOf('Formal market contract address'));
     expect(html).not.toContain('Advance time');expect(html).not.toContain('Reset simulation');
   });
   it('shows an honest loading state for missing Genesis history and testnet targets',()=>{
     const props=fixture();props.market.phase=0;
     const html=renderToStaticMarkup(<TestnetSimulation {...props}/>);
     expect(html).toContain('On-chain price history has not loaded');expect(html).toContain('Fixed testnet targets');
+    expect(html).toContain('Genesis market contract address');
     expect(html).not.toContain('Actual simulated prices');expect(html).not.toContain('3.6 / 0.6 ETH');
   });
   it('rejects unsupported phases instead of inventing a CREATE demo',()=>{

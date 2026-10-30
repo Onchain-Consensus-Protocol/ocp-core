@@ -61,7 +61,7 @@ function receive(s: TopicMarketState, id: number, amount: number) {
 }
 function accrueGenesis(s: TopicMarketState, id: number, gross: number) {
   const reserve = .045 * gross; s.B += reserve; s.accounts[id].z += reserve;
-  s.creatorFees += .01 * gross;
+  s.creatorFees += .007 * gross; s.protocolFees += .003 * gross;
 }
 /** 沿用OCPCore：三套条件奖励只在终局择一兑现；手续费不加入质押本金或多数分母。 */
 function accrueCoreFee(s: TopicMarketState, amount: number) {
@@ -124,19 +124,19 @@ export function topicMarketQuoteBuy(s: TopicMarketState, paid: number): TopicMar
   if (!positive(paid)) throw new Error("AMOUNT");
   const quantity = Math.sqrt((s.R + .945 * paid) / s.k) - s.S;
   return { quantity, gross: paid, net: .945 * paid, R: .945 * paid, B: .045 * paid, lpFee: 0,
-    creatorFee: .01 * paid, protocolFee: 0, coreFee: 0,
+    creatorFee: .007 * paid, protocolFee: .003 * paid, coreFee: 0,
     wouldGraduate: s.R + .945 * paid >= s.rTarget && s.B + .045 * paid >= s.bTarget,
     average: paid / quantity, actual: paid, contribution: .045 * paid,
-    fees: { creator: .01 * paid, lp: 0, protocol: 0, core: 0, B:0 } };
+    fees: { creator: .007 * paid, lp: 0, protocol: .003 * paid, core: 0, B:0 } };
 }
 export function topicMarketQuoteSell(s: TopicMarketState, tokens: number): TopicMarketTradeQuote {
   if (!positive(tokens) || tokens > s.S) throw new Error("HOLDINGS");
   const gross = tokens === s.S ? s.R : s.k * tokens * (2 * s.S - tokens);
   return { quantity: tokens, gross, net: .945 * gross, R: -gross, B: .045 * gross, lpFee: 0,
-    creatorFee: .01 * gross, protocolFee: 0, coreFee: 0,
+    creatorFee: .007 * gross, protocolFee: .003 * gross, coreFee: 0,
     wouldGraduate: s.R - gross >= s.rTarget && s.B + .045 * gross >= s.bTarget,
     average: .945 * gross / tokens, actual: .945 * gross, contribution: .045 * gross,
-    fees: { creator: .01 * gross, lp: 0, protocol: 0, core: 0, B:0 } };
+    fees: { creator: .007 * gross, lp: 0, protocol: .003 * gross, core: 0, B:0 } };
 }
 export function topicMarketBuy(state: TopicMarketState, id: number, paid: number): TopicMarketState {
   requireGen(state); const q = topicMarketQuoteBuy(state, paid), s = copy(state); pay(s, id, paid);
@@ -155,8 +155,8 @@ export function topicMarketQuoteFormalBuy(s: TopicMarketState, side: Side, token
   const net = Math.max(0, topicMarketCost(...end, s.b) - topicMarketCost(...q, s.b));
   const gross = net / .98;
   return { quantity: tokens, gross, net, R: 0, B: .005*gross, lpFee: .005 * gross,
-    creatorFee: 0, protocolFee: 0, coreFee: .01 * gross, wouldGraduate: false, average: gross / tokens,
-    actual: gross, contribution: 0, fees: { creator: 0, lp: .005 * gross, protocol: 0, core: .01 * gross, B:.005*gross } };
+    creatorFee: 0, protocolFee: .003 * gross, coreFee: .007 * gross, wouldGraduate: false, average: gross / tokens,
+    actual: gross, contribution: 0, fees: { creator: 0, lp: .005 * gross, protocol: .003 * gross, core: .007 * gross, B:.005*gross } };
 }
 export function topicMarketQuoteFormalSell(s: TopicMarketState, side: Side, tokens: number): TopicMarketTradeQuote {
   const i = sideIndex(side), q = topicMarketCoordinates(s);
@@ -169,12 +169,12 @@ export function topicMarketQuoteFormalSell(s: TopicMarketState, side: Side, toke
   const gross = Math.max(0, topicMarketCost(...q, s.b) + mergePairs - topicMarketCost(...end, s.b));
   if (gross > s.cash + mergePairs + EPS) throw new Error("CASH");
   return { quantity: tokens, gross, net: .98 * gross, mergePairs, R: 0, B: .005*gross, lpFee: .005 * gross,
-    creatorFee: 0, protocolFee: 0, coreFee: .01 * gross, wouldGraduate: false, average: .98 * gross / tokens,
-    actual: .98 * gross, contribution: 0, fees: { creator: 0, lp: .005 * gross, protocol: 0, core: .01 * gross, B:.005*gross } };
+    creatorFee: 0, protocolFee: .003 * gross, coreFee: .007 * gross, wouldGraduate: false, average: .98 * gross / tokens,
+    actual: .98 * gross, contribution: 0, fees: { creator: 0, lp: .005 * gross, protocol: .003 * gross, core: .007 * gross, B:.005*gross } };
 }
 export function topicMarketFormalBuy(state: TopicMarketState, id: number, side: Side, tokens: number): TopicMarketState {
   requireFormal(state); const q = topicMarketQuoteFormalBuy(state, side, tokens), s = copy(state), i = sideIndex(side);
-  pay(s, id, q.gross); s.cash += q.net; s.B+=q.B;s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; accrueCoreFee(s, q.coreFee);
+  pay(s, id, q.gross); s.cash += q.net; s.B+=q.B;s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
   s.inventory[i] -= tokens; if (i === 0) s.accounts[id].yes += tokens; else s.accounts[id].no += tokens;
   record(s, "FORMAL_BUY", id, q.gross, tokens, side); return result(s);
 }
@@ -206,7 +206,7 @@ export function topicMarketFormalSell(state: TopicMarketState, id: number, side:
   s.inventory[i] += tokens; if (i === 0) s.accounts[id].yes -= tokens; else s.accounts[id].no -= tokens;
   s.inventory[0] -= mergePairs; s.inventory[1] -= mergePairs;
   s.collateral -= mergePairs; s.redeemedPairs += mergePairs;
-  s.cash += mergePairs - q.gross; s.B+=q.B;s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; accrueCoreFee(s, q.coreFee);
+  s.cash += mergePairs - q.gross; s.B+=q.B;s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
   receive(s, id, q.net); record(s, "FORMAL_SELL", id, q.net, tokens, side); return result(s);
 }
 // 旧版本入口明确禁用，不能从LP权益转让绕回底层提款。
@@ -259,6 +259,12 @@ export function topicMarketCoreStake(state: TopicMarketState, id: number, side: 
   if (side === "YES") s.core.yes += amount; else if (side === "NO") s.core.no += amount; else s.core.invalid += amount;
   record(s, "CORE_STAKE", id, amount, undefined, side); return result(s);
 }
+function distributeOfficialFees(s:TopicMarketState){
+ if(s.config.protocolAccount<0)return;
+ // 本地模拟账户直接收款；共享模拟的外部收款人由服务端管理，保留其可领取账。
+ if(s.accounts[s.config.creatorAccount]&&s.creatorFees>0){const n=s.creatorFees;s.creatorFees=0;receive(s,s.config.creatorAccount,n);record(s,'CLAIM_FEES',s.config.creatorAccount,n,undefined,'CREATOR');}
+ if(s.accounts[s.config.protocolAccount]){const n=s.protocolFees+s.coreOfficialBudget;s.protocolFees=0;s.coreOfficialBudget=0;if(n>0){receive(s,s.config.protocolAccount,n);record(s,'CLAIM_FEES',s.config.protocolAccount,n,undefined,'PROTOCOL');}}
+}
 function settle(s: TopicMarketState) {
   const totalStake = s.core.yes + s.core.no + s.core.invalid;
   const outcome: Outcome = s.core.yes > totalStake / 2 ? "YES" : s.core.no > totalStake / 2 ? "NO" : "INVALID";
@@ -276,11 +282,12 @@ function settle(s: TopicMarketState) {
   s.coreBudget = sum(s.corePayouts); s.coreOfficialBudget = s.core.officialRewards[rewardIndex];
   s.core.fees = 0; s.core.cash = 0; s.cash = 0; s.lpFees = 0; s.B = 0; s.inventory = [0, 0];
   record(s, "SETTLE", undefined, s.cover, undefined, outcome);
+  distributeOfficialFees(s);
 }
 function fail(s:TopicMarketState){
   s.phase="FAILED";s.failedBudget=s.R;s.failedBudgetInitial=s.R;s.failedSupply=s.S;
   s.bBudget=s.B;s.bBudgetInitial=s.B;s.bClaimSupply=sum(s.accounts.map(a=>a.z));s.payouts=[];
-  s.R=0;s.B=0;record(s,"FAIL");
+  s.R=0;s.B=0;record(s,"FAIL");distributeOfficialFees(s);
 }
 /** 按当前token余额预览；结算分母/初始预算固定，转让和burn不改变每份兑付率。 */
 export function topicMarketClaimPreview(s:TopicMarketState,id:number):TopicMarketPayout {

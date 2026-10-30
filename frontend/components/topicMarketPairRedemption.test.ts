@@ -47,7 +47,7 @@ describe("TopicMarket locked LP: directly purchased outcome pair redemption",()=
   s=topicMarketClaimLP(s,1,s.accounts[1].lp/4);s=topicMarketClaimB(s,2,s.accounts[2].z/5);
   s=topicMarketTransferLP(s,2,0,s.accounts[2].lp/2);s=topicMarketTransferB(s,0,1,s.accounts[0].z/2);
   for(let id=0;id<3;id++){s=topicMarketClaim(s,id);s=topicMarketClaimCore(s,id);expect(()=>topicMarketClaim(s,id)).toThrow();ledger(s);}
-  s=topicMarketClaimFees(s,"CREATOR",1);if(s.protocolFees>0)s=topicMarketClaimFees(s,"PROTOCOL",2);if(s.coreOfficialBudget>0)s=topicMarketClaimCoreOfficial(s,2);
+  if(s.creatorFees>0)s=topicMarketClaimFees(s,"CREATOR",1);if(s.protocolFees>0)s=topicMarketClaimFees(s,"PROTOCOL",2);if(s.coreOfficialBudget>0)s=topicMarketClaimCoreOfficial(s,2);
   expect(topicMarketAccounting(s).wallets).toBeCloseTo(30000,7);expect(topicMarketAccounting(s).reserves).toBeCloseTo(0,7);ledger(s);
  });
 });

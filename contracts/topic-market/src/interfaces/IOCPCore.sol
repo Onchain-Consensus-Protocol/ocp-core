@@ -75,6 +75,8 @@ interface IOCPCore {
     function withdraw() external;
     function claimMarketFeesFor(address user) external returns (uint256 amount);
     function claimEmptySettlement() external returns (uint256 amount);
+    function flushOfficialPayments() external;
+
     function claimOfficialMarketFees() external returns (uint256 amount);
     function claimSurplus() external returns (uint256 amount);
 }

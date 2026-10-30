@@ -1,23 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-
+// Historical six-decimal USDC reader fixture; not the stock-collateral production reader.
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
-interface ITopicMarketPriceSnapshot {
-    /// @notice ETH price denominated in USDC, with six decimals.
-    function ethPrice6() external view returns (uint256);
-}
-
-interface IUsdCollateralSnapshot {
-    function collateralForUsd(uint256 usdWad) external view returns (uint256);
-}
-
-interface ITopicMarketAggregator {
-    function decimals() external view returns (uint8);
-    function latestRoundData() external view returns (
-        uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound
-    );
-}
+import {ITopicMarketPriceSnapshot,ITopicMarketAggregator} from "../../src/interfaces/ITopicMarketPriceSnapshot.sol";
 
 /// @notice Immutable ETH/USD divided by USDC/USD price reader. Consumers store its result at creation.
 /// @dev Feed identity, chain compatibility and heartbeat values must be verified for deployment.

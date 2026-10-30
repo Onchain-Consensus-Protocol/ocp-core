@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
-import {TopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
+import {TopicMarketPriceSnapshot} from "./legacy/TopicMarketPriceSnapshot.sol";
 
 contract SnapshotFeedMock {
     uint8 public immutable decimals;

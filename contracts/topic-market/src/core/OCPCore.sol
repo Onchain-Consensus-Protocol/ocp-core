@@ -655,6 +655,36 @@ contract OCPCore is ReentrancyGuard, IOCPCore {
         emit MarketFeesClaimed(user, gross);
     }
 
+    /// @notice 官方费用仅为既有Core未分配费用，不是市场固定0.3%协议费。
+    /// Failed transfers remain claimable and cannot unwind Core/Market finalization.
+    function flushOfficialPayments() external override nonReentrant {
+        if (!resolved || !settlementReady || gasleft() < 250000) return;
+        uint256 amount = officialMarketFeesClaimable;
+        if (amount > 0) {
+            officialMarketFeesClaimable = 0;
+            try this.executeOfficialTransfer{gas: 100000}(amount) {
+                emit OfficialMarketFeesClaimed(emptySettlementRecipient, amount);
+            } catch { officialMarketFeesClaimable = amount; }
+        }
+        if (_totalPrincipal == 0 && remainingSettlementPool > 0) {
+            amount = remainingSettlementPool;
+            remainingSettlementPool = 0;
+            emptySettlementClaimable = 0;
+            try this.executeOfficialTransfer{gas: 100000}(amount) {
+                emit EmptySettlementClaimed(emptySettlementRecipient, amount);
+            } catch { remainingSettlementPool = amount; emptySettlementClaimable = amount; }
+        }
+        _assertVaultSolvent();
+    }
+
+    function executeOfficialTransfer(uint256 amount) external {
+        require(msg.sender == address(this), "SELF_ONLY");
+        uint256 beforeBalance = stakeToken.balanceOf(address(this));
+        uint256 beforeRecipient = stakeToken.balanceOf(emptySettlementRecipient);
+        stakeToken.safeTransfer(emptySettlementRecipient, amount);
+        require(stakeToken.balanceOf(address(this)) + amount == beforeBalance && stakeToken.balanceOf(emptySettlementRecipient) == beforeRecipient + amount, "FEE_EXACT");
+    }
+
     function claimOfficialMarketFees() external override nonReentrant returns (uint256 amount) {
         require(resolved && settlementReady, "Settlement not ready");
         amount = officialMarketFeesClaimable;
@@ -672,6 +702,7 @@ contract OCPCore is ReentrancyGuard, IOCPCore {
         require(resolved && settlementReady, "Settlement not ready");
         require(
             remainingSettlementPool == 0 && marketFeeUserPoolRemaining == 0
+                && remainingEligibleClaims == 0 && remainingMarketFeeClaims == 0
                 && officialMarketFeesClaimable == 0 && totalEarlyBondRefunds == 0,
             "Outstanding liabilities"
         );

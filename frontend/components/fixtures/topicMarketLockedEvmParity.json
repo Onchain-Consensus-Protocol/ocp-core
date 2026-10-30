@@ -1,7 +1,7 @@
 {
   "schema": "topicMarket-evm-parity-snapshots-v1",
-  "source": "FINAL_TESTS.txt",
-  "units": "suffix6=microUSDC; suffixWad=1e18 shares",
+  "source": "TopicMarketRealCore.t.sol::testDemoParityLockedTokensBurn; Foundry -vv, 2026-10-30",
+  "units": "suffix6=6-decimal collateral raw units; suffixWad=1e18 shares",
   "tests": {
     "testDemoParityLockedTokensBurn": [
       {
@@ -37,7 +37,7 @@
         "inventoryYWad": "25515000000000000000000",
         "inventoryNWad": "25515000000000000000000",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "159734154143689633149",
         "lpFees6": "0",
         "B6": "1215000000",
@@ -68,7 +68,7 @@
           },
           {
             "account": 2,
-            "wallet6": "953804797",
+            "wallet6": "959151677",
             "lpWad": "29311763427984685986",
             "yesWad": "80000000000000000000",
             "noWad": "0",
@@ -76,19 +76,19 @@
           }
         ],
         "collateral6": "25515000000",
-        "cash6": "45271298",
+        "cash6": "40031356",
         "inventoryYWad": "25435000000000000000000",
         "inventoryNWad": "25515000000000000000000",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "159734154143689633149",
-        "lpFees6": "230976",
-        "B6": "1215230976",
-        "coreFeesSent6": "461952",
-        "coreFeesEscrow6": "461952",
+        "lpFees6": "204241",
+        "B6": "1215204241",
+        "coreFeesSent6": "285938",
+        "coreFeesEscrow6": "285938",
         "merged6": "0",
         "redeemed6": "0",
-        "priceYesWad": "630260222917751306"
+        "priceYesWad": "500783851993546959"
       },
       {
         "step": "transfer_lp_10",
@@ -111,7 +111,7 @@
           },
           {
             "account": 2,
-            "wallet6": "953804797",
+            "wallet6": "959151677",
             "lpWad": "29311763427984685986",
             "yesWad": "80000000000000000000",
             "noWad": "0",
@@ -119,19 +119,19 @@
           }
         ],
         "collateral6": "25515000000",
-        "cash6": "45271298",
+        "cash6": "40031356",
         "inventoryYWad": "25435000000000000000000",
         "inventoryNWad": "25515000000000000000000",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "159734154143689633149",
-        "lpFees6": "230976",
-        "B6": "1215230976",
-        "coreFeesSent6": "461952",
-        "coreFeesEscrow6": "461952",
+        "lpFees6": "204241",
+        "B6": "1215204241",
+        "coreFeesSent6": "285938",
+        "coreFeesEscrow6": "285938",
         "merged6": "0",
         "redeemed6": "0",
-        "priceYesWad": "630260222917751306"
+        "priceYesWad": "500783851993546959"
       },
       {
         "step": "transfer_b_100",
@@ -154,7 +154,7 @@
           },
           {
             "account": 2,
-            "wallet6": "953804797",
+            "wallet6": "959151677",
             "lpWad": "29311763427984685986",
             "yesWad": "80000000000000000000",
             "noWad": "0",
@@ -162,19 +162,19 @@
           }
         ],
         "collateral6": "25515000000",
-        "cash6": "45271298",
+        "cash6": "40031356",
         "inventoryYWad": "25435000000000000000000",
         "inventoryNWad": "25515000000000000000000",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "159734154143689633149",
-        "lpFees6": "230976",
-        "B6": "1215230976",
-        "coreFeesSent6": "461952",
-        "coreFeesEscrow6": "461952",
+        "lpFees6": "204241",
+        "B6": "1215204241",
+        "coreFeesSent6": "285938",
+        "coreFeesEscrow6": "285938",
         "merged6": "0",
         "redeemed6": "0",
-        "priceYesWad": "630260222917751306"
+        "priceYesWad": "500783851993546959"
       },
       {
         "step": "sell_yes_30",
@@ -197,7 +197,7 @@
           },
           {
             "account": 2,
-            "wallet6": "971638382",
+            "wallet6": "973870399",
             "lpWad": "29311763427984685986",
             "yesWad": "50000000000000000000",
             "noWad": "0",
@@ -205,19 +205,19 @@
           }
         ],
         "collateral6": "25515000000",
-        "cash6": "27073762",
+        "cash6": "25012251",
         "inventoryYWad": "25465000000000000000000",
         "inventoryNWad": "25515000000000000000000",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "159734154143689633149",
-        "lpFees6": "321963",
-        "B6": "1215321963",
-        "coreFeesSent6": "643927",
-        "coreFeesEscrow6": "643927",
+        "lpFees6": "279336",
+        "B6": "1215279336",
+        "coreFeesSent6": "391071",
+        "coreFeesEscrow6": "391071",
         "merged6": "0",
         "redeemed6": "0",
-        "priceYesWad": "582570206462314677"
+        "priceYesWad": "500489907740538471"
       },
       {
         "step": "finalized",
@@ -232,7 +232,7 @@
           },
           {
             "account": 1,
-            "wallet6": "900000000",
+            "wallet6": "1089000000",
             "lpWad": "48199833822068561715",
             "yesWad": "0",
             "noWad": "0",
@@ -240,7 +240,7 @@
           },
           {
             "account": 2,
-            "wallet6": "971638382",
+            "wallet6": "1055429071",
             "lpWad": "29311763427984685986",
             "yesWad": "50000000000000000000",
             "noWad": "0",
@@ -252,12 +252,12 @@
         "inventoryYWad": "0",
         "inventoryNWad": "0",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "159734154143689633149",
         "lpFees6": "0",
         "B6": "0",
-        "coreFeesSent6": "643927",
-        "coreFeesEscrow6": "643927",
+        "coreFeesSent6": "391071",
+        "coreFeesEscrow6": "391071",
         "merged6": "0",
         "redeemed6": "0"
       },
@@ -274,7 +274,7 @@
           },
           {
             "account": 1,
-            "wallet6": "1059734154",
+            "wallet6": "1248734154",
             "lpWad": "47199833822068561715",
             "yesWad": "0",
             "noWad": "0",
@@ -282,7 +282,7 @@
           },
           {
             "account": 2,
-            "wallet6": "971638382",
+            "wallet6": "1055429071",
             "lpWad": "29311763427984685986",
             "yesWad": "50000000000000000000",
             "noWad": "0",
@@ -294,12 +294,12 @@
         "inventoryYWad": "0",
         "inventoryNWad": "0",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "158734154143689633149",
         "lpFees6": "0",
         "B6": "0",
-        "coreFeesSent6": "643927",
-        "coreFeesEscrow6": "643927",
+        "coreFeesSent6": "391071",
+        "coreFeesEscrow6": "391071",
         "merged6": "0",
         "redeemed6": "0"
       },
@@ -316,7 +316,7 @@
           },
           {
             "account": 1,
-            "wallet6": "1059734154",
+            "wallet6": "1248734154",
             "lpWad": "47199833822068561715",
             "yesWad": "0",
             "noWad": "0",
@@ -324,7 +324,7 @@
           },
           {
             "account": 2,
-            "wallet6": "1020721414",
+            "wallet6": "1104423759",
             "lpWad": "29311763427984685986",
             "yesWad": "50000000000000000000",
             "noWad": "0",
@@ -336,12 +336,12 @@
         "inventoryYWad": "0",
         "inventoryNWad": "0",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "158734154143689633149",
         "lpFees6": "0",
         "B6": "0",
-        "coreFeesSent6": "643927",
-        "coreFeesEscrow6": "643927",
+        "coreFeesSent6": "391071",
+        "coreFeesEscrow6": "391071",
         "merged6": "0",
         "redeemed6": "0"
       },
@@ -358,7 +358,7 @@
           },
           {
             "account": 1,
-            "wallet6": "1059734154",
+            "wallet6": "1248734154",
             "lpWad": "45199833822068561715",
             "yesWad": "0",
             "noWad": "0",
@@ -366,7 +366,7 @@
           },
           {
             "account": 2,
-            "wallet6": "1020721414",
+            "wallet6": "1104423759",
             "lpWad": "31311763427984685986",
             "yesWad": "50000000000000000000",
             "noWad": "0",
@@ -378,12 +378,12 @@
         "inventoryYWad": "0",
         "inventoryNWad": "0",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "158734154143689633149",
         "lpFees6": "0",
         "B6": "0",
-        "coreFeesSent6": "643927",
-        "coreFeesEscrow6": "643927",
+        "coreFeesSent6": "391071",
+        "coreFeesEscrow6": "391071",
         "merged6": "0",
         "redeemed6": "0"
       },
@@ -392,7 +392,7 @@
         "accounts": [
           {
             "account": 0,
-            "wallet6": "14433157073",
+            "wallet6": "14432618173",
             "lpWad": "0",
             "yesWad": "0",
             "noWad": "0",
@@ -400,7 +400,7 @@
           },
           {
             "account": 1,
-            "wallet6": "9047263939",
+            "wallet6": "8965548351",
             "lpWad": "0",
             "yesWad": "0",
             "noWad": "0",
@@ -408,7 +408,7 @@
           },
           {
             "account": 2,
-            "wallet6": "6519578981",
+            "wallet6": "6601833466",
             "lpWad": "0",
             "yesWad": "0",
             "noWad": "0",
@@ -420,15 +420,26 @@
         "inventoryYWad": "0",
         "inventoryNWad": "0",
         "basisWad": "25515000000000000000000",
-        "bWad": "150000000000000000000",
+        "bWad": "25515000000000000000000",
         "liquiditySupplyWad": "0",
         "lpFees6": "0",
         "B6": "0",
-        "coreFeesSent6": "643927",
-        "coreFeesEscrow6": "643927",
+        "coreFeesSent6": "391071",
+        "coreFeesEscrow6": "391071",
         "merged6": "0",
         "redeemed6": "0"
       }
     ]
+  },
+  "provenance": {
+    "compiler": "0.8.20",
+    "viaIR": true,
+    "optimizerRuns": 1,
+    "sha256": {
+      "contracts/topic-market/src/TopicMarket.sol": "6661e81188f85c1a95682e44cb072b598d91aa595c4a1aea42be44928a802d27",
+      "contracts/topic-market/src/core/OCPCore.sol": "13d025cf852ddf5f9cb059dd03de18bff8cbadaf9a82c4391f847c8c65ea7bd5",
+      "contracts/topic-market/src/VaultCoreAdapter.sol": "b651be0f6c5c8195da5de05831c1d49cabcae594592d4d6e8eb7fc4371da4e0b",
+      "contracts/topic-market/test/TopicMarketRealCore.t.sol": "4e7cc3ffb26031951338cd84b7365ffa3f86a0893912e44a8b6f3667ce0912a5"
+    }
   }
 }

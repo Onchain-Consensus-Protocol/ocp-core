@@ -22,7 +22,7 @@ export interface MarketPresentation {
   formalVolume?:bigint;totalFees:bigint;feeYes?:bigint;feeNo?:bigint;feeInvalid?:bigint;
   corePayout?:bigint;marketPayout?:bigint;genesisPrice:bigint;
 }
-export interface MarketState extends MarketSummary { poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; R:bigint; B:bigint; S:bigint; rTarget:bigint; bTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; bBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
+export interface MarketState extends MarketSummary { feeClaims?:{automatic?:boolean;creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string}; poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; R:bigint; B:bigint; S:bigint; rTarget:bigint; bTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; bBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
 export interface DirectoryState { factory:string; owner:string; fixedTestTargets?:boolean; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
 export interface PaymentRoute {router:string;exchange:string;stock:string;stable:string;stableSymbol:string;stableDecimals:number;stableBalance?:bigint;stableAllowance?:bigint}
 export interface CreateMarketInput { stock:string; topic:string; yesRule:string; noRule:string; invalidRule:string; coreEnd:bigint }
@@ -103,6 +103,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const values=await Promise.all(keys.map(key=>m[key]()));
     const state={...base,...Object.fromEntries(keys.map((key,i)=>[key,values[i]]))} as MarketState;
     state.phase=Number(state.phase);state.outcome=Number(state.outcome);
+    try{const [creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient]=await Promise.all([m.creator(),m.protocol(),m.creatorFees(),m.protocolFees(),v.officialMarketFeesClaimable(),v.emptySettlementRecipient()]);state.feeClaims={creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient};try{state.feeClaims.automatic=await new Contract(base.address,['function automaticFeePayout() view returns(bool)'],provider).automaticFeePayout();}catch{state.feeClaims.automatic=false;}}catch{/* 无法读取时不假定手续费为零。 */}
     try{state.poolStockBalance=await new Contract(base.stock,tokenAbi,provider).balanceOf(base.address);}catch{/* 未读到真实余额时保持未知，不用cash或0代替。 */}
     [state.vaultResolved,state.vaultOutcome,state.vaultSettlementReady,state.totalStakeYes,state.totalStakeNo,state.totalStakeInvalid]=await Promise.all([v.resolved(),v.outcome(),v.settlementReady(),v.totalStakeYes(),v.totalStakeNo(),v.totalStakeInvalid()]);
     state.vaultOutcome=Number(state.vaultOutcome);
@@ -185,17 +186,20 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
   }
   function withSigner(signer:Signer,validateSession?:()=>void) {
     async function writeReady(){await ready();if(!signer.provider) throw new Error('钱包未连接');await assertTestnet(signer.provider);}
-    async function submit(contract:Contract,method:string,args:unknown[]):Promise<ContractTransactionResponse>{
+    async function submit(contract:Contract,method:string,args:unknown[],paymentGas=0n):Promise<ContractTransactionResponse>{
       if(!signer.provider) throw new Error('钱包未连接');
+      // 自动付款有可选gas分支；在估算值上预留付款预算，避免钱包只给够冻结结算的gas。
+      const gasLimit=paymentGas>0n?await contract[method].estimateGas(...args,{chainId:TESTNET_CHAIN_ID})+paymentGas:undefined;
       // 读取登记或授权配置期间用户可能切链；发送前再核验，并把链ID写入交易，
       // 让钱包即使在此后切链也只能拒绝，不能在其他链发送同地址交易。
       await assertTestnet(signer.provider);
       validateSession?.();
-      return contract[method](...args,{chainId:TESTNET_CHAIN_ID});
+      return contract[method](...args,{chainId:TESTNET_CHAIN_ID,...(gasLimit===undefined?{}:{gasLimit})});
     }
     async function send(marketAddress:string,target:'market'|'vault'|'adapter',method:string,args:unknown[]):Promise<ContractTransactionResponse>{
       await writeReady();const base=await summary(marketAddress);
-      return submit(new Contract(target==='market'?base.address:base[target],target==='market'?marketAbi:target==='vault'?vaultAbi:adapterAbi,signer),method,args);
+      const paymentGas=target==='adapter'&&method==='finalizeMarket'?600000n:target==='market'&&(method==='closeExpired'||method==='claimFees')?350000n:0n;
+      return submit(new Contract(target==='market'?base.address:base[target],target==='market'?marketAbi:target==='vault'?vaultAbi:adapterAbi,signer),method,args,paymentGas);
     }
     return {
       async createMarket(input:CreateMarketInput):Promise<ContractTransactionResponse>{
@@ -226,6 +230,8 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       closeExpired:(market:string)=>send(market,'market','closeExpired',[]),
       finalizeMarket:(market:string)=>send(market,'adapter','finalizeMarket',[]),
       claimMarket:(market:string)=>send(market,'market','claimAll',[]),
+      claimMarketFees:(market:string)=>send(market,'market','claimFees',[]),
+      claimProtocolFees:(market:string)=>send(market,'vault','claimOfficialMarketFees',[]),
       claimCore:(market:string)=>send(market,'vault','withdraw',[]),
       async executeRouter(request:RouterRequest):Promise<ContractTransactionResponse>{
         await writeReady();const base=await summary(request.market);const m=new Contract(base.address,marketAbi,provider);

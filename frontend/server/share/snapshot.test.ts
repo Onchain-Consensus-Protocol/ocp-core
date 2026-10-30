@@ -16,7 +16,7 @@ describe('personal market snapshots',()=>{
  it('does not fabricate infinite changes from a zero opening price or use truncated events for costs',()=>{
   const empty=createShareSnapshot(make(),'alice','light',now,id);expect(empty.prices[0].change).toBeNull();
   const m=buy(make());m.state.events=[];const snap=createShareSnapshot(m,'alice','light',now,id);
-  expect(snap.pnl!.low).toBeCloseTo(-8.7525,4);expect(snap.pnl!.note).toContain('B excluded');
+  expect(snap.pnl!.low).toBeCloseTo(-9.336,4);expect(snap.pnl!.note).toContain('B excluded');
   m.history=[{at:1000,genesisPriceUSD:0,yesPrice:null},{at:1001,genesisPriceUSD:Number(snap.prices[0].value.slice(1))/2,yesPrice:null}];
   expect(createShareSnapshot(m,'alice','light',now+1000,id).prices[0].change).toContain('+100.');
  });

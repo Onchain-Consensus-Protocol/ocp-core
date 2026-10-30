@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
@@ -35,7 +36,7 @@ contract TopicMarketRightsSecurityTest is Test {
     function finish(uint8 outcome) internal {vm.warp(m.coreCutoff());oracle.resolve(outcome);m.finalize();}
     function lp() internal view returns(ISecurityRights){return cachedLP;}
     function bt() internal view returns(ISecurityRights){return cachedB;}
-    function invariantMoney() internal view {assertEq(usd.balanceOf(address(m)),m.accountedBalance());assertTrue(m.checkInvariants());}
+    function invariantMoney() internal view {assertEq(usd.balanceOf(address(m)),m.accountedBalance());assertTrue(checkMarketInvariants(m));}
 
     function testUnmaterializedRightsCannotInflateFirstLPClaim() public {
         graduateTwo(); uint256 denominator=m.S(); uint256 aliceG=m.shares(a); uint256 bobG=m.shares(b);

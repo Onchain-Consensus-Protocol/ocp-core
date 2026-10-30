@@ -2,7 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {TopicMarketDeployer,TopicMarketCoreDeployer} from "../src/TopicMarketFactory.sol";
+import {TopicMarketDeployer} from "../src/deployers/TopicMarketDeployer.sol";
+import {TopicMarketCoreDeployer} from "../src/deployers/TopicMarketCoreDeployer.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 

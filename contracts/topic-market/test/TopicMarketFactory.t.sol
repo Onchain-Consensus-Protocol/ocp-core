@@ -2,10 +2,12 @@
 pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {TopicMarketFactory, TopicMarketCoreDeployer, TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
+import {TopicMarketFactory} from "./legacy/TopicMarketFactory.sol";
+import {TopicMarketCoreDeployer} from "../src/deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "../src/deployers/TopicMarketDeployer.sol";
 import {TopicMarket, IToken6, ITopicMarketCore} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
-import {ITopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
+import {ITopicMarketPriceSnapshot} from "../src/interfaces/ITopicMarketPriceSnapshot.sol";
 import {MockUSDC} from "./TopicMarketBase.sol";
 import {OCPCore} from "ocp/core/OCPCore.sol";
 import {IOCPCore} from "ocp/interfaces/IOCPCore.sol";

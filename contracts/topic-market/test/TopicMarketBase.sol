@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {TopicMarket, IToken6, ITopicMarketCore} from "../src/TopicMarket.sol";
@@ -155,7 +156,7 @@ abstract contract TopicMarketBase is Test {
 
     function _accounting() internal view {
         assertEq(usd.balanceOf(address(market)), market.accountedBalance());
-        assertTrue(market.checkInvariants());
+        assertTrue(checkMarketInvariants(market));
         uint256 ys = market.inventoryY() + market.yes(alice) + market.yes(bob) + market.yes(carol) + market.yes(dave);
         uint256 ns = market.inventoryN() + market.no(alice) + market.no(bob) + market.no(carol) + market.no(dave);
         assertEq(ys, market.yesSupply());

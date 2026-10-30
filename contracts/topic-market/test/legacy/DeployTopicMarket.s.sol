@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {Script, console2} from "forge-std/Script.sol";
-import {TopicMarket, IToken6} from "../src/TopicMarket.sol";
-import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
-import {TopicMarketFactory, TopicMarketCoreDeployer, TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
-import {TopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
+import {TopicMarket, IToken6} from "../../src/TopicMarket.sol";
+import {VaultCoreAdapter} from "../../src/VaultCoreAdapter.sol";
+import {TopicMarketFactory} from "./TopicMarketFactory.sol";
+import {TopicMarketCoreDeployer} from "../../src/deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "../../src/deployers/TopicMarketDeployer.sol";
+import {TopicMarketPriceSnapshot} from "./TopicMarketPriceSnapshot.sol";
 
-/// @notice Explicit configuration only; no network, token, key or oracle defaults.
+/// @notice HISTORICAL FIXTURE, not the current deployment entry point. Explicit configuration only; no network, token, key or oracle defaults.
 /// @dev Run a simulation first. This script never creates a topic or stakes user funds.
 contract DeployTopicMarket is Script {
     function run() external returns (TopicMarketFactory factory) {

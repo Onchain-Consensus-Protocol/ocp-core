@@ -1,3 +1,5 @@
+import {ContractAddress} from './ContractAddress';
+import {config} from '../config';
 import {ActivityRecords} from './ActivityRecords';
 import {FinalDeadlineInput} from './FinalDeadlineInput';
 import {defaultDeadlineLocal,parseLocalDeadline,validDeadlineTimestamp} from '../shared/deadlineDate';
@@ -10,7 +12,7 @@ import {genesisTokens,genesisShares,genesisPrice} from './genesisDisplay';
 import type {Language} from '../types';
 import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalBuy,topicMarketFormalSell,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalBuy,topicMarketQuoteFormalSell,topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketClaim,topicMarketClaimCore,topicMarketClaimPreview,topicMarketRedeemPairs,topicMarketPrices,type TopicMarketState,type TopicMarketTradeQuote,type Side,type Outcome} from './topicMarketDemoModel';
 export interface RemoteSimulation {
- chain?:{poolBalances?:{yes:string;no:string;stock:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
+ chain?:{contractAddresses?:{market:string;core:string};poolBalances?:{yes:string;no:string;stock:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
  input:{tab:'MARKET'|'PROTOCOL';mode:'BUY'|'SELL';amount:number;useStable:boolean};state:TopicMarketState;assetSymbol:string;balanceUSD:number;topic:{title:string;YES:string;NO:string;INVALID:string};pending:boolean;
  prices:{genesis:number;probability:[number,number]|null};preview:ReturnType<typeof topicMarketClaimPreview>;
  genesisPnl:number;lpBEstimates:{outcome:Outcome;lp:number;B:number}[];outstanding:[number,number];
@@ -524,7 +526,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
         </div>
         )}
         {activeTab !== "MARKET" && userVaultSide && <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto"><div className="flex justify-between gap-3"><span>{t("预计 Core 奖励","Estimated Core reward")}</span><strong className="text-text">{formatAmount(userConditionalFees[finalOutcome ?? provisionalOutcome],4)} {asset.symbol}</strong></div></div>}
-   {remote&&activityPanel}
+   {remote&&<>{activityPanel}{remote.chain?.contractAddresses&&<ContractAddress key={activeTab==='PROTOCOL'?remote.chain.contractAddresses.core:remote.chain.contractAddresses.market} address={activeTab==='PROTOCOL'?remote.chain.contractAddresses.core:remote.chain.contractAddresses.market} label={activeTab==='PROTOCOL'?t('Core 合约地址','Core contract address'):s.phase==='GENESIS'||s.phase==='FAILED'?t('Genesis 市场合约地址','Genesis market contract address'):t('Formal 市场合约地址','Formal market contract address')} explorer={config.explorer} lang={lang}/>}</>}
    {!remote&&<details className={box+' text-xs'} data-testid="demo-details"><summary className="cursor-pointer font-bold">{t('演示场景','Demo scenarios')}</summary><div className="mt-4 space-y-5"><div className="grid grid-cols-3 gap-3 text-center font-mono">{[['Genesis',s.TG],['Formal',s.TF],['Core',s.TC]].map(([label,v])=><div key={String(label)}>{label} {t('截止','closes')}<strong className="block mt-2">{clock(Number(v))}</strong></div>)}</div><p className="text-text-muted">{t('Formal与Core在毕业时同时开启，截止时间固定。','Formal and Core open together at graduation. Deadlines stay fixed.')}</p><details><summary className="cursor-pointer">{t('演示参数','Demo parameters')}</summary><label className="block my-3">{t('ETH固定快照','Fixed ETH snapshot')}<input aria-label="ETH snapshot" type="number" value={snapshot} onChange={e=>setSnapshot(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><label>{t('正式深度','Formal depth')}<input aria-label="Formal depth" type="number" value={depth} onChange={e=>setDepth(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><p className="text-text-muted mt-2">{t('仅在下次创建生效，非实时价格或生产参数。','Applies at next creation; illustrative parameters only.')}</p></details>{activityPanel}</div></details>}      </div>
     </div>
   );

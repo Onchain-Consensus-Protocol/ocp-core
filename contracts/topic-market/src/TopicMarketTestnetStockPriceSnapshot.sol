@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {ITopicMarketPriceSnapshot,IUsdCollateralSnapshot} from "./TopicMarketPriceSnapshot.sol";
+import {ITopicMarketPriceSnapshot,IUsdCollateralSnapshot} from "./interfaces/ITopicMarketPriceSnapshot.sol";
 
 /// @notice Fixed TEST price of 400 USD per canonical Robinhood testnet TSLA token.
 /// @dev Not a market oracle or an ETH price. No owner, updates, rounds or freshness promises.

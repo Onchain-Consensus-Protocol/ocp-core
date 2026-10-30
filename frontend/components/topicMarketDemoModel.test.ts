@@ -104,7 +104,7 @@ describe("TopicMarket homepage: independent full lifecycle and settlement", () =
     s = topicMarketClaim(s, 0);
     expect(s.accounts[0].wallet).toBeCloseTo(9998.055, 7);
     s = topicMarketClaim(s, 1);
-    expect(s.accounts[1].wallet).toBeCloseTo(9999.9, 7);
+    expect(s.accounts[1].wallet).toBeCloseTo(10001.3315, 7);
     rejectsUnchanged(s, () => topicMarketClaim(s, 0));
     rejectsUnchanged(s, () => topicMarketClaimCore(s, 0));
     ledger(s);
@@ -137,7 +137,7 @@ describe("TopicMarket homepage: independent full lifecycle and settlement", () =
         s = topicMarketClaimCore(s, 2);
         rejectsUnchanged(s, () => topicMarketClaimCore(s, 2));
       }
-      s = topicMarketClaimFees(s, "CREATOR", 1);
+      if(s.creatorFees>0)s = topicMarketClaimFees(s, "CREATOR", 1);
       if (s.protocolFees > 0) s = topicMarketClaimFees(s, "PROTOCOL", 2);
       if (s.coreOfficialBudget > 0) s = topicMarketClaimCoreOfficial(s, 2);
       ledger(s);
@@ -236,7 +236,7 @@ describe("TopicMarket homepage: independent full lifecycle and settlement", () =
     expect(s.inventory[0]).toBeCloseTo(M, 8);
     expect(s.collateral).toBe(M);
     rejectsUnchanged(s, () => topicMarketClaimFees(s, "CREATOR", 0));
-    s = topicMarketClaimFees(s, "CREATOR", 1);
+    if(s.creatorFees>0)s = topicMarketClaimFees(s, "CREATOR", 1);
     rejectsUnchanged(s, () => topicMarketClaimFees(s, "CREATOR", 1));
     s = topicMarketFinalize(topicMarketAdvanceTime(s, s.TC));
     expect(s.cover).toBeCloseTo(0, 8);

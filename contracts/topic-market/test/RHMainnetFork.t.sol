@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {TopicMarket,IToken6} from "../src/TopicMarket.sol";
 import {TopicMarketStockFactory} from "../src/TopicMarketStockFactory.sol";
-import {TopicMarketCoreDeployer,TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
+import {TopicMarketCoreDeployer} from "../src/deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "../src/deployers/TopicMarketDeployer.sol";
 import {TopicMarketAssetRouter,ITopicMarketRouterRegistry} from "../src/TopicMarketAssetRouter.sol";
 import {TopicMarketV3Router02Exchange,ITopicMarketV3Router02} from "../src/TopicMarketV3Router02Exchange.sol";
 import {TopicMarketV3Exchange,ITopicMarketV3SwapRouter} from "../src/TopicMarketV3Exchange.sol";
-import {ITopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
+import {ITopicMarketPriceSnapshot} from "../src/interfaces/ITopicMarketPriceSnapshot.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
 import {OCPCore} from "ocp/core/OCPCore.sol";
 
@@ -80,7 +82,7 @@ contract RHMainnetForkTest is Test {
         r.minOutput=1;uint256 before=IERC20(USDG).balanceOf(alice);vm.prank(alice);router.execute(r);assertGt(IERC20(USDG).balanceOf(alice),before);
         r=request(mm,TopicMarketAssetRouter.Action.ClaimCore);r.minOutput=1;vm.prank(alice);router.execute(r);
         assertEq(IERC20(stock).balanceOf(address(router)),0);assertEq(IERC20(USDG).balanceOf(address(router)),0);
-        assertEq(IERC20(stock).allowance(address(router),mm),0);assertTrue(m.checkInvariants());
+        assertEq(IERC20(stock).allowance(address(router),mm),0);assertTrue(checkMarketInvariants(m));
         vm.prank(alice);vm.expectRevert();router.execute(r);
     }
     function _claimState(TopicMarket m,address stock,address router,address exchange) private view returns(bytes32) {

@@ -2,10 +2,12 @@
 pragma solidity ^0.8.20;
 import {TopicMarketBase} from "./TopicMarketBase.sol";
 import {SnapshotFeedMock} from "./TopicMarketPriceSnapshot.t.sol";
-import {TopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
+import {TopicMarketPriceSnapshot} from "./legacy/TopicMarketPriceSnapshot.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
-import {TopicMarketFactory,TopicMarketCoreDeployer,TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
+import {TopicMarketFactory} from "./legacy/TopicMarketFactory.sol";
+import {TopicMarketCoreDeployer} from "../src/deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "../src/deployers/TopicMarketDeployer.sol";
 import {OCPCore} from "ocp/core/OCPCore.sol";
 import {IOCPCore} from "ocp/interfaces/IOCPCore.sol";
 

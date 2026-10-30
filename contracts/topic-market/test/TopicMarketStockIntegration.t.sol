@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ITopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
+import {ITopicMarketPriceSnapshot} from "../src/interfaces/ITopicMarketPriceSnapshot.sol";
 import {TopicMarketStockFactory} from "../src/TopicMarketStockFactory.sol";
-import {TopicMarketCoreDeployer,TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
+import {TopicMarketCoreDeployer} from "../src/deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "../src/deployers/TopicMarketDeployer.sol";
 import {TopicMarketAssetRouter,ITopicMarketAssetExchange,ITopicMarketRouterRegistry} from "../src/TopicMarketAssetRouter.sol";
 import {TopicMarketStockPriceSnapshot} from "../src/TopicMarketStockPriceSnapshot.sol";
 import {TopicMarket,IToken6} from "../src/TopicMarket.sol";
@@ -98,7 +100,7 @@ contract TopicMarketStockIntegrationTest is Test {
         TopicMarketAssetRouter.Request memory r=req(TopicMarketAssetRouter.Action.GenesisSell);r.quantity=m.shares(alice)/2;
         uint256 before=u.balanceOf(alice);vm.prank(alice);router.execute(r);assertGt(u.balanceOf(alice),before);
         assertEq(c.allowance(address(router),address(m)),0);assertEq(c.allowance(address(router),address(ex)),0);
-        assertTrue(m.checkInvariants());
+        assertTrue(checkMarketInvariants(m));
     }
     function testFullFormalCoreAndBurnClaimsThroughStableRoute() public {
         factory.setStockEnabled(address(c),false);
@@ -111,7 +113,7 @@ contract TopicMarketStockIntegrationTest is Test {
         vm.warp(m.coreCutoff());adapter.finalizeMarket();
         r=req(TopicMarketAssetRouter.Action.ClaimMarket);uint256 before=u.balanceOf(alice);vm.prank(alice);router.execute(r);assertGt(u.balanceOf(alice),before);
         assertEq(m.bToken().balanceOf(alice),0);assertEq(m.lpToken().balanceOf(alice),0);
-        r=req(TopicMarketAssetRouter.Action.ClaimCore);vm.prank(alice);router.execute(r);assertTrue(m.checkInvariants());
+        r=req(TopicMarketAssetRouter.Action.ClaimCore);vm.prank(alice);router.execute(r);assertTrue(checkMarketInvariants(m));
         vm.prank(alice);vm.expectRevert();router.execute(r);
     }
     function testOutputSwapFailureRollsBackBurnAndAllowsNativeClaim() public {
@@ -207,7 +209,7 @@ contract TopicMarketStockIntegrationTest is Test {
         factory.setStockEnabled(address(c),false);
         vm.prank(alice);secondRouter.execute(r);
         assertGt(other.shares(alice),0);assertEq(c.balanceOf(address(m)),firstBalance);
-        assertTrue(other.checkInvariants());assertTrue(m.checkInvariants());
+        assertTrue(checkMarketInvariants(other));assertTrue(checkMarketInvariants(m));
         buy(1000e6);assertGt(m.shares(alice),0);
     }
     function testRegistrationRejectsWrongFactoryAndOracleUnits() public {

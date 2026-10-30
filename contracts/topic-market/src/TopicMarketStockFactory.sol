@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {IUsdCollateralSnapshot} from "./TopicMarketPriceSnapshot.sol";
+import {IUsdCollateralSnapshot} from "./interfaces/ITopicMarketPriceSnapshot.sol";
 import {TopicMarket,IToken6,ITopicMarketCore} from "./TopicMarket.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {VaultCoreAdapter} from "./VaultCoreAdapter.sol";
-import {TopicMarketCoreDeployer,TopicMarketDeployer} from "./TopicMarketFactory.sol";
-import {ITopicMarketPriceSnapshot} from "./TopicMarketPriceSnapshot.sol";
+import {TopicMarketCoreDeployer} from "./deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "./deployers/TopicMarketDeployer.sol";
+import {ITopicMarketPriceSnapshot} from "./interfaces/ITopicMarketPriceSnapshot.sol";
 interface IStockRouterBinding { function factory() external view returns (address); }
 interface IStockOracleUnits { function unit() external view returns (uint256); }
 /// @notice Shared factory with append-only stock configurations and independent markets.

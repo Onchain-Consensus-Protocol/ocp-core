@@ -65,8 +65,8 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
         _buy(alice, 1e6);
         vm.warp(market.genesisCutoff());
         vm.prank(alice);
-        vm.expectRevert("TRANSFER_NOT_IN_DEMO");
-        market.transferShares(bob, 1);
+        vm.expectRevert();
+        IRemovedMarketAPI(address(market)).transferShares(bob, 1);
     }
 
 
@@ -112,4 +112,13 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
 
 
 
+}
+
+interface IRemovedMarketAPI {
+    function quoteAddLP(uint256) external;
+    function quoteExit(uint256) external;
+    function addLP(uint256,uint256,uint256,uint256,uint64) external;
+    function exitLP(uint256,uint256,uint256,uint256) external;
+    function transferShares(address,uint256) external;
+    function transferOutcome(address,bool,uint256) external;
 }

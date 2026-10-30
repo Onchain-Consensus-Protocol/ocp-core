@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {TopicMarket,IToken6} from "../src/TopicMarket.sol";
 import {TopicMarketStockFactory} from "../src/TopicMarketStockFactory.sol";
-import {TopicMarketCoreDeployer,TopicMarketDeployer} from "../src/TopicMarketFactory.sol";
+import {TopicMarketCoreDeployer} from "../src/deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "../src/deployers/TopicMarketDeployer.sol";
 import {TopicMarketStockPriceSnapshot} from "../src/TopicMarketStockPriceSnapshot.sol";
-import {ITopicMarketAggregator} from "../src/TopicMarketPriceSnapshot.sol";
+import {ITopicMarketAggregator} from "../src/interfaces/ITopicMarketPriceSnapshot.sol";
 import {TopicMarketAssetRouter,ITopicMarketRouterRegistry} from "../src/TopicMarketAssetRouter.sol";
 import {TopicMarketV3Router02Exchange,ITopicMarketV3Router02} from "../src/TopicMarketV3Router02Exchange.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
@@ -158,7 +160,7 @@ contract RHEarlyTerminationForkTest is Test {
         uint256 usd=IERC20(USDG).balanceOf(ALICE);_route(0,ALICE,claim);assertGt(IERC20(USDG).balanceOf(ALICE),usd);
         assertEq(markets[0].shares(ALICE)+markets[0].yes(ALICE)+markets[0].bToken().balanceOf(ALICE)+markets[0].lpToken().balanceOf(ALICE),0);
         _claimCore(ALICE);_claimCore(BOB);assertEq(IERC20(stocks[0]).balanceOf(address(cores[0])),0);
-        assertTrue(markets[0].checkInvariants());assertEq(_state(1),isolated);assertTrue(adapters[1].tradingAllowed());
+        assertTrue(checkMarketInvariants(markets[0]));assertEq(_state(1),isolated);assertTrue(adapters[1].tradingAllowed());
         assertEq(IERC20(stocks[0]).balanceOf(address(routers[0])),0);assertEq(IERC20(USDG).balanceOf(address(routers[0])),0);
         assertEq(IERC20(stocks[0]).balanceOf(address(exchanges[0])),0);assertEq(IERC20(USDG).balanceOf(address(exchanges[0])),0);
         emit log_named_uint("500 USD real TSLA bond raw",bonds[0]);emit log_named_uint("exit penalty raw",penalty);

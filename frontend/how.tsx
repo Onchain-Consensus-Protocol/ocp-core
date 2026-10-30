@@ -41,7 +41,7 @@ const copy = {
     shared: "Shared final outcome",
     sharedDesc: "Core finalizes one result: YES, NO or INVALID. Market shares and LP / B rights settle using that same result.",
     lifecycle: "One market lifecycle",
-    steps: [["Launch a topic", "Define the question and YES / NO / INVALID criteria. Launch with zero creator capital and set one final Core deadline. Genesis closes one hour before the formal market, two hours before the final Core deadline, and may graduate earlier."], ["Trade gToken", "Buy and sell on the Genesis curve. For a buy of 100 dUSDC, 94.5 buys gToken, 4.5 enters the B risk reserve and earns B tokens, and 1 is the creator fee. Sales use the same split on the curve gross amount."], ["Graduate in either direction", "Targets are R = 3.6 ETH equivalent and B = 0.6 ETH equivalent, converted at creation and fixed in dUSDC. Each buy or sell checks both targets; the triggering order executes in full, then graduation is immediate. Genesis gToken becomes LP rights."], ["Formal Market + Core open", "Both open at graduation. Set one final Core deadline. The formal market closes 1 hour earlier, and Genesis closes 1 hour before the formal market. Deadlines follow server time, without fast-forward. Early graduation opens trading sooner; it does not reset deadlines."], ["Trade and stake", "Formal market trades allocate 98% to share purchases / seller proceeds, 0.5% to LP, 0.5% to B and 1% to Core rewards. Core staking is separate; eligible stakes earn fees only as those fees occur."], ["Settle and claim", "Core determines the result. Claim winning shares, Core principal / rewards and LP / B settlement amounts. Redeeming LP and B burns those tokens. If Genesis fails, R is distributed by gToken holdings and B by B-token holdings; creator fees are not refunded."]],
+    steps: [["Launch a topic", "Define the question and YES / NO / INVALID criteria. Launch with zero creator capital and set one final Core deadline. Genesis closes one hour before the formal market, two hours before the final Core deadline, and may graduate earlier."], ["Trade gToken", "Buy and sell on the Genesis curve. For a buy of 100 dUSDC, 94.5 buys gToken, 4.5 enters the B risk reserve and earns B tokens, 0.7 is the creator fee and 0.3 is the protocol fee. Sales use the same split on the curve gross amount."], ["Graduate in either direction", "Targets are R = 3.6 ETH equivalent and B = 0.6 ETH equivalent, converted at creation and fixed in dUSDC. Each buy or sell checks both targets; the triggering order executes in full, then graduation is immediate. Genesis gToken becomes LP rights."], ["Formal Market + Core open", "Both open at graduation. Set one final Core deadline. The formal market closes 1 hour earlier, and Genesis closes 1 hour before the formal market. Deadlines follow server time, without fast-forward. Early graduation opens trading sooner; it does not reset deadlines."], ["Trade and stake", "Formal market trades allocate 98% to share purchases / seller proceeds, 0.5% to LP, 0.5% to B, 0.7% to Core rewards and 0.3% to the protocol. Core staking is separate; eligible stakes earn fees only as those fees occur."], ["Settle and claim", "Core determines the result. Claim winning shares, Core principal / rewards and LP / B settlement amounts. Redeeming LP and B burns those tokens. If Genesis fails, R is distributed by gToken holdings and B by B-token holdings; creator fees are not refunded."]],
     capitalLab: "Capital consensus lab",
     capitalLabDesc: "An illustrative Core snapshot: YES or NO must exceed 50% of all three sides combined. Otherwise the result is INVALID.",
     total: "Total capital",
@@ -57,8 +57,8 @@ const copy = {
     maxLoss: "B covers LP losses first",
     subsidy: "Pool cash, accumulated LP fees and outcome inventory form LP net assets. B first covers any shortfall against the fixed LP basis, up to the available B reserve. LP receives net assets plus that cover; B holders receive the reserve left over. Neither is guaranteed a profit.",
     feeTitle: "Market trades: 2% total allocation",
-    vaultFee: "1% → eligible Core rewards",
-    protocolFee: "0.5% → LP · 0.5% → B reserve · no fixed creator or protocol cut",
+    vaultFee: "0.7% → eligible Core rewards",
+    protocolFee: "0.5% → LP · 0.5% → B reserve · 0.3% → protocol",
     feeBasis: "Buy 100 dUSDC: 98 buys shares. Sell for a curve gross amount of 100: receive 98. The remaining 2 is split as above; the pool pays the full gross amount on a sale.",
     outcomes: "What happens at settlement",
     yesResult: "YES exceeds 50% of all Core principal",
@@ -66,7 +66,7 @@ const copy = {
     invalidResult: "Neither YES nor NO exceeds 50%",
     vaultSettlement: "OCP Core",
     pmSettlement: "Market shares",
-    feeSettlement: "Core rewards (1%)",
+    feeSettlement: "Core rewards (0.7%)",
     yesVault: "YES stakers share the entire Core principal pool. Other sides lose their principal.",
     noVault: "NO stakers share the entire Core principal pool. Other sides lose their principal.",
     invalidVault: "Each account receives its own Core principal back.",
@@ -101,7 +101,7 @@ const copy = {
     shared: "共享同一个最终结果",
     sharedDesc: "Core 产生 YES、NO 或 INVALID 结果；市场份额及 LP／B 权益使用同一结果结算。",
     lifecycle: "一个市场的生命周期",
-    steps: [["发射话题", "填写话题内容，定义 YES／NO／INVALID 判定条件。创建者无需初始本金；Genesis比正式市场提前1小时截止，达标可提前毕业；只需设置最终Core截止时间。"], ["买卖 gToken", "Genesis 按曲线买卖。买入 100 dUSDC，94.5 买 gToken，4.5 计入 B 做市风险准备金并获得 B 代币，1 为创建者手续费。卖出按曲线毛额采用相同比例。"], ["买卖都可触发毕业", "R 目标为 3.6 ETH 等值，B 目标为 0.6 ETH 等值，创建时快照换算后固定。每笔买卖完成后检查双池，达标立即毕业。触发订单完整成交；gToken 转为 LP 权益。"], ["市场与 Core 同时开启", "仅毕业后开放。只需设置最终Core截止：正式市场提前1小时关闭，Genesis再提前1小时截止。所有截止时间按服务器时间计算，不能快进。提前毕业就提前开放，但不重置截止时间。"], ["交易与质押", "正式买卖的98%用于购买份额／卖家实收，0.5%归LP，0.5%进入B，1%归Core奖励。Core质押独立记账，只分参与期间符合条件的新增费用。"], ["结算并领取", "按Core结果领取份额赔付、Core本金及奖励，以及LP／B结算款。领取LP、B需销毁对应代币。未毕业则R按gToken份额、B按B代币份额清算，已付创建者手续费不退。"]],
+    steps: [["发射话题", "填写话题内容，定义 YES／NO／INVALID 判定条件。创建者无需初始本金；Genesis比正式市场提前1小时截止，达标可提前毕业；只需设置最终Core截止时间。"], ["买卖 gToken", "Genesis 按曲线买卖。买入 100 dUSDC，94.5 买 gToken，4.5 计入 B 做市风险准备金并获得 B 代币，0.7 为创建者手续费、0.3 为协议手续费。卖出按曲线毛额采用相同比例。"], ["买卖都可触发毕业", "R 目标为 3.6 ETH 等值，B 目标为 0.6 ETH 等值，创建时快照换算后固定。每笔买卖完成后检查双池，达标立即毕业。触发订单完整成交；gToken 转为 LP 权益。"], ["市场与 Core 同时开启", "仅毕业后开放。只需设置最终Core截止：正式市场提前1小时关闭，Genesis再提前1小时截止。所有截止时间按服务器时间计算，不能快进。提前毕业就提前开放，但不重置截止时间。"], ["交易与质押", "正式买卖的98%用于购买份额／卖家实收，0.5%归LP，0.5%进入B，0.7%归Core奖励、0.3%归协议。Core质押独立记账，只分参与期间符合条件的新增费用。"], ["结算并领取", "按Core结果领取份额赔付、Core本金及奖励，以及LP／B结算款。领取LP、B需销毁对应代币。未毕业则R按gToken份额、B按B代币份额清算，已付创建者手续费不退。"]],
     capitalLab: "资本共识实验",
     capitalLabDesc: "这是一个 Core 资本快照示例：YES 或 NO 必须严格超过三个方向全部质押的50%，否则为 INVALID。",
     total: "总资本",
@@ -117,8 +117,8 @@ const copy = {
     maxLoss: "B 优先补偿 LP 做市亏损",
     subsidy: "池内现金、累计LP费用及YES／NO库存的结算价值形成LP净资产。低于固定LP本金基准时，B按实际余额优先补损。LP领取净资产加补损；B持有人分配补损后的剩余准备金，两者都不保证盈利。",
     feeTitle: "正式市场：费用合计2%",
-    vaultFee: "1% → Core合格质押者奖励",
-    protocolFee: "0.5% → LP · 0.5% → B准备金 · 创建者及协议固定分成均为0",
+    vaultFee: "0.7% → Core合格质押者奖励",
+    protocolFee: "0.5% → LP · 0.5% → B准备金 · 0.3% → 协议",
     feeBasis: "买入100 dUSDC，98用于购买份额；卖出曲线毛额100，98到账，其余2按上述比例分配。卖出时交易池支付完整毛额，不是只扣98。",
     outcomes: "三种终局分别发生什么",
     yesResult: "YES严格超过Core全部质押本金的50%",
@@ -126,7 +126,7 @@ const copy = {
     invalidResult: "YES与NO均未严格超过50%",
     vaultSettlement: "OCP Core",
     pmSettlement: "市场份额",
-    feeSettlement: "Core奖励（1%）",
+    feeSettlement: "Core奖励（0.7%）",
     yesVault: "YES质押者按比例分享Core全部质押本金，其他方向损失本金。",
     noVault: "NO质押者按比例分享Core全部质押本金，其他方向损失本金。",
     invalidVault: "各账户领取自己的Core质押本金。",
@@ -263,7 +263,7 @@ function GenesisLab({lang}:{lang:Language}) {
     <div className="text-xs text-text-muted mb-5">{zh?'可用余额':'Available balance'}: {fmt(account.wallet)} dUSDC</div>
     {([['R',state.R,state.rTarget],['B',state.B,state.bTarget]] as const).map(([name,value,target])=><div key={name} className="mt-3"><div className="flex justify-between text-xs mb-2"><strong>{name}</strong><span>{fmt(value)} / {fmt(target)} dUSDC</span></div><div className="h-3 bg-slate-100 rounded-full overflow-hidden"><div className={name==='R'?'h-full bg-purple-500':'h-full bg-orange-500'} style={{width:`${Math.min(100,value/target*100)}%`}}/></div></div>)}
     <p className="mt-4 text-xs leading-6 text-text-muted">{active?(zh?'买入推动价格上涨；卖出使价格下降并继续增加B。R与B同时达标即毕业，买卖都可能触发。':'Buys raise the price. Sales lower it and still add to B. Either direction can trigger graduation when both targets are met.'):(zh?'已毕业：Genesis停止交易，Formal与Core同时开启。点击重置重新体验。':'Graduated: Genesis closes; Formal and Core open together. Reset to try again.')}</p>
-    <details className="mt-3 text-xs text-text-muted"><summary className="cursor-pointer">{zh?'费用说明':'Cost details'}</summary><p className="mt-2 leading-6">{zh?'买入100：94.5买gToken，4.5计入B并获得B份额，1为创建者手续费。卖出毛额100：94.5到账，4.5计入B，1为创建者手续费。':'Buy 100: 94.5 buys gToken, 4.5 enters B and earns B shares, and 1 pays the creator. Sell gross 100: receive 94.5, B receives 4.5 and the creator receives 1.'}</p></details>
+    <details className="mt-3 text-xs text-text-muted"><summary className="cursor-pointer">{zh?'费用说明':'Cost details'}</summary><p className="mt-2 leading-6">{zh?'买入100：94.5买gToken，4.5计入B并获得B份额，0.7为创建者手续费、0.3为协议手续费。卖出毛额100：94.5到账，4.5计入B，0.7为创建者手续费、0.3为协议手续费。':'Buy 100: 94.5 buys gToken, 4.5 enters B and earns B shares, 0.7 pays the creator and 0.3 pays the protocol. Sell gross 100: receive 94.5, B receives 4.5 the creator receives 0.7 and the protocol receives 0.3.'}</p></details>
     {message&&<p role="alert" className="text-danger text-xs mt-2">{message}</p>}
   </div>;
 }
@@ -311,7 +311,7 @@ function HowPage() {
 
         <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6" id="genesis-guide"><SectionTitle eyebrow="01 / GENESIS" title={lang==='zh'?'Genesis · 启动与价格发现':'Genesis · Launch and price discovery'}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{lang==='zh'?'通过早期投机交易实现话题冷启动、价格发现和做市资本积累，并筛选有真实市场需求的话题进入 Formal Market。采用二次储备曲线：买入推高价格，卖出降低价格，实际成交按曲线积分计算。':'Early trading bootstraps topics, discovers prices and builds market-making capital, filtering demand into the Formal Market. A quadratic reserve curve raises prices on buys and lowers them on sales; orders execute along the curve.'}</p><details className="mb-5 text-xs text-text-muted"><summary className="cursor-pointer">{lang==='zh'?'价格曲线与毕业条件':'Price curve and graduation rules'}</summary><p className="mt-3 leading-7">{lang==='zh'?'R = kS²，边际价格 P = 2kS。R 是真实储备，S 是内部计量供应量，k 是固定曲线参数；展示面额为每个内部份额 1,000 万枚 gToken，页面单价相应除以 1,000 万。零供应时价格为零。R 达到 3.6 ETH 等值、B 达到 0.6 ETH 等值时毕业，目标按创建时价格快照固定；买卖均可触发。':'R = kS²; marginal price P = 2kS. R is real reserve, S is internal supply and k is fixed. Each internal unit displays as 10 million gToken, with the displayed price divided accordingly. Price starts at zero supply. Graduation requires R ≥ 3.6 ETH equivalent and B ≥ 0.6 ETH equivalent, fixed at creation; buys or sales can trigger it.'}</p></details><GenesisLab lang={lang}/><div className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6" id="graduation-guide"><h3 className="font-display text-xl font-bold mb-3">{lang==='zh'?'毕业转换':'Graduation conversion'}</h3><p className="text-sm leading-7 text-text">{lang==='zh'?'gToken → 正式LMSR二元市场的 LP 代币':'gToken → LP tokens in the formal LMSR binary market'}</p><p className="mt-2 text-sm leading-7 text-text-muted">{lang==='zh'?'按你持有的 gToken 占总供应量的比例，转换为 LP 代币，代表正式市场流动性池的份额，享有做市资产及 LP 费用的相应权益。':'Your share of the total gToken supply converts into LP tokens, representing proportional rights to the Formal Market liquidity pool’s assets and LP fees.'}</p><p className="mt-2 text-sm leading-7 text-text-muted">{lang==='zh'?'B 代币独立保留，代表做市风险准备金权益。gToken 不直接转换为 YES／NO 份额。':'B tokens remain separate rights to the market-making risk reserve. gToken does not convert directly into YES / NO shares.'}</p></div></section>
 
-        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="02 / FORMAL" title={t.marketLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.marketLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'毕业后与 Core 同时开启。买卖 YES／NO 份额，截止前可卖出，最终按 Core 结果兑付。交易费用合计 2%：LP 0.5%、B 0.5%、Core 1%。交易在创建时设定的Core截止前1小时停止，按服务器真实时间计算。':'Opens with Core at graduation. Trade YES / NO shares until the trading deadline; settlement follows Core. Trading fees total 2%: LP 0.5%, B 0.5%, Core 1%. Trading closes one hour before the Core deadline set at creation, following real elapsed server time.'}</p><LmsrLab lang={lang}/></section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="02 / FORMAL" title={t.marketLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.marketLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'毕业后与 Core 同时开启。买卖 YES／NO 份额，截止前可卖出，最终按 Core 结果兑付。交易费用合计 2%：LP 0.5%、B 0.5%、Core 0.7%、协议 0.3%。交易在创建时设定的Core截止前1小时停止，按服务器真实时间计算。':'Opens with Core at graduation. Trade YES / NO shares until the trading deadline; settlement follows Core. Trading fees total 2%: LP 0.5%, B 0.5%, Core 0.7%, protocol 0.3%. Trading closes one hour before the Core deadline set at creation, following real elapsed server time.'}</p><LmsrLab lang={lang}/></section>
         <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="03 / OCP CORE" title={t.capitalLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.capitalLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'用本金支持一个结果，结算前不能撤回或换边。赢方按比例分享输方本金及参与期间符合条件的市场费用。毕业后开启，在创建时设定的最终截止时间结束质押并确定结果，比市场交易晚1小时。':'Commit principal to an outcome; stakes cannot be withdrawn or switched before settlement. Winners share losing principal and eligible market fees accrued while participating. Opens at graduation. Staking closes and the result is determined at the final deadline set at creation, one hour after trading closes.'}</p><CapitalLab lang={lang}/></section>
 
 

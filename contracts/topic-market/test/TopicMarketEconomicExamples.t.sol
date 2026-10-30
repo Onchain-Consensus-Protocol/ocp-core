@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase, MockCore} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -44,7 +45,7 @@ contract TopicMarketEconomicExamplesTest is TopicMarketBase {
         _accounting();
     }
 
-    function testCreatorSelfTradeRecoversFeesAndBWithNearZeroNetLoss() public {
+    function testCreatorSelfTradeStillPaysProtocolShareAfterRecoveringOwnFeesAndB() public {
         uint256 start = usd.balanceOf(creator);
         _buy(creator, 100e6);
         uint256 supply = market.shares(creator);
@@ -62,10 +63,11 @@ contract TopicMarketEconomicExamplesTest is TopicMarketBase {
         market.claimFees();
         vm.stopPrank();
         assertLe(usd.balanceOf(creator), start);
-        assertLe(start - usd.balanceOf(creator), 10);
+        assertApproxEqAbs(start - usd.balanceOf(creator), usd.balanceOf(protocol), 10);
+        assertGt(usd.balanceOf(protocol), 0);
         assertEq(market.bToken().totalSupply(), 0);
         assertEq(usd.balanceOf(address(market)), market.accountedBalance());
-        assertTrue(market.checkInvariants());
+        assertTrue(checkMarketInvariants(market));
     }
 
     function testClaimAllTransferFailureRollsBackAllRightsAndBudgets() public {

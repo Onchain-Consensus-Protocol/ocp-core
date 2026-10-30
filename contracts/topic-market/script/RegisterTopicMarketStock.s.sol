@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {Script,console2} from "forge-std/Script.sol";
-import {ITopicMarketPriceSnapshot} from "../src/TopicMarketPriceSnapshot.sol";
+import {ITopicMarketPriceSnapshot} from "../src/interfaces/ITopicMarketPriceSnapshot.sol";
 import {IToken6} from "../src/TopicMarket.sol";
 import {TopicMarketStockFactory} from "../src/TopicMarketStockFactory.sol";
 import {TopicMarketStockPriceSnapshot} from "../src/TopicMarketStockPriceSnapshot.sol";

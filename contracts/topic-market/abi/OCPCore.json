@@ -486,6 +486,19 @@
   },
   {
     "type": "function",
+    "name": "executeOfficialTransfer",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "exitPenaltyPool",
     "inputs": [],
     "outputs": [
@@ -544,6 +557,13 @@
   {
     "type": "function",
     "name": "finalize",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "flushOfficialPayments",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"

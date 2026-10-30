@@ -20,7 +20,7 @@ function transactionFixture(){
     return abi.encodeFunctionResult(fragment,results[fragment.name]);
   })};
   const wallet=provider(46630n);const sendTransaction=vi.fn(async(tx:unknown)=>({hash:'0x01',request:tx}));
-  const writer=createChainClient(p as unknown as Provider,factory).withSigner({provider:wallet,sendTransaction} as unknown as Signer);
+  const writer=createChainClient(p as unknown as Provider,factory).withSigner({provider:wallet,sendTransaction,estimateGas:vi.fn(async()=>200000n)} as unknown as Signer);
   return {writer,wallet,sendTransaction,readerProvider:p};
 }
 describe('testnet transaction boundary',()=>{
@@ -83,13 +83,18 @@ describe('testnet transaction boundary',()=>{
     await writer.approveStock(market,'market',1n);
     await writer.approveRouterAsset(market,market,1n);
     await writer.executeRouter({market,action:RouterAction.GenesisBuy,paymentAsset:market,inputAmount:1n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0});
-    expect(sendTransaction).toHaveBeenCalledTimes(14);
+    await writer.claimMarketFees(market);
+    await writer.claimProtocolFees(market);
+    expect(sendTransaction).toHaveBeenCalledTimes(16);
     for(const [request] of sendTransaction.mock.calls) expect(request).toMatchObject({chainId:46630n});
+    expect(sendTransaction.mock.calls[3][0]).toMatchObject({gasLimit:800000n});
+    expect(sendTransaction.mock.calls[8][0]).toMatchObject({gasLimit:800000n});
+    expect(sendTransaction.mock.calls[14][0]).toMatchObject({gasLimit:550000n});
   });
   it('blocks a stale wallet session after asynchronous registry reads and before signing',async()=>{
     const {readerProvider,wallet,sendTransaction}=transactionFixture();
     const client=createChainClient(readerProvider as unknown as Provider,factory).withSigner(
-      {provider:wallet,sendTransaction} as unknown as Signer,()=>{throw new Error('Wallet session changed');});
+      {provider:wallet,sendTransaction,estimateGas:vi.fn(async()=>200000n)} as unknown as Signer,()=>{throw new Error('Wallet session changed');});
     await expect(client.claimMarket(market)).rejects.toThrow('Wallet session changed');
     expect(readerProvider.call).toHaveBeenCalled();expect(sendTransaction).not.toHaveBeenCalled();
   });

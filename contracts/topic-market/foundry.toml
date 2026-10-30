@@ -8,7 +8,7 @@ solc = "0.8.20"
 optimizer = true
 optimizer_runs = 1
 via_ir = true
-remappings = ["forge-std/=lib/forge-std/src/", "@openzeppelin/=lib/openzeppelin-contracts/", "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/", "@prb/math/=lib/prb-math/", "ocp/=lib/ocp-snapshot/src/"]
+remappings = ["forge-std/=lib/forge-std/src/", "@openzeppelin/=lib/openzeppelin-contracts/", "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/", "@prb/math/=lib/prb-math/", "ocp/=src/"]
 [profile.default.fuzz]
 runs = 256
 seed = "0x20261019"

@@ -20,8 +20,8 @@ contract TopicMarketTest is TopicMarketBase {
         _buy(alice, 100e3);
         assertEq(market.R(), 94500);
         assertEq(market.B(), 4500);
-        assertEq(market.protocolFees(), 0);
-        assertEq(market.creatorFees(), 1000);
+        assertEq(market.protocolFees(), 300);
+        assertEq(market.creatorFees(), 700);
         assertEq(market.contribution(alice), 4500);
         assertEq(market.S(), Math.sqrt(94500 * 1e30));
         _accounting();
@@ -167,8 +167,8 @@ contract TopicMarketTest is TopicMarketBase {
         uint256 z = market.contribution(alice);
         uint256 part = market.shares(alice) / 3;
         vm.prank(alice);
-        vm.expectRevert("TRANSFER_NOT_IN_DEMO");
-        market.transferShares(bob, part);
+        vm.expectRevert();
+        IRemovedMarketAPI(address(market)).transferShares(bob, part);
         assertEq(market.shares(bob), 0);
         assertEq(market.contribution(alice), z);
         assertEq(market.contribution(bob), 0);
@@ -182,8 +182,8 @@ contract TopicMarketTest is TopicMarketBase {
         _graduate();
         _formalBuy(bob, true, 1e18);
         vm.prank(bob);
-        vm.expectRevert("TRANSFER_NOT_IN_DEMO");
-        market.transferOutcome(carol, true, 1e18);
+        vm.expectRevert();
+        IRemovedMarketAPI(address(market)).transferOutcome(carol, true, 1e18);
         _finish(1);
         vm.prank(bob);
         assertEq(market.claimOutcome(), 1e6);
@@ -250,7 +250,6 @@ contract TopicMarketTest is TopicMarketBase {
         assertEq(market.B(), b);
         assertEq(market.collateralCash(), c);
         vm.prank(dave);
-        vm.expectRevert("NO_FEES");
         market.claimFees();
         _accounting();
     }
@@ -311,4 +310,13 @@ contract TopicMarketTest is TopicMarketBase {
     }
 
 
+}
+
+interface IRemovedMarketAPI {
+    function quoteAddLP(uint256) external;
+    function quoteExit(uint256) external;
+    function addLP(uint256,uint256,uint256,uint256,uint64) external;
+    function exitLP(uint256,uint256,uint256,uint256) external;
+    function transferShares(address,uint256) external;
+    function transferOutcome(address,bool,uint256) external;
 }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {TopicMarketStockFactory} from "./TopicMarketStockFactory.sol";
-import {TopicMarketCoreDeployer,TopicMarketDeployer} from "./TopicMarketFactory.sol";
+import {TopicMarketCoreDeployer} from "./deployers/TopicMarketCoreDeployer.sol";
+import {TopicMarketDeployer} from "./deployers/TopicMarketDeployer.sol";
 
 /// @notice Robinhood testnet-only TSLA graduation profile, not an ETH/TSLA price source.
 contract TopicMarketTestnetStockFactory is TopicMarketStockFactory {

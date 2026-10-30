@@ -17,7 +17,6 @@ contract TopicMarketMergeTest is TopicMarketBase {
         uint256 extN=market.no(alice)+market.no(bob)+market.no(carol)+market.no(dave);
         assertEq(y,extY+market.redeemedPairs()*market.SCALE());
         assertEq(n,extN+market.redeemedPairs()*market.SCALE());
-        assertEq(market.mergedPairs(),0);
         assertEq(market.collateralCash()+market.redeemedPairs(),market.initialCollateral());
         _accounting();
     }

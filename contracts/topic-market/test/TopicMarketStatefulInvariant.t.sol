@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {MockUSDC} from "./TopicMarketBase.sol";
@@ -117,7 +118,7 @@ contract TopicMarketStatefulInvariantTest is StdInvariant,Test {
     }
     function invariantMarketSolventAndRightsConserved() public view {
         assertGe(usd.balanceOf(address(market)),market.accountedBalance());
-        assertTrue(market.checkInvariants());
+        assertTrue(checkMarketInvariants(market));
         uint256 lp=market.lpToken().balanceOf(address(market));
         uint256 b;uint256 unmaterialized;uint256 y=market.inventoryY();uint256 n=market.inventoryN();
         for(uint256 i;i<4;i++){
