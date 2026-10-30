@@ -30,6 +30,9 @@ describe('chain data adapter for the shared Simulation view',()=>{
     expect(s.core.yes).toBe(3);expect(s.core.no).toBe(1);expect(s.core.invalid).toBe(2);
     expect(s.core.feeTotal).toBe(.12);expect(remote.prices.probability).toEqual([.6,.4]);
     expect(remote.outstanding).toEqual([3,1]);expect(remote.prices.genesis).toBe(18);
+    expect(remote.chain?.poolBalances).toEqual({yes:'7.0',no:'9.0',stock:'—'});
+    const props=fixture();props.market.poolStockBalance=1234567n;
+    expect(buildTestnetRemote(props).chain?.poolBalances?.stock).toBe('1.234567');
   });
   it('counts pending materialization as LP after graduation, preserving raw holdings',()=>{
     const props=fixture();const remote=buildTestnetRemote(props);

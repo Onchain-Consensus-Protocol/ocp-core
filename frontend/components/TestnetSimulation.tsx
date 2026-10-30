@@ -78,7 +78,7 @@ export function buildTestnetRemote(
     chart:props.history??[],onInput,
     // Parent-supplied controls are the sole write surface; the display adapter has no transaction callbacks.
     quote:()=>null,trade:noop,stake:noop,canStake:()=>false,claimMarket:noop,claimCore:noop,redeemPairs:noop,
-    chain:{controls:props.controls,coreActions:props.coreActions,status:props.status,stockSymbol:stock.symbol,
+    chain:{poolBalances:{yes:p?formatUnits(p.inventoryYes,18):'—',no:p?formatUnits(p.inventoryNo,18):'—',stock:props.market.poolStockBalance===undefined?'—':formatUnits(props.market.poolStockBalance,stock.decimals)},controls:props.controls,coreActions:props.coreActions,status:props.status,stockSymbol:stock.symbol,
       readOnlyMetrics:true,volumeAvailable:p?.formalVolume!==undefined,onTabChange:props.onTabChange},
   };
 }

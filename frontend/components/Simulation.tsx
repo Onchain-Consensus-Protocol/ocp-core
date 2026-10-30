@@ -9,7 +9,7 @@ import {genesisTokens,genesisShares,genesisPrice} from './genesisDisplay';
 import type {Language} from '../types';
 import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalBuy,topicMarketFormalSell,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalBuy,topicMarketQuoteFormalSell,topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketClaim,topicMarketClaimCore,topicMarketClaimPreview,topicMarketRedeemPairs,topicMarketPrices,type TopicMarketState,type TopicMarketTradeQuote,type Side,type Outcome} from './topicMarketDemoModel';
 export interface RemoteSimulation {
- chain?:{controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
+ chain?:{poolBalances?:{yes:string;no:string;stock:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
  input:{tab:'MARKET'|'PROTOCOL';mode:'BUY'|'SELL';amount:number;useStable:boolean};state:TopicMarketState;assetSymbol:string;balanceUSD:number;topic:{title:string;YES:string;NO:string;INVALID:string};pending:boolean;
  prices:{genesis:number;probability:[number,number]|null};preview:ReturnType<typeof topicMarketClaimPreview>;
  genesisPnl:number;lpBEstimates:{outcome:Outcome;lp:number;B:number}[];outstanding:[number,number];
@@ -470,6 +470,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
             </div>
           )}
         </div>
+
+        {activeTab==='MARKET'&&remote?.chain?.poolBalances&&!gen&&<div className="border border-border rounded-xl p-4 mb-5 text-xs" data-testid="market-pool-balances"><h3 className="text-text-muted font-bold mb-2">{t('池内资产','Pool assets')}</h3><Row label={t('池内 YES 份额','Pool YES shares')} value={`${remote.chain.poolBalances.yes} ${t('份','shares')}`}/><Row label={t('池内 NO 份额','Pool NO shares')} value={`${remote.chain.poolBalances.no} ${t('份','shares')}`}/><Row label={t('市场合约股票余额','Market stock balance')} value={`${remote.chain.poolBalances.stock} ${asset.symbol}`}/></div>}
 
         <div className={` ${gen?"hidden":"grid"} grid-cols-2 gap-4 mb-6`}>
           <div className="border border-border rounded-xl p-4">
