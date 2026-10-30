@@ -53,12 +53,13 @@ function ExploreStandalone() {
     <div className="min-h-screen flex flex-col selection:bg-accent/30 selection:text-white">
       <nav className="sticky top-0 z-50 backdrop-blur-md bg-transparent border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 sm:flex sm:justify-between sm:h-16 sm:py-0">
             <OCPMenu lang={lang} suffix="MARKET" />
-            <div className="flex items-center gap-4">
-              <a className="text-xs font-bold text-text-muted hover:text-accent" href={`${testnetMode ? '/' : '/testnet.html'}?lang=${lang}`}>{testnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '测试网入口' : 'Testnet')}</a>
+            <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+              <a className="hidden sm:inline whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent" href={`${testnetMode ? '/' : '/testnet.html'}?lang=${lang}`}>{testnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '测试网入口' : 'Testnet')}</a>
               <LanguageToggle lang={lang} setLang={setLang} />
             </div>
+            <a className="col-span-2 justify-self-end whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent sm:hidden" href={`${testnetMode ? '/' : '/testnet.html'}?lang=${lang}`}>{testnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '测试网入口' : 'Testnet')}</a>
           </div>
         </div>
       </nav>

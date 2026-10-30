@@ -52,7 +52,7 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
   }, []);
 
   return (
-    <div className="flex items-center gap-2 sm:gap-3">
+    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
     <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
