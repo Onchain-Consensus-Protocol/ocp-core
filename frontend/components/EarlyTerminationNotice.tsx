@@ -12,7 +12,7 @@ export function EarlyTerminationNotice({request,now,lang,connected,busy,onConnec
   const zh=lang==='zh',t=(cn:string,en:string)=>zh?cn:en;
   const seconds=Math.max(0,Number(request.processAfter)-now),due=seconds===0;
   const countdown=[Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(v=>String(v).padStart(2,'0')).join(':');
-  return <section role="region" aria-label={t('提前终止申请公告','Early resolution notice')} className="mb-4 rounded-xl border border-border border-l-2 border-l-orange-400 bg-orange-400/[0.03] px-4 py-2.5" data-testid="early-resolution-notice">
+  return <section role="region" aria-label={t('提前终止申请公告','Early resolution notice')} className="max-w-6xl mx-auto mb-4 rounded-xl border border-border border-l-2 border-l-orange-400 bg-orange-400/[0.03] px-4 py-2.5" data-testid="early-resolution-notice">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
       <div className="flex items-center gap-2"><Clock3 size={14} className="text-orange-400 shrink-0"/><span className="font-semibold">{t('提前终止申请','Early resolution')}</span><span aria-label={t('申请结果','Requested result')} className={'rounded px-1.5 py-0.5 font-mono font-bold '+(request.requestedOutcome===1?'bg-success/10 text-success':'bg-danger/10 text-danger')}>{request.requestedOutcome===1?'YES':'NO'}</span></div>
       <span className="text-text-muted">{due?t('窗口结束 · 待处理','Window ended · Action needed'):<>{t('剩余','Remaining')} <span className="font-mono tabular-nums text-text">{countdown}</span></>}</span>
