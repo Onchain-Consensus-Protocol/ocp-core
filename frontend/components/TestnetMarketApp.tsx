@@ -13,6 +13,7 @@ import {createChainClient, type MarketState,type PaymentRoute,RouterAction,type 
 import type {Language} from '../types';
 import factoryAbi from '../testnet/abi/TopicMarketStockFactory.json';
 import type {ChainPriceHistory} from '../testnet/priceHistory';
+import {useAsyncQuote} from '../testnet/useAsyncQuote';
 
 const CHAIN_ID = 46630;
 const field = 'block w-full border border-border rounded-lg p-3 mt-2 bg-white text-text';
@@ -55,9 +56,6 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   const [payAsset,setPayAsset]=useState<'STOCK'|'STABLE'>('STOCK');
   const [paymentRoute,setPaymentRoute]=useState<PaymentRoute|null>(null);
   const [routeError,setRouteError]=useState('');
-  const [stakeRouteQuote,setStakeRouteQuote]=useState<{key:string;input:bigint;minCollateral:bigint;estimated:bigint}|null>(null);
-  const [sideQuotes,setSideQuotes]=useState<Partial<Record<0|1,Quote>>>({});
-  const [sideErrors,setSideErrors]=useState<Partial<Record<0|1,string>>>({});
   const [query, setQuery] = useState('');
   const [topic, setTopic] = useState({topic: '', yesRule: '', noRule: '', invalidRule: ''});
   const [deadline, setDeadline] = useState(defaultDeadlineLocal);
@@ -86,13 +84,13 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
 
   function chooseMarket(address:string,symbol=category,confirmed=false) {
     if(pending.current&&!confirmed)return;
-    setSelected(address);setMarket(null);setAmount('');setSideQuotes({});setNotice('');
+    setSelected(address);setMarket(null);setAmount('');setNotice('');
     const url=new URL(window.location.href);if(address)url.searchParams.set('market',address);else url.searchParams.delete('market');
     if(symbol==='all')url.searchParams.delete('stock');else url.searchParams.set('stock',symbol);
     window.history.pushState({},'',url);
   }
-  useEffect(()=>{const pop=()=>{const url=new URL(window.location.href),address=url.searchParams.get('market');setSelected(address&&isAddress(address)?address:'');setCategory(url.searchParams.get('stock')||'all');setMarket(null);setSideQuotes({});setAmount('');};window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[]);
-  const onDetailTab=useCallback((next:'MARKET'|'PROTOCOL')=>{setTab(next==='PROTOCOL'?'CORE':'MARKET');setAmount('');setSideQuotes({});},[]);
+  useEffect(()=>{const pop=()=>{const url=new URL(window.location.href),address=url.searchParams.get('market');setSelected(address&&isAddress(address)?address:'');setCategory(url.searchParams.get('stock')||'all');setMarket(null);setAmount('');};window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[]);
+  const onDetailTab=useCallback((next:'MARKET'|'PROTOCOL')=>{setTab(next==='PROTOCOL'?'CORE':'MARKET');setAmount('');},[]);
 
   const refresh = useCallback(async () => {
     if (!reader || readIdentity.current!==selected+':'+(wallet?.address??'')) return;
@@ -143,7 +141,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
       walletEpoch.current++;
       readSequence.current++;
       setWallet(null);
-      setSideQuotes({});
+
       setMarket(null);
       setNotice(zh ? '钱包账户或网络已变化，请重新连接。' : 'Wallet account or network changed. Reconnect.');
     };
@@ -229,39 +227,41 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   const formalOpen = !!market && market.phase === 1 && now < Number(market.formalCutoff) && !market.vaultResolved && !earlyDue;
   const coreOpen = !!market && [1, 2].includes(market.phase) && now < Number(market.coreCutoff) && !market.vaultResolved && !earlyDue;
   const terminal = !!market && [3, 4].includes(market.phase);
-  const quoteKey = `${selected}:${tab}:${mode}:${amount}:${market?.phase}:${wallet?.address}:${earlyDue}:${payAsset}:${Math.floor(now/20)}`;
-  useEffect(() => {
-    let cancelled=false;setSideQuotes({});setSideErrors({});setStakeRouteQuote(null);
-    if(!reader||!market||!stock||!amount||(usingStable&&!paymentRoute))return;
-    const timer=window.setTimeout(()=>{void (async()=>{
-      if(tab==='CORE'){
-        if(!usingStable)return;
-        try{const input=parseUnits(amount,payDecimals);if(input<=0n)return;const value=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,input,'input');if(!cancelled)setStakeRouteQuote({key:quoteKey,input,minCollateral:value.amountOut*99n/100n,estimated:value.amountOut});}
-        catch(error){if(!cancelled)setSideErrors({0:errorText(error)});}return;
-      }
-      await Promise.all(([0,...(genesis?[]:[1])] as (0|1)[]).map(async direction=>{
-        try {
-          const quantity=parseUnits(amount,genesis?mode==='BUY'?payDecimals:11:18);if(quantity<=0n)return;
-          let cash:bigint,limit:bigint,shares:bigint|undefined,route:RouterRequest|undefined;
-          const request=(action:RouterAction):RouterRequest=>({market:market.address,action,paymentAsset:paymentRoute!.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(now+600),side:direction,graduationIntent:0});
-          if(genesis&&mode==='BUY'){
-            if(usingStable){const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,quantity,'input');const floor=swap.amountOut*995n/1000n;shares=await reader.quoteGenesisBuy(market.address,swap.amountOut);limit=(await reader.quoteGenesisBuy(market.address,floor))*995n/1000n;cash=quantity;route={...request(RouterAction.GenesisBuy),inputAmount:quantity,minCollateral:floor,businessLimit:limit};}
-            else{shares=await reader.quoteGenesisBuy(market.address,quantity);cash=quantity;limit=shares*99n/100n;}
-          }else if(mode==='BUY'){
-            const cost=await reader.quoteFormalBuy(market.address,direction===0,quantity);
-            if(usingStable){const maxStock=(cost*1005n+999n)/1000n;const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,maxStock,'output');cash=swap.amountIn;limit=(cash*1005n+999n)/1000n;route={...request(RouterAction.FormalBuy),inputAmount:limit,quantity,minCollateral:maxStock,businessLimit:maxStock};}
-            else{cash=cost;limit=(cash*101n+99n)/100n;}
-          }else{
-            const value=genesis?await reader.quoteGenesisSell(market.address,quantity,wallet?.address):await reader.quoteFormalSell(market.address,direction===0,quantity,wallet?.address);
-            if(usingStable){const stockFloor=value.seller*995n/1000n;const [swap,safeSwap]=await Promise.all([reader.quotePaymentSwap(market.address,stock.address,paymentRoute!.stable,value.seller,'input'),reader.quotePaymentSwap(market.address,stock.address,paymentRoute!.stable,stockFloor,'input')]);cash=swap.amountOut;limit=safeSwap.amountOut*995n/1000n;route={...request(genesis?RouterAction.GenesisSell:RouterAction.FormalSell),quantity,businessLimit:stockFloor,minOutput:limit};}
-            else{cash=value.seller;limit=cash*99n/100n;}
-          }
-          if(!cancelled)setSideQuotes(prev=>({...prev,[direction]:{key:quoteKey+':'+direction,quantity,cash,limit,shares,route}}));
-        }catch(error){if(!cancelled)setSideErrors(prev=>({...prev,[direction]:errorText(error)}));}
-      }));
-    })();},250);
-    return()=>{cancelled=true;window.clearTimeout(timer);};
-  },[reader,market,stock,amount,tab,mode,genesis,quoteKey,wallet?.address,usingStable,paymentRoute,payDecimals]);
+  // 只有业务参数变化才废弃报价；目录轮询会生成新的对象引用，
+  // 不能因此中断多轮 USDG 读取，否则慢请求的结果和错误都会永久被丢弃。
+  const quoteKey = `${selected}:${tab}:${mode}:${amount}:${tradeSide}:${market?.phase}:${wallet?.address}:${earlyDue}:${payAsset}:${stock?.address}:${stock?.decimals}:${paymentRoute?.stable}:${paymentRoute?.router}:${payDecimals}:${confirmedRevision}`;
+  type QuoteBundle={sides?:Partial<Record<0|1,Quote>>;stake?:{key:string;input:bigint;minCollateral:bigint;estimated:bigint}};
+  const quoteEnabled=!!reader&&!!market&&!!stock&&!!amount&&(!usingStable||!!paymentRoute)&&(tab!=='CORE'||usingStable);
+  const quoteState=useAsyncQuote<QuoteBundle>(quoteEnabled?quoteKey:null,async()=>{
+    if(!reader||!market||!stock)throw new Error('Market unavailable');
+    if(tab==='CORE'){
+      const input=parseUnits(amount,payDecimals);if(input<=0n)return {};
+      const value=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,input,'input');
+      const minCollateral=value.amountOut*99n/100n;
+      if(minCollateral<=0n)throw new Error(t('金额过小，无法兑换。','Amount is too small to swap.'));
+      return {stake:{key:quoteKey,input,minCollateral,estimated:value.amountOut}};
+    }
+    const direction=genesis?0:tradeSide;
+    const quantity=parseUnits(amount,genesis?mode==='BUY'?payDecimals:11:18);if(quantity<=0n)return {};
+    let cash:bigint,limit:bigint,shares:bigint|undefined,route:RouterRequest|undefined;
+    const request=(action:RouterAction):RouterRequest=>({market:market.address,action,paymentAsset:paymentRoute!.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(Math.floor(Date.now()/1000)+chainTimeOffset.current+600),side:direction,graduationIntent:0});
+    if(genesis&&mode==='BUY'){
+      if(usingStable){const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,quantity,'input');const floor=swap.amountOut*995n/1000n;shares=await reader.quoteGenesisBuy(market.address,swap.amountOut);limit=(await reader.quoteGenesisBuy(market.address,floor))*995n/1000n;cash=quantity;route={...request(RouterAction.GenesisBuy),inputAmount:quantity,minCollateral:floor,businessLimit:limit};}
+      else{shares=await reader.quoteGenesisBuy(market.address,quantity);cash=quantity;limit=shares*99n/100n;}
+    }else if(mode==='BUY'){
+      const cost=await reader.quoteFormalBuy(market.address,direction===0,quantity);
+      if(usingStable){const maxStock=(cost*1005n+999n)/1000n;const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,maxStock,'output');cash=swap.amountIn;limit=(cash*1005n+999n)/1000n;route={...request(RouterAction.FormalBuy),inputAmount:limit,quantity,minCollateral:maxStock,businessLimit:maxStock};}
+      else{cash=cost;limit=(cash*101n+99n)/100n;}
+    }else{
+      const value=genesis?await reader.quoteGenesisSell(market.address,quantity,wallet?.address):await reader.quoteFormalSell(market.address,direction===0,quantity,wallet?.address);
+      if(usingStable){const stockFloor=value.seller*995n/1000n;const [swap,safeSwap]=await Promise.all([reader.quotePaymentSwap(market.address,stock.address,paymentRoute!.stable,value.seller,'input'),reader.quotePaymentSwap(market.address,stock.address,paymentRoute!.stable,stockFloor,'input')]);cash=swap.amountOut;limit=safeSwap.amountOut*995n/1000n;route={...request(genesis?RouterAction.GenesisSell:RouterAction.FormalSell),quantity,businessLimit:stockFloor,minOutput:limit};}
+      else{cash=value.seller;limit=cash*99n/100n;}
+    }
+    return {sides:{[direction]:{key:quoteKey+':'+direction,quantity,cash,limit,shares,route}}};
+  });
+  const sideQuotes=quoteState.expired?{}:quoteState.data?.sides??{};
+  const stakeRouteQuote=quoteState.expired?undefined:quoteState.data?.stake;
+  const sideErrors:Partial<Record<0|1,string>>=quoteState.error?{[tab==='CORE'||genesis?0:tradeSide]:errorText(quoteState.error)}:{};
 
   let coreAmount = 0n;
   try {if (stock && amount) coreAmount = parseUnits(amount, payDecimals);} catch {/* The input remains editable. */}
@@ -320,12 +320,16 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     void transact(async c=>{const request:RouterRequest={market:market.address,action:kind==='market'?RouterAction.ClaimMarket:RouterAction.ClaimCore,paymentAsset:paymentRoute.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(now+600),side:0,graduationIntent:0};const expected=await c.previewRouter(request);if(expected<=0n)throw new Error(t('当前没有可兑换的结算款。','No convertible payout is available.'));return c.executeRouter({...request,minOutput:expected*99n/100n});});
   }
   const tradeControls=market&&stock?<div className="space-y-4 animate-fade-in" data-testid="chain-trade-controls">
-    <div className={box+' space-y-2 text-xs'} data-testid="stock-route-panel"><strong>{stock.symbol} {t('股票代币底池','stock-token pool')}</strong><label className="flex justify-between items-center gap-2">{t('支付／收款资产','Pay / receive')}<select aria-label="Payment asset" className="border border-border rounded p-2 bg-white" value={payAsset} disabled={busy} onChange={e=>{setPayAsset(e.target.value as 'STOCK'|'STABLE');setSideQuotes({});setStakeRouteQuote(null);}}><option value="STOCK">{stock.symbol}</option>{paymentRoute&&<option value="STABLE">{paymentRoute.stableSymbol}</option>}</select></label>{row(t('可用余额','Available balance'),`${units(payBalance,payDecimals)} ${paySymbol}`)}<p className="text-text-muted">{usingStable?t('通过现有池兑换，使用真实 USDG 支付和收款。','Swap through the existing pool to pay and receive USDG.'):t('使用钱包中的测试股票支付和收款。','Pay and receive test stock tokens in your wallet.')}</p>{routeError&&<p className="text-text-muted">{routeError}</p>}</div>
+    <div className={box+' space-y-2 text-xs'} data-testid="stock-route-panel"><strong>{stock.symbol} {t('股票代币底池','stock-token pool')}</strong><label className="flex justify-between items-center gap-2">{t('支付／收款资产','Pay / receive')}<select aria-label="Payment asset" className="border border-border rounded p-2 bg-white" value={payAsset} disabled={busy} onChange={e=>{setPayAsset(e.target.value as 'STOCK'|'STABLE');}}><option value="STOCK">{stock.symbol}</option>{paymentRoute&&<option value="STABLE">{paymentRoute.stableSymbol}</option>}</select></label>{row(t('可用余额','Available balance'),`${units(payBalance,payDecimals)} ${paySymbol}`)}<p className="text-text-muted">{usingStable?t('通过现有池兑换，使用真实 USDG 支付和收款。','Swap through the existing pool to pay and receive USDG.'):t('使用钱包中的测试股票支付和收款。','Pay and receive test stock tokens in your wallet.')}</p>{routeError&&<p className="text-text-muted">{routeError}</p>}</div>
+    {quoteEnabled&&quoteState.loading&&!quoteState.data&&<p role="status" className="text-xs text-text-muted">{t('正在读取链上兑换报价…','Loading on-chain quote…')}</p>}
+    {quoteEnabled&&(quoteState.error||quoteState.expired)&&<div role="status" className="text-xs text-danger">{quoteState.expired?t('报价已过期，请刷新后操作。','Quote expired. Refresh before proceeding.'):t('报价读取失败，请重试。','Quote unavailable. Please retry.')} <button type="button" className="underline" onClick={quoteState.refresh}>{t('刷新报价','Refresh quote')}</button></div>}
+    {wallet&&tab==='CORE'&&coreAmount>0n&&!balanceEnough&&<p role="status" className="text-xs text-danger">{t('余额不足','Insufficient balance')} · {paySymbol}</p>}
+    {wallet&&tab==='MARKET'&&mode==='BUY'&&quoteFor(genesis?0:tradeSide)&&!canSubmit(genesis?0:tradeSide)&&!earlyDue&&(genesis?genesisOpen:formalOpen)&&(payBalance??0n)<(quoteFor(genesis?0:tradeSide)!.route?.inputAmount??quoteFor(genesis?0:tradeSide)!.limit)&&<p role="status" className="text-xs text-danger">{t('余额不足','Insufficient balance')} · {paySymbol}</p>}
     {tab==='CORE'?<>
       <div className={box+' text-xs text-text-muted'}>{t('质押资本决定最终结果。选定方向后只能同侧追加；可退出全部本金，罚没10%并放弃累计手续费。','Staked capital decides the result. Add to the same side, or exit all stake with a 10% penalty and forfeit accrued fees.')}</div>
       <div className={box+' text-xs'}><strong>{t('我的质押','My stake')}</strong>{(['YES','NO','INVALID'] as const).map((label,i)=>row(label,`${units(market.position?[market.position.coreYes,market.position.coreNo,market.position.coreInvalid][i]:undefined,stock.decimals)} ${stock.symbol}`))}</div>
       <label className="block text-xs font-bold text-text-muted">{t('质押金额','Stake amount')} ({paySymbol})<input className={field} aria-label={t('Core质押金额','Core stake amount')} inputMode="decimal" value={amount} disabled={busy} onChange={e=>setAmount(e.target.value)} placeholder="0"/></label>
-      {usingStable&&<p className="text-xs text-text-muted">{stakeRouteQuote?.key===quoteKey?`${t('预计质押','Estimated stake')}: ${units(stakeRouteQuote.estimated,stock.decimals)} ${stock.symbol}`:sideErrors[0]||t('输入金额读取兑换报价。','Enter an amount for a swap quote.')}</p>}
+      {usingStable&&<p className="text-xs text-text-muted">{stakeRouteQuote?.key===quoteKey?`${t('预计质押','Estimated stake')}: ${units(stakeRouteQuote.estimated,stock.decimals)} ${stock.symbol}`:sideErrors[0]||(quoteState.loading?t('正在读取链上兑换报价…','Loading on-chain quote…'):t('输入金额读取兑换报价。','Enter an amount for a swap quote.'))}</p>}
       <div className="grid grid-cols-2 gap-3">{([0,1] as const).map(i=><Button key={i} variant={i===0?'success':'danger'} disabled={!canSubmit(i)} onClick={()=>void submitSide(i)}>{!wallet?t('连接钱包','Connect wallet'):(usingStable?paymentRoute?.stableAllowance??0n:market.position?.vaultAllowance??0n)<coreAmount?t('授权','Approve'):t('质押','Stake')} {i===0?'YES':'NO'}</Button>)}</div><Button className="w-full text-yellow-700" variant="secondary" disabled={!canSubmit(2)} onClick={()=>void submitSide(2)}>{!wallet?t('连接钱包','Connect wallet'):(usingStable?paymentRoute?.stableAllowance??0n:market.position?.vaultAllowance??0n)<coreAmount?t('授权','Approve'):t('质押','Stake')} INVALID</Button>
     </>:!terminal?<div className={box+' space-y-3'}>
       <h5 className="font-bold text-sm">{t('市场','Market')}</h5><p className="text-xs text-text-muted">{genesis?t('买卖gToken；双池达标后转为LP。','Trade gToken; holdings become LP at graduation.'):t('连续报价YES／NO，LP资产留池做市。','YES / NO quotes while LP assets remain in the pool.')}</p>
