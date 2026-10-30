@@ -11,7 +11,7 @@ import {readChainPriceHistory, type ChainPriceHistory} from './priceHistory';
 export const TESTNET_CHAIN_ID = 46630n;
 const tokenAbi = ['function symbol() view returns(string)', 'function decimals() view returns(uint8)', 'function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'];
 export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; fixedRTarget?:bigint; fixedBTarget?:bigint }
-export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;phase?:number;priceYes?:bigint;R?:bigint;B?:bigint;rTarget?:bigint;bTarget?:bigint }
+export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;priceYes?:bigint;R?:bigint;B?:bigint;rTarget?:bigint;bTarget?:bigint }
 export interface AccountPosition { balance:bigint; genesisShares:bigint; yes:bigint; no:bigint; lp:bigint; b:bigint; coreYes:bigint; coreNo:bigint; coreInvalid:bigint; marketAllowance:bigint; vaultAllowance:bigint; routerAllowance:bigint }
 export interface CoreLifecycle {bond:bigint; requestId:bigint; requestedOutcome:number; processAfter:bigint; effectiveCutoff:bigint; due:boolean; refund?:bigint; penalty?:bigint; bondRefund?:bigint}
 /** Prices/quantities are WAD; money and payouts use collateral native units. Unknown metrics stay absent. */
@@ -58,7 +58,15 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
         if(names[i]==='phase')result.phase=Number(value.value);
         else result[names[i] as 'R'|'B'|'rTarget'|'bTarget']=value.value;
       }});
-      if(result.phase===1||result.phase===2){try{result.priceYes=await m.priceYes();}catch{/* Unknown odds remain absent. */}}
+      if(result.phase===1||result.phase===2){
+        const v=new Contract(result.vault,vaultAbi,provider);
+        await Promise.all([
+          m.priceYes().then((price:bigint)=>{result.priceYes=price;}).catch(()=>{}),
+          v.pendingEarlyTermination().then((request:{id:bigint;requestedOutcome:bigint;processAfter:bigint})=>{
+            if(request.id>0n)result.earlyRequest={requestId:request.id,requestedOutcome:Number(request.requestedOutcome),processAfter:request.processAfter};
+          }).catch(()=>{}),
+        ]);
+      }
     }
     return result;
   }
