@@ -206,7 +206,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       materializeLP:async(market:string)=>send(market,'market','materializeLP',[await signer.getAddress()]),
       exitCore:(market:string)=>send(market,'vault','exitStake',[]),
       proposeEarlyTermination:(market:string,outcome:1|2,reason:string)=>{
-        if(!reason.trim()) throw new Error('请填写提前终止原因');
+        if(!reason.trim()) throw new Error('请填写提前结算原因');
         return send(market,'vault','proposeEarlyTermination',[outcome,id(reason.trim())]);
       },
       processEarlyTermination:(market:string)=>send(market,'adapter','finalizeMarket',[]),

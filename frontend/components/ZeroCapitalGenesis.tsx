@@ -189,7 +189,7 @@ export function ZeroCapitalGenesis({ vaultAddr, genesisAddr, signer, walletAddre
       <p className="text-sm whitespace-pre-wrap">{state.description}</p>
       <p className="text-xs text-text-muted">截止 <time>{new Date(state.deadline * 1000).toLocaleString()}</time> · {expired ? "已到期" : `剩余 ${Math.floor((state.deadline - clock) / 3600)} 小时 ${Math.floor((state.deadline - clock) % 3600 / 60)} 分钟`}</p>
       <MarketPriceHistory address={genesisAddr} genesis symbol={state.symbol} />
-      <details className="text-xs text-text-muted"><summary className="cursor-pointer">交易风险</summary><p className="mt-2">临近截止仍允许毕业，知晓结果的交易者可能有优势。毕业后创建者可选择提前终止时点；做市份额本金可能损失至零。</p></details>
+      <details className="text-xs text-text-muted"><summary className="cursor-pointer">交易风险</summary><p className="mt-2">临近截止仍允许毕业，知晓结果的交易者可能有优势。毕业后创建者可选择提前结算时点；做市份额本金可能损失至零。</p></details>
       <details className="text-xs break-all"><summary className="cursor-pointer text-text-muted">合约信息</summary>Genesis：{genesisAddr}<br />正式市场：{same(state.market, ZERO) ? "毕业时部署" : state.market}</details>
       <div className="flex gap-3 flex-wrap">{button("刷新 Genesis", () => void refresh().catch(e => setError(e.message)))}
         {!signer && button("连接钱包", onConnectWallet)}

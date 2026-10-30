@@ -6,7 +6,7 @@
 
 独立入口为 `https://market.ocp-protocol.org/testnet.html`，固定链46630；普通市场入口仍为模拟。公开配置 `VITE_TOPIC_MARKET_FACTORY=0xB5C08A89F11D18A62361b87Dc963379281CA6D82` 由Vercel构建环境提供；`.env.testnet`只用于本地testnet构建，不控制默认页面模式。
 
-TSLA和官方测试USDG使用已有真实V3池，匹配带deadline的兑换适配器。R=.0036及B=.0006 TSLA双门槛；固定测试价400USD/TSLA仅用于500U保证金换算（1.25 TSLA），不提供假ETH行情。独立提前终止模块每市场创建并固定绑定。已真实验证0.1USDG路由买入、原生TSLA毕业、Core质押及90%退出；不会把分叉中的完整结算测试描述为测试网上已到期结算。
+TSLA和官方测试USDG使用已有真实V3池，匹配带deadline的兑换适配器。R=.0036及B=.0006 TSLA双门槛；固定测试价400USD/TSLA仅用于500U保证金换算（1.25 TSLA），不提供假ETH行情。独立提前结算模块每市场创建并固定绑定。已真实验证0.1USDG路由买入、原生TSLA毕业、Core质押及90%退出；不会把分叉中的完整结算测试描述为测试网上已到期结算。
 
 部署记录见contracts/topic-market/deployments/46630.json；源码验证状态独立记录，提交成功不等于已经验证。
 

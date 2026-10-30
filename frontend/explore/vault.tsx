@@ -1470,7 +1470,7 @@ function VaultPage({
           )}
           {detailState?.earlyTerminationEnabled && (
             <div className="rounded-lg border border-orange-400 bg-orange-50 px-3 py-2 text-xs leading-5 text-orange-950">
-              <strong>Permissionless 提前终止：</strong>创建者{" "}
+              <strong>Permissionless 提前结算：</strong>创建者{" "}
               <span className="font-mono break-all">
                 {detailState.permissionlessCreator}
               </span>{" "}
@@ -1478,7 +1478,7 @@ function VaultPage({
               Vault 的严格资金多数。X验证不等于官方背书，公开交易还可能被抢跑。
               {detailState.terminatedEarlyAt > 0 && (
                 <div className="mt-1 font-bold">
-                  已由创建者提前终止：
+                  已由创建者提前结算：
                   {new Date(
                     detailState.terminatedEarlyAt * 1000,
                   ).toLocaleString()}

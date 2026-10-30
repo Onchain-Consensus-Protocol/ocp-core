@@ -675,7 +675,7 @@ function App() {
                 <p className="text-xs text-text-muted">等值 4.2 ETH，创建时按链上报价冻结。</p>
                 <div className="flex justify-between gap-3"><span>正式交易手续费</span><strong>1.1%</strong></div>
               </div>
-              <p className="text-xs text-text-muted leading-5">参与资金可能损失。Genesis 有交易后不能取消；毕业后创建者可提前终止。<a href="/how.html?lang=zh#genesis-guide" className="text-accent underline ml-1">机制与风险说明</a></p>
+              <p className="text-xs text-text-muted leading-5">参与资金可能损失。Genesis 有交易后不能取消；毕业后创建者可提前结算。<a href="/how.html?lang=zh#genesis-guide" className="text-accent underline ml-1">机制与风险说明</a></p>
               <label className="block text-sm font-bold">
                 X用户名
                 <input
