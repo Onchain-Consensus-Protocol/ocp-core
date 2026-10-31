@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -103,7 +104,7 @@ contract RHSharedFactoryForkTest is Test {
             core.officialMarketFeesClaimable(),core.historicalFeePoolRemaining(),core.forfeitedBonusPoolRemaining(),
             core.accYesFeePerStake(),core.accNoFeePerStake(),core.accInvalidFeePerStake()));
         return keccak256(abi.encode(custody,ledger,requests,fees,m.phase(),m.shares(ALICE),m.yes(ALICE),m.no(ALICE),
-            m.bToken().balanceOf(ALICE),m.lpToken().balanceOf(ALICE),yes,no,invalid));
+            removedBBalance(m,ALICE),m.lpToken().balanceOf(ALICE),yes,no,invalid));
     }
     function _otherStates(uint256 active) private view returns(bytes32[5] memory states){
         for(uint256 i;i<5;i++)if(i!=active)states[i]=_assetState(i);
@@ -173,7 +174,7 @@ contract RHSharedFactoryForkTest is Test {
         vm.prank(ALICE);vm.expectRevert();routers[i].execute(r);
         assertEq(_assetState(i),beforeState);assertEq(IERC20(USDG).balanceOf(ALICE),usdBefore);_assertOthers(i,states);
         r.minOutput=1;_execute(i,r);assertGt(IERC20(USDG).balanceOf(ALICE),usdBefore);
-        assertEq(m.bToken().balanceOf(ALICE),0);assertEq(m.lpToken().balanceOf(ALICE),0);
+        assertEq(removedBBalance(m,ALICE),0);assertEq(m.lpToken().balanceOf(ALICE),0);
         assertEq(m.shares(ALICE),0);assertEq(m.yes(ALICE),0);
         r=_request(i,TopicMarketAssetRouter.Action.ClaimCore);r.minOutput=1;_execute(i,r);
         vm.prank(ALICE);vm.expectRevert();routers[i].execute(r);

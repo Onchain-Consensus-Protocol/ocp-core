@@ -50,7 +50,7 @@ export function buildTestnetRemote(
   const state:TopicMarketState={
     phase,now:Math.max(0,props.now-created),TG:relative(m.genesisCutoff),TF:relative(m.formalCutoff),
     TC:relative(m.early?.effectiveCutoff??m.coreCutoff),TT:relative(m.coreCutoff),Q:money(m.snapshot),k:wad(m.k),
-    rTarget:money(m.rTarget),bTarget:money(m.bTarget),R:money(m.R),B:money(m.B),S:wad(m.S),
+    singlePool:m.singlePool===true,rTarget:money(m.rTarget),bTarget:money(m.bTarget),R:money(m.R),B:money(m.B),S:wad(m.S),
     M0:wad(p?.basisWad),redeemedPairs:0,collateral:0,cash:money(m.cash),lpFees:money(m.lpFees),
     lpFeesEarned:0,formalVolume:money(p?.formalVolume),creatorFees:0,protocolFees:0,
     basis:wad(p?.basisWad),b:wad(p?.bWad),lpSupply:0,inventory:[wad(p?.inventoryYes),wad(p?.inventoryNo)],

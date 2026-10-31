@@ -58,26 +58,22 @@ contract TopicMarketRightsSecurityTest is Test {
         vm.prank(thief);(bool ok,)=address(m).call(abi.encodeWithSignature("materializeLP(address)",a));
         ok;assertEq(lp().balanceOf(a),amount);assertEq(lp().totalSupply(),supply);assertEq(lp().balanceOf(address(m)),escrow);invariantMoney();
     }
-    function testLPApprovalCannotSpendBAndDoesNotGrantClaimForOwner() public {
-        graduateTwo();rights.materializeLP(a);uint256 amount=lp().balanceOf(a)/2;uint256 bBefore=bt().balanceOf(a);
-        vm.prank(a);lp().approve(thief,amount);vm.prank(thief);lp().transferFrom(a,c,amount);
-        assertEq(lp().balanceOf(c),amount);assertEq(bt().balanceOf(a),bBefore);
-        vm.prank(thief);vm.expectRevert();bt().transferFrom(a,thief,1);
-        finish(1);uint256 oldA=usd.balanceOf(a);uint256 oldThief=usd.balanceOf(thief);
-        vm.prank(thief);vm.expectRevert();rights.claimLP(1);
-        assertEq(usd.balanceOf(a),oldA);assertEq(usd.balanceOf(thief),oldThief);
-        vm.prank(c);rights.claimLP(amount);assertEq(lp().balanceOf(c),0);invariantMoney();
+    function testLPApprovalDoesNotCreateBOrGrantClaimForOwner() public {
+        graduateTwo(); rights.materializeLP(a); uint256 amount=lp().balanceOf(a)/2;
+        vm.prank(a); lp().approve(thief,amount); vm.prank(thief); lp().transferFrom(a,c,amount);
+        assertEq(lp().balanceOf(c),amount); assertEq(rights.bToken(),address(0));
+        vm.prank(thief); vm.expectRevert("B_REMOVED"); rights.claimB(1);
+        finish(1); uint256 oldA=usd.balanceOf(a); uint256 oldThief=usd.balanceOf(thief);
+        vm.prank(thief); vm.expectRevert(); rights.claimLP(1);
+        assertEq(usd.balanceOf(a),oldA); assertEq(usd.balanceOf(thief),oldThief);
+        vm.prank(c); rights.claimLP(amount); assertEq(lp().balanceOf(c),0); invariantMoney();
     }
-    function testOnlyMarketCanMintOrBurnEitherRightsToken() public {
-        graduateTwo();rights.materializeLP(a);
-        address[2] memory tokens=[address(lp()),address(bt())];
-        for(uint i;i<2;i++){
-            uint256 supply=ISecurityRights(tokens[i]).totalSupply();uint256 balance=ISecurityRights(tokens[i]).balanceOf(a);
-            vm.prank(thief);(bool mintOK,)=tokens[i].call(abi.encodeWithSignature("mint(address,uint256)",thief,1));assertFalse(mintOK);
-            vm.prank(thief);(bool burnOK,)=tokens[i].call(abi.encodeWithSignature("burn(address,uint256)",a,1));assertFalse(burnOK);
-            assertEq(ISecurityRights(tokens[i]).totalSupply(),supply);assertEq(ISecurityRights(tokens[i]).balanceOf(a),balance);
-        }
-        invariantMoney();
+    function testOnlyMarketCanMintOrBurnTheSingleLPRightsToken() public {
+        graduateTwo(); rights.materializeLP(a); assertEq(rights.bToken(),address(0));
+        uint256 supply=lp().totalSupply(); uint256 balance=lp().balanceOf(a);
+        vm.prank(thief); (bool mintOK,)=address(lp()).call(abi.encodeWithSignature("mint(address,uint256)",thief,1)); assertFalse(mintOK);
+        vm.prank(thief); (bool burnOK,)=address(lp()).call(abi.encodeWithSignature("burn(address,uint256)",a,1)); assertFalse(burnOK);
+        assertEq(lp().totalSupply(),supply); assertEq(lp().balanceOf(a),balance); invariantMoney();
     }
     function testUSDCFailureRollsBackLPBurnAndBudget() public {
         graduateTwo();rights.materializeLP(a);finish(1);uint256 amount=lp().balanceOf(a)/2;
@@ -86,29 +82,23 @@ contract TopicMarketRightsSecurityTest is Test {
         assertEq(lp().totalSupply(),supply);assertEq(lp().balanceOf(a),bal);assertEq(m.lpBudgetRemaining(),budget);
         usd.setFail(false);vm.prank(a);rights.claimLP(amount);assertEq(lp().balanceOf(a),bal-amount);invariantMoney();
     }
-    function testGenesisFailureBBurnRollbackAndNoLP() public {
-        buy(a,1e6);uint256 amount=bt().balanceOf(a);vm.warp(m.genesisCutoff());m.closeExpired();
-        assertEq(lp().totalSupply(),0);vm.expectRevert();rights.materializeLP(a);
-        uint256 budget=m.bBudgetRemaining();usd.setFail(true);vm.prank(a);vm.expectRevert();rights.claimB(amount);
-        assertEq(bt().balanceOf(a),amount);assertEq(m.bBudgetRemaining(),budget);usd.setFail(false);
-        vm.prank(a);rights.claimB(amount);assertEq(bt().balanceOf(a),0);assertEq(m.bBudgetRemaining(),0);invariantMoney();
+    function testGenesisFailureRefundRollbackProtectsSingleGRight() public {
+        buy(a,1e6); uint256 amount=m.shares(a); vm.warp(m.genesisCutoff()); m.closeExpired();
+        assertEq(lp().totalSupply(),0); assertEq(rights.bToken(),address(0)); vm.expectRevert(); rights.materializeLP(a);
+        uint256 budget=m.failedRRemaining(); usd.setFail(true); vm.prank(a); vm.expectRevert(); m.claimFailed();
+        assertEq(m.shares(a),amount); assertEq(m.failedRRemaining(),budget); usd.setFail(false);
+        vm.prank(a); m.claimFailed(); assertEq(m.shares(a),0); assertEq(m.failedRRemaining(),0); invariantMoney();
     }
-    function testPartialBClaimsKeepFixedDenominatorAndTransferRight() public {
-        graduateTwo();uint256 denominator=bt().totalSupply();uint256 amount=bt().balanceOf(a)/2;
-        vm.prank(a);bt().transfer(c,amount);finish(2);uint256 budget=m.bBudgetInitial();uint256 oldC=usd.balanceOf(c);
-        vm.prank(c);rights.claimB(amount);assertEq(usd.balanceOf(c)-oldC,Math.mulDiv(budget,amount,denominator));
-        uint256 rest=bt().balanceOf(a);uint256 oldA=usd.balanceOf(a);vm.prank(a);rights.claimB(rest);
-        assertEq(usd.balanceOf(a)-oldA,Math.mulDiv(budget,rest,denominator));
-        uint256 bobRest=bt().balanceOf(b);vm.prank(b);rights.claimB(bobRest);assertEq(bt().totalSupply(),0);assertEq(m.bBudgetRemaining(),0);invariantMoney();
+    function testFormerBClaimersCannotExtractSinglePoolFunds() public {
+        graduateTwo(); finish(2); uint256 budget=m.lpBudgetRemaining(); uint256 wallet=usd.balanceOf(c);
+        for(uint256 i;i<3;i++){address user=i==0?a:i==1?b:c; vm.prank(user); vm.expectRevert("B_REMOVED"); rights.claimB(i+1);}
+        assertEq(m.lpBudgetRemaining(),budget); assertEq(usd.balanceOf(c),wallet); assertEq(m.bBudgetRemaining(),0); invariantMoney();
     }
-    function testExhaustedBStillBurnsZeroPayoutRights() public {
-        oracle=new MockCore();m=new TopicMarket(usd, oracle, address(0xC0), address(0xF0), uint64(block.timestamp+6 hours), 1e6, 1e18);
-        oracle.bind(address(m));rights=ISecurityMarket(address(m));cachedLP=ISecurityRights(rights.lpToken());cachedB=ISecurityRights(rights.bToken());
-        vm.prank(a);usd.approve(address(m),type(uint256).max);vm.prank(b);usd.approve(address(m),type(uint256).max);
-        buy(a,14e6);vm.prank(b);m.formalBuy(true,5e18,type(uint256).max,type(uint64).max);finish(1);
-        assertEq(m.bBudgetInitial(),0);uint256 amount=bt().balanceOf(a);uint256 before=usd.balanceOf(a);
-        assertGt(amount,0);usd.setFail(true);vm.prank(a);rights.claimB(amount);
-        assertEq(bt().balanceOf(a),0);assertEq(bt().totalSupply(),0);assertEq(usd.balanceOf(a),before);usd.setFail(false);invariantMoney();
+    function testNoPhantomBClaimEvenWhenSinglePoolHasTradingLoss() public {
+        graduateTwo(); vm.prank(b); m.formalBuy(true,5e18,type(uint256).max,type(uint64).max); finish(1);
+        assertEq(m.bBudgetInitial(),0); assertEq(rights.bToken(),address(0)); uint256 before=usd.balanceOf(a);
+        vm.prank(a); vm.expectRevert("B_REMOVED"); rights.claimB(type(uint256).max);
+        assertEq(usd.balanceOf(a),before); invariantMoney();
     }
     function testZeroQuantityClaimsRejectedAndBurnNotReusable() public {
         graduateTwo();rights.materializeLP(a);finish(3);

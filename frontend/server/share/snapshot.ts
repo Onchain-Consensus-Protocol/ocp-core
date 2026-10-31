@@ -32,7 +32,7 @@ export function createShareSnapshot(stored:StoredPaperMarket,userId:string,theme
    // This is cash-out P&L, not total account NAV: locked B is explicitly excluded.
    const sale=a.g>0?topicMarketQuoteSell(s,a.g):null;
    const value=(net+(sale?.net??0)+creator+(m.creatorId===userId?(sale?.creatorFee??0):0))*P;
-   pnl={label:'MY EXIT P&L (EST.)',low:value,high:value,note:'Net gToken sale + receipts/claimable creator fees - all invested. Locked B excluded.'};
+   pnl={label:'MY EXIT P&L (EST.)',low:value,high:value,note:'Net gToken sale + receipts/claimable creator fees - all invested.'+(s.singlePool?'':' Locked B excluded.')};
   }else{
    const scenarios=view.presentation!.lpBEstimates.map((r,i)=>{
     const shares=r.outcome==='YES'?a.yes:r.outcome==='NO'?a.no:(a.yes+a.no)/2;

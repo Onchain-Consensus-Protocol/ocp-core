@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase, MockUSDC} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter, ILegacyVault} from "../src/VaultCoreAdapter.sol";
@@ -236,7 +237,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         uint64 end = uint64(block.timestamp+6 hours);
         adapter = new VaultCoreAdapter(usd,bob,carol,end,500e6);
         vault = OCPCore(address(adapter.vault()));
-        market = new TopicMarket(usd, adapter, bob, carol, end, 2000e6, 1e18);
+        market = new TopicMarket(usd, adapter, bob, carol, end, 6000e6, 1e18);
         adapter.bind(address(market));
         address[3] memory users=[alice,bob,carol];
         for(uint256 j;j<3;++j){
@@ -260,7 +261,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
         for(uint256 j;j<3;++j){
             emit log_named_uint("account",j); emit log_named_uint("wallet6",usd.balanceOf(users[j]));
             emit log_named_uint("lpWad",market.shares(users[j])+market.lpToken().balanceOf(users[j])); emit log_named_uint("yesWad",market.yes(users[j]));
-            emit log_named_uint("noWad",market.no(users[j])); emit log_named_uint("zWad",market.bToken().balanceOf(users[j]));
+            emit log_named_uint("noWad",market.no(users[j])); emit log_named_uint("zWad",removedBBalance(market,users[j]));
         }
         _accounting();
     }
@@ -273,12 +274,12 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
   _paritySetup();_parityLog("graduated");
   _formalBuy(carol,true,80e18);_parityLog("buy_yes_80");
   market.materializeLP(alice);vm.startPrank(alice);market.lpToken().transfer(bob,10e18);vm.stopPrank();_parityLog("transfer_lp_10");
-  vm.startPrank(alice);market.bToken().transfer(carol,100e18);vm.stopPrank();_parityLog("transfer_b_100");
+  assertEq(address(market.bToken()),address(0));_parityLog("b_absent");
   vm.prank(carol);market.formalSell(true,30e18,0,type(uint64).max);_parityLog("sell_yes_30");
   _stake(bob,IOCPCore.Side.YES,100e6);
   vm.warp(market.coreCutoff());adapter.finalizeMarket();_parityLog("finalized");
   vm.prank(bob);market.claimLP(1e18);_parityLog("burn_lp_1");
-  vm.prank(carol);market.claimB(50e18);_parityLog("burn_b_50");
+  vm.prank(carol);vm.expectRevert("B_REMOVED");market.claimB(50e18);_parityLog("b_claim_rejected");
   vm.startPrank(bob);market.lpToken().transfer(carol,2e18);vm.stopPrank();_parityLog("transfer_after_settle");
   _claimAll(alice);_claimAll(bob);_claimAll(carol);
   vm.prank(bob);vault.withdraw();
@@ -286,7 +287,7 @@ contract TopicMarketRealCoreTest is TopicMarketBase {
   vm.prank(carol);market.claimFees();
   if(vault.officialMarketFeesClaimable()>0)vault.claimOfficialMarketFees();
   _parityLog("all_claimed");
-  assertEq(market.lpToken().totalSupply(),0);assertEq(market.bToken().totalSupply(),0);
+  assertEq(market.lpToken().totalSupply(),0);assertEq(removedBSupply(market),0);
   assertLe(market.lpBudgetRemaining(),3);assertLe(market.bBudgetRemaining(),3);
  }
 }

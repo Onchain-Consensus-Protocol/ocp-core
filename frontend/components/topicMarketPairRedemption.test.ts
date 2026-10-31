@@ -4,7 +4,7 @@ import { createTopicMarketDemo, topicMarketCreate, topicMarketBuy, topicMarketFo
   topicMarketTransferLP, topicMarketTransferB, topicMarketClaimLP, topicMarketClaimB, topicMarketClaim, topicMarketClaimCore,
   topicMarketClaimFees, topicMarketClaimCoreOfficial, topicMarketAccounting, topicMarketAssertLedger } from "./topicMarketDemoModel";
 type State=ReturnType<typeof createTopicMarketDemo>;
-const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo());for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
+const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo({singlePool:false}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
 const bought=()=>topicMarketFormalBuy(topicMarketFormalBuy(formal(),0,"YES",100),0,"NO",80);
 const ledger=(s:State)=>{topicMarketAssertLedger(s);expect(topicMarketAccounting(s).error).toBeCloseTo(0,7);};
 const frozen=(s:State)=>({basis:s.basis,b:s.b,inventory:s.inventory,cash:s.cash,B:s.B,lpFees:s.lpFees,creatorFees:s.creatorFees,protocolFees:s.protocolFees,core:s.core,lp:s.accounts.map(a=>a.lp),z:s.accounts.map(a=>a.z)});

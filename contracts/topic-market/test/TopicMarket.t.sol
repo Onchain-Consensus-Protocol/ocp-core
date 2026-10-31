@@ -18,12 +18,12 @@ contract TopicMarketTest is TopicMarketBase {
 
     function testBuySplitAndSquareQuote() public {
         _buy(alice, 100e3);
-        assertEq(market.R(), 94500);
-        assertEq(market.B(), 4500);
+        assertEq(market.R(), 99000);
+        assertEq(market.B(), 0);
         assertEq(market.protocolFees(), 300);
         assertEq(market.creatorFees(), 700);
-        assertEq(market.contribution(alice), 4500);
-        assertEq(market.S(), Math.sqrt(94500 * 1e30));
+        assertEq(market.contribution(alice), 0);
+        assertEq(market.S(), Math.sqrt(99000 * 1e30));
         _accounting();
     }
 
@@ -35,29 +35,24 @@ contract TopicMarketTest is TopicMarketBase {
         // Integer curve reverse may leave at most one microUSDC, isolated from R.
         assertEq(market.S(), 0);
         assertEq(market.R(), 0);
-        assertApproxEqAbs(market.B(), 8752, 1);
+        assertEq(market.B(), 0);
         assertEq(market.B(), market.contribution(alice));
         _accounting();
     }
 
-    function testSellGraduationFromLegalPath() public {
-        _buy(alice, 9e6);
-        assertEq(uint256(market.phase()), 0);
-        uint256 targetY = Math.mulDiv(market.bTarget() - market.B(), 1000, 45, Math.Rounding.Ceil) + 3;
-        uint256 newSupply = Math.sqrt((market.R() - targetY) * 1e30);
-        uint256 quantity = market.S() - newSupply + 1;
-        vm.prank(alice);
-        market.genesisSell(quantity, 0, type(uint64).max, 1);
-        assertEq(uint256(market.phase()), 1);
-        assertGe(market.initialCollateral(), market.rTarget());
-        assertGe(market.B(), market.bTarget());
-        _accounting();
+    function testSellCannotTriggerGraduationByAccumulatingRemovedB() public {
+        _buy(alice,4e6); uint256 beforeR=market.R(); uint256 qty=market.shares(alice)/10;
+        vm.prank(alice); market.genesisSell(qty,0,type(uint64).max,0);
+        assertLt(market.R(),beforeR); assertLt(market.R(),market.rTarget()); assertEq(uint256(market.phase()),0);
+        uint256 remaining=market.shares(alice);uint256 rBeforeRejected=market.R();uint256 sBeforeRejected=market.S();
+        vm.prank(alice); vm.expectRevert("MUST_GRADUATE"); market.genesisSell(remaining/10,0,type(uint64).max,1);
+        assertEq(market.R(),rBeforeRejected);assertEq(market.S(),sBeforeRejected);assertEq(market.shares(alice),remaining);_accounting();
     }
 
     function testBuyGraduationDoesNotCapActualFunds() public {
         _graduate();
-        assertEq(market.initialCollateral(), 13230000);
-        assertEq(market.B(), 630000);
+        assertEq(market.initialCollateral(), 13860000);
+        assertEq(market.B(), 0);
         assertGt(market.initialCollateral() + market.B(), 4200000);
         _accounting();
     }
@@ -109,8 +104,8 @@ contract TopicMarketTest is TopicMarketBase {
         uint256 fee0 = market.lpFees();
         uint256 gross = market.quoteFormalBuy(true, 1e18);
         _formalBuy(bob, true, 1e18);
-        assertEq(market.lpFees() - fee0, gross / 200);
-        assertEq(market.B(), beforeB + gross / 200);
+        assertEq(market.lpFees() - fee0, gross / 100);
+        assertEq(market.B(), beforeB);
         assertEq(market.totalContribution(), beforeZ);
         (uint256 sellGross, uint256 net) = market.quoteFormalSell(true, 1e18);
         uint256 cashBefore = market.cash();
@@ -204,7 +199,7 @@ contract TopicMarketTest is TopicMarketBase {
         vm.expectRevert("CLAIMED");
         market.claimLP();
         vm.prank(alice);
-        vm.expectRevert("CLAIMED");
+        vm.expectRevert("B_REMOVED");
         market.claimB();
         vm.expectRevert("CORE_PENDING");
         market.finalize();
@@ -254,26 +249,12 @@ contract TopicMarketTest is TopicMarketBase {
         _accounting();
     }
 
-    function testUnGraduatedCurrentSplitAndTwoSeparateRights() public {
-        _buy(alice, 100e3);
-        uint256 allG = market.shares(alice);
-        vm.prank(alice);
-        market.genesisSell(allG, 0, type(uint64).max, 0);
-        _buy(bob, 10e3);
-        uint256 rf = market.R();
-        uint256 bf = market.B();
-        uint256 za = market.contribution(alice);
-        vm.warp(market.genesisCutoff());
-        market.closeExpired();
-        vm.prank(bob);
-        assertEq(market.claimFailed(), rf);
-        vm.prank(alice);
-        assertEq(market.claimB(), Math.mulDiv(bf, za, market.totalContribution()));
-        vm.prank(bob);
-        market.claimB();
-        _accounting();
-        assertEq(market.failedRRemaining(), 0);
-        assertLe(market.bBudgetRemaining(), 1);
+    function testUnGraduatedClaimsOnlyRemainingGenesisR() public {
+        _buy(alice,100e3);uint256 sold=market.shares(alice);vm.prank(alice);market.genesisSell(sold,0,type(uint64).max,0);
+        _buy(bob,10e3); uint256 rf=market.R(); vm.warp(market.genesisCutoff()); market.closeExpired();
+        vm.prank(bob); assertEq(market.claimFailed(),rf);
+        vm.prank(alice); vm.expectRevert("B_REMOVED"); market.claimB();
+        assertEq(market.failedRRemaining(),0); assertEq(market.bBudgetRemaining(),0); _accounting();
     }
 
     function testZeroSupplyFailureNoDivisionByZero() public {
@@ -283,8 +264,10 @@ contract TopicMarketTest is TopicMarketBase {
         market.genesisSell(allG, 0, type(uint64).max, 0);
         vm.warp(market.genesisCutoff());
         market.closeExpired();
-        vm.prank(alice);
-        market.claimB();
+        uint256 walletBefore=usd.balanceOf(alice);
+        vm.prank(alice);vm.expectRevert("B_REMOVED");market.claimB();
+        vm.prank(alice);vm.expectRevert("CLAIMED");market.claimFailed();
+        assertEq(usd.balanceOf(alice),walletBefore);
         _accounting();
         assertEq(market.failedRRemaining(), 0);
     }

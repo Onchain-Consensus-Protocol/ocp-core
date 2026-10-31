@@ -39,7 +39,7 @@ export function PaperSimulation({market:m,balanceUSD,lang,signedIn,pending,now,g
  },[api,m.id,m.revision,m.phase,actions,signedIn,pending,refresh]);
  if(!p)return <p>{lang==='zh'?'正在加载市场…':'Loading market…'}</p>;
  const state=createStockDemo(m.assetPriceUSD);
- Object.assign(state,p,{phase:m.phase,now:Math.max(0,now-m.createdAt),R:Number(m.R),B:Number(m.B),rTarget:Number(m.rTarget),bTarget:Number(m.bTarget),result:m.result,formalVolume:Number(m.volumeUSD)/m.assetPriceUSD});
+ Object.assign(state,p,{singlePool:p.singlePool===true,phase:m.phase,now:Math.max(0,now-m.createdAt),R:Number(m.R),B:Number(m.B),rTarget:Number(m.rTarget),bTarget:Number(m.bTarget),result:m.result,formalVolume:Number(m.volumeUSD)/m.assetPriceUSD});
  state.accounts=[{...state.accounts[0],...(p.own??{}),wallet:Number(balanceUSD)/m.assetPriceUSD}];
  state.core={...state.core,openedAt:m.coreOpenedAt===null?null:m.coreOpenedAt-m.createdAt,yes:Number(m.coreYes),no:Number(m.coreNo),invalid:Number(m.coreInvalid),feeTotal:p.coreFees};
  state.corePayouts=[p.corePayout];

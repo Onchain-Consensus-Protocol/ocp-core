@@ -8,7 +8,7 @@ describe("Genesis token denomination", () => {
     const before = topicMarketQuoteSell(s, shares);
     const after = topicMarketQuoteSell(s, genesisShares(genesisTokens(shares)));
     expect(after.net).toBeCloseTo(before.net, 10);
-    expect(genesisPrice(2 * s.k * s.S)).toBe("0.0000019442");
+    expect(genesisPrice(2 * s.k * s.S)).toBe("0.00000199");
     expect(genesisTokens(s.S) * (2 * s.k * s.S / GENESIS_TOKEN_UNIT)).toBeCloseTo(s.S * 2 * s.k * s.S, 8);
   });
 });

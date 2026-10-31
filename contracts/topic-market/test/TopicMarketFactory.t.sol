@@ -60,7 +60,7 @@ contract TopicMarketFactoryTest is Test {
         assertEq(m.coreCutoff(), block.timestamp + 6 hours);
         assertEq(m.formalCutoff(), block.timestamp + 5 hours);
         assertEq(m.genesisCutoff(), block.timestamp + 4 hours);
-        assertEq(m.rTarget(), 3.6e6); assertEq(m.bTarget(), .6e6);
+        assertEq(m.rTarget(), 4.2e6); assertEq(m.bTarget(), 0);
         assertEq(factory.marketCount(), 1); assertEq(factory.markets(0), address(m));
         TopicMarketFactory.MarketRecord memory r = factory.marketRecord(address(m));
         assertEq(r.creator, alice); assertEq(r.adapter, address(a)); assertEq(r.vault, address(v));
@@ -80,7 +80,7 @@ contract TopicMarketFactoryTest is Test {
     function testSnapshotIsFixedPerMarket() public {
         (TopicMarket first,,) = create(); oracle.set(2000e6);
         (TopicMarket second,,) = create();
-        assertEq(first.rTarget(), 3.6e6); assertEq(second.rTarget(), 7200e6);
+        assertEq(first.rTarget(), 4.2e6); assertEq(second.rTarget(), 8400e6);
         assertEq(factory.marketCount(), 2);
     }
     function testRejectInvalidMetadataBeforeDeployment() public {

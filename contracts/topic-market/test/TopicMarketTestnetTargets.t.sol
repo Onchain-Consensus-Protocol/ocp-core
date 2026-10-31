@@ -38,17 +38,16 @@ contract TopicMarketTestnetTargetsTest is Test {
     }
     function testFixedTargetsIgnoreUnavailableEthPriceAndKeepUsdBondSeparate() public {
         (TopicMarket m,OCPCore vault)=create();
-        assertEq(m.rTarget(),36e14);assertEq(m.bTarget(),6e14);
+        assertEq(m.rTarget(),42e14);assertEq(m.bTarget(),0);
         assertEq(vault.earlyTerminationBondRequired(),2e18); // 500USD /250USD per TSLA
         assertTrue(factory.fixedTestnetGraduation());assertEq(factory.marketRecord(address(m)).snapshot,0);
     }
-    function testSmallFundedOrdersStillRequireBothTargetsAndGraduate() public {
-        (TopicMarket m,)=create();IntegrationStock(STOCK).mint(USER,1e18);
-        vm.startPrank(USER);IntegrationStock(STOCK).approve(address(m),1e18);
-        m.genesisBuy(5e15,0,type(uint64).max,0); // R target reached, B not yet reached.
-        assertGt(m.R(),m.rTarget());assertLt(m.B(),m.bTarget());assertEq(uint256(m.phase()),0);
-        m.genesisBuy(8333333333333334,0,type(uint64).max,0);
-        vm.stopPrank();assertEq(uint256(m.phase()),1);assertGe(m.B(),m.bTarget());assertGe(m.initialCollateral(),m.rTarget());
+    function testSmallFundedOrdersGraduateAtOnlyTheRTarget() public {
+        (TopicMarket m,)=create(); IntegrationStock(STOCK).mint(USER,1e18);
+        vm.startPrank(USER); IntegrationStock(STOCK).approve(address(m),1e18);
+        m.genesisBuy(4e15,0,type(uint64).max,0); assertLt(m.R(),m.rTarget()); assertEq(uint256(m.phase()),0);
+        m.genesisBuy(3e14,0,type(uint64).max,0); vm.stopPrank();
+        assertEq(uint256(m.phase()),1); assertGe(m.initialCollateral(),m.rTarget()); assertEq(m.B(),0); assertEq(address(m.bToken()),address(0));
         assertTrue(checkMarketInvariants(m));
     }
     function testProfileRejectsMainnetEvenWithCorrectBindings() public {

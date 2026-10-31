@@ -12,7 +12,7 @@ import {readChainPriceHistory, replayCheckpoint, type ChainPriceHistory} from '.
 export const TESTNET_CHAIN_ID = 46630n;
 const tokenAbi = ['function symbol() view returns(string)', 'function decimals() view returns(uint8)', 'function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'];
 export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; fixedRTarget?:bigint; fixedBTarget?:bigint }
-export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;priceYes?:bigint;R?:bigint;B?:bigint;rTarget?:bigint;bTarget?:bigint }
+export interface MarketSummary { singlePool?:boolean; address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;priceYes?:bigint;R?:bigint;B?:bigint;rTarget?:bigint;bTarget?:bigint }
 export interface AccountPosition { balance:bigint; genesisShares:bigint; yes:bigint; no:bigint; lp:bigint; b:bigint; coreYes:bigint; coreNo:bigint; coreInvalid:bigint; marketAllowance:bigint; vaultAllowance:bigint; routerAllowance:bigint }
 export interface CoreLifecycle {bond:bigint; requestId:bigint; requestedOutcome:number; processAfter:bigint; effectiveCutoff:bigint; due:boolean; refund?:bigint; penalty?:bigint; bondRefund?:bigint}
 /** Prices/quantities are WAD; money and payouts use collateral native units. Unknown metrics stay absent. */
@@ -53,6 +53,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const result:MarketSummary={address:market,stock,creator:r.creator,adapter:r.adapter,vault:r.vault,topic:r.topic,yesRule:r.yesRule,noRule:r.noRule,invalidRule:r.invalidRule,createdAt:r.createdAt,genesisCutoff:r.coreCutoff-7200n,formalCutoff:r.formalCutoff,coreCutoff:r.coreCutoff,snapshot:r.snapshot};
     if(includePresentation){
       const m=new Contract(market,marketAbi,provider);
+      result.singlePool=await new Contract(market,['function singlePool() view returns(bool)'],provider).singlePool().catch(()=>false);
       const metrics=await Promise.allSettled([m.phase(),m.R(),m.B(),m.rTarget(),m.bTarget()]);
       const names=['phase','R','B','rTarget','bTarget'] as const;
       metrics.forEach((value,i)=>{if(value.status==='fulfilled'){
@@ -87,7 +88,8 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
         if(fixedTestTargets){
           if(getAddress(stock)!==getAddress('0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E') || result.decimals!==18) throw new Error('TESTNET_TSLA_ONLY');
           await oracle.collateralForUsd(500n*10n**18n); // Bond still needs a valid USD conversion.
-          result.fixedRTarget=3600000000000000n;result.fixedBTarget=600000000000000n;
+          const singlePool=await new Contract(address,['function singlePool() view returns(bool)'],provider).singlePool().catch(()=>false);
+          result.fixedRTarget=singlePool?4200000000000000n:3600000000000000n;result.fixedBTarget=singlePool?0n:600000000000000n;
         } else result.snapshot=await oracle.ethPrice6();
       }
       catch {result.snapshotError='价格快照不可用：请检查喂价时效、状态和配置';}
@@ -102,6 +104,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const keys=['phase','outcome','R','B','S','rTarget','bTarget','k','cash','lpFees','lpBudgetRemaining','bBudgetRemaining'] as const;
     const values=await Promise.all(keys.map(key=>m[key]()));
     const state={...base,...Object.fromEntries(keys.map((key,i)=>[key,values[i]]))} as MarketState;
+    state.singlePool=await new Contract(base.address,['function singlePool() view returns(bool)'],provider).singlePool().catch(()=>false);
     state.phase=Number(state.phase);state.outcome=Number(state.outcome);
     try{const [creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient]=await Promise.all([m.creator(),m.protocol(),m.creatorFees(),m.protocolFees(),v.officialMarketFeesClaimable(),v.emptySettlementRecipient()]);state.feeClaims={creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient};try{state.feeClaims.automatic=await new Contract(base.address,['function automaticFeePayout() view returns(bool)'],provider).automaticFeePayout();}catch{state.feeClaims.automatic=false;}}catch{/* 无法读取时不假定手续费为零。 */}
     try{state.poolStockBalance=await new Contract(base.stock,tokenAbi,provider).balanceOf(base.address);}catch{/* 未读到真实余额时保持未知，不用cash或0代替。 */}
@@ -110,7 +113,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     if(account){
       account=nonzeroAddress(account);const token=new Contract(base.stock,tokenAbi,provider);
       const [lp,b,router]=await Promise.all([m.lpToken(),m.bToken(),m.trustedForwarder()]);
-      const [balance,genesisShares,yes,no,lpBalance,bBalance,stake,marketAllowance,vaultAllowance,routerAllowance]=await Promise.all([token.balanceOf(account),m.shares(account),m.yes(account),m.no(account),new Contract(lp,tokenAbi,provider).balanceOf(account),new Contract(b,tokenAbi,provider).balanceOf(account),v.stakeOf(account),token.allowance(account,base.address),token.allowance(account,base.vault),token.allowance(account,router)]);
+      const [balance,genesisShares,yes,no,lpBalance,bBalance,stake,marketAllowance,vaultAllowance,routerAllowance]=await Promise.all([token.balanceOf(account),m.shares(account),m.yes(account),m.no(account),new Contract(lp,tokenAbi,provider).balanceOf(account),getAddress(b)===ZeroAddress?Promise.resolve(0n):new Contract(b,tokenAbi,provider).balanceOf(account),v.stakeOf(account),token.allowance(account,base.address),token.allowance(account,base.vault),token.allowance(account,router)]);
       state.position={balance,genesisShares,yes,no,lp:lpBalance,b:bBalance,coreYes:stake[0],coreNo:stake[1],coreInvalid:stake[2],marketAllowance,vaultAllowance,routerAllowance};
     }
     try {
@@ -188,7 +191,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     async function writeReady(){await ready();if(!signer.provider) throw new Error('钱包未连接');await assertTestnet(signer.provider);}
     async function submit(contract:Contract,method:string,args:unknown[],paymentGas=0n):Promise<ContractTransactionResponse>{
       if(!signer.provider) throw new Error('钱包未连接');
-      // 自动付款有可选gas分支；在估算值上预留付款预算，避免钱包只给够冻结结算的gas。
+      // 在估算值上另加发费预算；避免估算绕过发费后钱包只提供冻结结算的gas。
       const gasLimit=paymentGas>0n?await contract[method].estimateGas(...args,{chainId:TESTNET_CHAIN_ID})+paymentGas:undefined;
       // 读取登记或授权配置期间用户可能切链；发送前再核验，并把链ID写入交易，
       // 让钱包即使在此后切链也只能拒绝，不能在其他链发送同地址交易。
@@ -198,7 +201,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     }
     async function send(marketAddress:string,target:'market'|'vault'|'adapter',method:string,args:unknown[]):Promise<ContractTransactionResponse>{
       await writeReady();const base=await summary(marketAddress);
-      const paymentGas=target==='adapter'&&method==='finalizeMarket'?600000n:target==='market'&&(method==='closeExpired'||method==='claimFees')?350000n:0n;
+      const paymentGas=target==='adapter'&&method==='finalizeMarket'?600000n:target==='market'&&(method==='closeExpired'||method==='claimFees')?600000n:target==='vault'&&method==='claimOfficialMarketFees'?600000n:0n;
       return submit(new Contract(target==='market'?base.address:base[target],target==='market'?marketAbi:target==='vault'?vaultAbi:adapterAbi,signer),method,args,paymentGas);
     }
     return {

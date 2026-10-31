@@ -26,12 +26,12 @@ function compare(s: TopicMarketState, expected: any) {
   expect(Math.abs(topicMarketAccounting(s).error)).toBeLessThan(1e-7);
 }
 
-it('matches real ERC20 LP/B transfers, partial burns, post-settlement transfer and final claims at 10 EVM checkpoints',()=>{
- let s=topicMarketCreate(createTopicMarketDemo({depthPolicy:"GRADUATION_CAPITAL"}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);
+it('matches single-pool ERC20 LP transfers, partial burns, post-settlement transfer and final claims at 10 EVM checkpoints',()=>{
+ let s=topicMarketCreate(createTopicMarketDemo({Q:6000,singlePool:true,depthPolicy:"GRADUATION_CAPITAL"}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);
  const rows=snapshots.tests.testDemoParityLockedTokensBurn;let i=0;const snap=()=>compare(s,rows[i++]);
- snap();s=topicMarketFormalBuy(s,2,'YES',80);snap();s=topicMarketTransferLP(s,0,1,10);snap();s=topicMarketTransferB(s,0,2,100);snap();
+ snap();s=topicMarketFormalBuy(s,2,'YES',80);snap();s=topicMarketTransferLP(s,0,1,10);snap();expect(s.accounts.every(a=>a.z===0)).toBe(true);snap();
  s=topicMarketFormalSell(s,2,'YES',30);snap();s=topicMarketCoreStake(s,1,'YES',100);s=topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));snap();
- s=topicMarketClaimLP(s,1,1);snap();s=topicMarketClaimB(s,2,50);snap();s=topicMarketTransferLP(s,1,2,2);snap();
+ s=topicMarketClaimLP(s,1,1);snap();expect(()=>topicMarketClaimB(s,2,50)).toThrow();snap();s=topicMarketTransferLP(s,1,2,2);snap();
  for(let id=0;id<3;id++)s=topicMarketClaim(s,id);s=topicMarketClaimCore(s,1);if(s.creatorFees>0)s=topicMarketClaimFees(s,'CREATOR',1);if(s.protocolFees>0)s=topicMarketClaimFees(s,'PROTOCOL',2);
  if(s.coreOfficialBudget>0)s=topicMarketClaimCoreOfficial(s,2);snap();expect(i).toBe(10);
 });

@@ -67,8 +67,8 @@ contract RHProductionOracleForkTest is Test {
             address module=OCPCore(core).earlyTerminationModule();
             assertEq(module.code.length,45);assertEq(IEarlyTerminationModule(module).core(),core);
             assertEq(IEarlyTerminationModule(module).bondAmount(),expectedBond);
-            assertEq(TopicMarket(market).rTarget(),Math.mulDiv(expected,36,10));
-            assertEq(TopicMarket(market).bTarget(),Math.mulDiv(expected,6,10));
+            assertEq(TopicMarket(market).rTarget(),Math.mulDiv(expected,42,10));
+            assertEq(TopicMarket(market).bTarget(),0);
             emit log_named_address("official stock feed",feeds[i]);
             emit log_named_uint("ETH in native stock units",expected);
         }

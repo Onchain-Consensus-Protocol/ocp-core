@@ -36,9 +36,9 @@ contract TopicMarketFullFlowTest is TopicMarketBase {
         }
     }
     function _run(uint8 expected) internal {
-        assertEq(market.rTarget(),7200e6);assertEq(market.bTarget(),1200e6);
+        assertEq(market.rTarget(),8400e6);assertEq(market.bTarget(),0);
         vm.prank(alice);vm.expectRevert();vault.stake(IOCPCore.Side.YES,1e6);
-        _buy(alice,26000e6);assertEq(adapter.openedAt(),0);
+        _buy(alice,8000e6);assertEq(adapter.openedAt(),0);
         _buy(bob,1000e6);assertEq(adapter.openedAt(),block.timestamp);
         assertLe(address(market).code.length,24576);
         _formalBuy(carol,true,100*W);

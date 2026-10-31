@@ -4,7 +4,7 @@ import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,t
  topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketTransferB,topicMarketClaimB,topicMarketClaimLP,
  topicMarketClaim,topicMarketClaimCore,topicMarketClaimFees,topicMarketClaimCoreOfficial,topicMarketAccounting,topicMarketAssertLedger} from "./topicMarketDemoModel";
 type State=ReturnType<typeof createTopicMarketDemo>;
-const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo());for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
+const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo({singlePool:false}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
 const ledger=(s:State)=>{topicMarketAssertLedger(s);expect(topicMarketAccounting(s).total).toBeCloseTo(30000,7);expect(topicMarketAccounting(s).error).toBeCloseTo(0,7);};
 const finish=(s:State)=>topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));
 const drain=(state:State)=>{let s=state;for(let id=0;id<3;id++){
@@ -15,7 +15,7 @@ const drain=(state:State)=>{let s=state;for(let id=0;id<3;id++){
 
 describe("TopicMarket v1.9 fee distribution and non-minting B capital income",()=>{
  it("assigns Genesis fees as 0.7 percent creator and 0.3 percent project on both directions",()=>{
-  let s=topicMarketCreate(createTopicMarketDemo());const buy=topicMarketQuoteBuy(s,100);
+  let s=topicMarketCreate(createTopicMarketDemo({singlePool:false}));const buy=topicMarketQuoteBuy(s,100);
   expect(buy.net).toBeCloseTo(94.5,8);expect(buy.B).toBeCloseTo(4.5,8);
   expect(buy.creatorFee).toBeCloseTo(.7,8);expect(buy.protocolFee).toBeCloseTo(.3,8);
   s=topicMarketBuy(s,0,100);const sell=topicMarketQuoteSell(s,s.accounts[0].g),before=s;
@@ -51,7 +51,7 @@ describe("TopicMarket v1.9 fee distribution and non-minting B capital income",()
   expect(s.accounts[0].wallet-wallet).toBeCloseTo(allB*z/Z,8);expect(s.accounts[0].wallet-wallet).toBeGreaterThan(z);ledger(s);
  });
  it("uses Formal B fee capital for losses before charging any residual loss to LP",()=>{
-  let s=topicMarketBuy(topicMarketCreate(createTopicMarketDemo({Q:1,b:150})),0,30);const initialB=s.B;
+  let s=topicMarketBuy(topicMarketCreate(createTopicMarketDemo({singlePool:false,Q:1,b:150})),0,30);const initialB=s.B;
   s=topicMarketFormalBuy(s,1,"YES",20);const allB=s.B;expect(allB).toBeGreaterThan(initialB);
   s=topicMarketCoreStake(s,2,"YES",1);const nav=s.cash+s.lpFees+s.inventory[0];expect(s.basis-nav).toBeGreaterThan(allB);
   s=finish(s);expect(s.cover).toBeCloseTo(allB,8);expect(s.bBudget).toBeCloseTo(0,8);expect(s.lpBudget).toBeCloseTo(nav+allB,8);

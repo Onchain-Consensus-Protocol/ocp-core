@@ -383,6 +383,19 @@
   },
   {
     "type": "function",
+    "name": "singlePool",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "stockCount",
     "inputs": [],
     "outputs": [

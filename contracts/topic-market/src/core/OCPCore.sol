@@ -658,7 +658,9 @@ contract OCPCore is ReentrancyGuard, IOCPCore {
     /// @notice 官方费用仅为既有Core未分配费用，不是市场固定0.3%协议费。
     /// Failed transfers remain claimable and cannot unwind Core/Market finalization.
     function flushOfficialPayments() external override nonReentrant {
-        if (!resolved || !settlementReady || gasleft() < 250000) return;
+        if (!resolved || !settlementReady) return;
+        if (officialMarketFeesClaimable == 0 && (_totalPrincipal != 0 || remainingSettlementPool == 0)) return;
+        require(gasleft() >= 300000, "FEE_PAYOUT_GAS");
         uint256 amount = officialMarketFeesClaimable;
         if (amount > 0) {
             officialMarketFeesClaimable = 0;

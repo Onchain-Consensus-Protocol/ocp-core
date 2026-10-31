@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase} from "./TopicMarketBase.sol";
 import {TopicMarketRightsToken} from "../src/TopicMarketRightsToken.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @dev 历史文件名保留；锁池模型不再使用内部merge，也不允许底层退出。
 contract TopicMarketMergeTest is TopicMarketBase {
-    function _three() internal { _buy(alice,3e6); _buy(bob,4e6); _buy(carol,7e6); }
+    function _three() internal { _buy(alice,1e6); _buy(bob,2e6); _buy(carol,11e6); }
     function _sell(address who,bool side,uint256 qty) internal {
         vm.prank(who); market.formalSell(side,qty,0,type(uint64).max);
     }
@@ -72,7 +73,7 @@ contract TopicMarketMergeTest is TopicMarketBase {
             assertEq(market.coverPaid(),cover); assertEq(market.lpBudgetInitial(),nav+cover);
             assertEq(market.bBudgetInitial(),reserve-cover);
             _claimAll(alice); _claimAll(bob); _claimAll(carol); _claimAll(dave); _accounting();
-            assertEq(market.lpToken().totalSupply(),0); assertEq(market.bToken().totalSupply(),0);
+            assertEq(market.lpToken().totalSupply(),0); assertEq(removedBSupply(market),0);
             assertLe(market.collateralCash(),4); assertLe(market.lpBudgetRemaining(),3); assertLe(market.bBudgetRemaining(),3);
             assertTrue(vm.revertToState(snap)); snap=vm.snapshotState();
         }
@@ -92,7 +93,7 @@ contract TopicMarketMergeTest is TopicMarketBase {
     function testFuzzTradesLPBTransfersPartialBurnAllClaims(uint256 seed,uint8 result) public {
         result=uint8(bound(result,1,3)); _three();
         address[4] memory actors=[alice,bob,carol,dave];
-        TopicMarketRightsToken lpRights=market.lpToken(); TopicMarketRightsToken bRights=market.bToken();
+        TopicMarketRightsToken lpRights=market.lpToken();
         for(uint256 i;i<4;i++) market.materializeLP(actors[i]);
         for(uint256 i;i<20;i++){
             seed=uint256(keccak256(abi.encode(seed,i))); address a=actors[seed%4]; address to=actors[(seed>>8)%4];
@@ -100,7 +101,7 @@ contract TopicMarketMergeTest is TopicMarketBase {
             if(op==0){_formalBuy(a,side,W/(1000+seed%100));}
             else if(op==1){uint256 held=side?market.yes(a):market.no(a); if(held>1e13) _sell(a,side,held/2);}
             else if(op==2){uint256 held=market.lpToken().balanceOf(a); if(held>0){vm.prank(a);lpRights.transfer(to,held/2);}}
-            else if(op==3){uint256 held=market.bToken().balanceOf(a); if(held>0){vm.prank(a);bRights.transfer(to,held/2);}}
+            else if(op==3){vm.prank(a);vm.expectRevert("B_REMOVED");market.claimB();}
             else {uint256 pairs=Math.min(market.yes(a),market.no(a))/(2*market.SCALE());if(pairs>0){vm.prank(a);market.redeemPairs(pairs);}}
             _capacityInvariant();
         }
@@ -109,13 +110,10 @@ contract TopicMarketMergeTest is TopicMarketBase {
             address a=actors[i]; uint256 held=market.lpToken().balanceOf(a);
             if(held>1){uint256 qty=held/3; uint256 expected=Math.mulDiv(market.lpBudgetInitial(),qty,lpDen);
                 vm.prank(a); assertEq(market.claimLP(qty),expected);}
-            held=market.bToken().balanceOf(a);
-            if(held>1){uint256 qty=held/3; uint256 expected=Math.mulDiv(market.bBudgetInitial(),qty,bDen);
-                vm.prank(a); assertEq(market.claimB(qty),expected);}
             _claimAll(a); _accounting();
         }
         assertEq(market.lpSnapshot(),lpDen); assertEq(market.bSnapshotWad(),bDen);
-        assertEq(market.lpToken().totalSupply(),0); assertEq(market.bToken().totalSupply(),0);
+        assertEq(market.lpToken().totalSupply(),0); assertEq(removedBSupply(market),0);
         assertLe(market.collateralCash(),4); assertLe(market.lpBudgetRemaining(),8); assertLe(market.bBudgetRemaining(),8);
     }
 }

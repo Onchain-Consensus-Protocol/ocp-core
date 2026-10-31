@@ -7,7 +7,7 @@ import {
 } from "./topicMarketDemoModel";
 
 type State = ReturnType<typeof createTopicMarketDemo>;
-const active = () => topicMarketCreate(createTopicMarketDemo());
+const active = () => topicMarketCreate(createTopicMarketDemo({singlePool:false}));
 const formal = () => {
   let s = active();
   for (let id = 0; id < 3; id++) s = topicMarketBuy(s, id, 9000);
@@ -107,7 +107,7 @@ describe("TopicMarket locked LP and independent transferable B burn rights", () 
   it("rejects LP transfer before graduation and B transfer before creation", () => {
     const genesis = topicMarketBuy(active(), 0, 100);
     rejectsUnchanged(genesis, () => topicMarketTransferLP(genesis, 0, 1, 1));
-    rejectsUnchanged(createTopicMarketDemo(), () => topicMarketTransferB(createTopicMarketDemo(), 0, 1, 1));
+    rejectsUnchanged(createTopicMarketDemo({singlePool:false}), () => topicMarketTransferB(createTopicMarketDemo({singlePool:false}), 0, 1, 1));
   });
 
   it("locks LP underlying assets and disables additional LP in every former exit phase", () => {
@@ -227,7 +227,7 @@ describe("TopicMarket locked LP and independent transferable B burn rights", () 
   });
 
   it("allows zero-value B rights to be transferred and burned after B covers all capital", () => {
-    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({ Q: 1, b: 150 })), 0, 30);
+    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({ singlePool:false,Q: 1, b: 150 })), 0, 30);
     s = topicMarketFormalBuy(s, 1, "YES", 20);
     s = topicMarketCoreStake(s, 2, "YES", 1);
     s = topicMarketFinalize(topicMarketAdvanceTime(s, s.TC));

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -148,10 +149,7 @@ abstract contract TopicMarketBase is Test {
             if (settled) market.claimLP();
             else market.claimFailed();
         }
-        if (market.bToken().balanceOf(user) > 0) {
-            vm.prank(user);
-            market.claimB();
-        }
+
     }
 
     function _accounting() internal view {

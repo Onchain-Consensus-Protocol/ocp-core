@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {TopicMarket, IToken6} from "../src/TopicMarket.sol";
@@ -27,16 +28,16 @@ contract TopicMarketStockCollateralTest is Test {
     }
     function testEquivalentWholeTokenCurveAcrossDecimals() public {
         (, ,TopicMarket six) = _market(6);
-        uint256 referenceSupply = six.quoteGenesisBuy(10e6);
+        uint256 referenceSupply = six.quoteGenesisBuy(1e6);
         for(uint8 d=6; d<=18; d++) {
             (, ,TopicMarket m) = _market(d);
             uint256 unit=10**d;
             assertEq(m.SCALE(),10**(18-d));
             assertEq(m.LIMIT(),1e12*unit);
-            assertEq(m.quoteGenesisBuy(10*unit),referenceSupply);
-            m.genesisBuy(10*unit,referenceSupply,type(uint64).max,0);
-            assertEq(m.R(),945*unit/100);
-            assertEq(m.bToken().totalSupply(),45e16);
+            assertEq(m.quoteGenesisBuy(unit),referenceSupply);
+            m.genesisBuy(unit,referenceSupply,type(uint64).max,0);
+            assertEq(m.R(),99*unit/100);
+            assertEq(removedBSupply(m),0);
             assertTrue(checkMarketInvariants(m));
             m.genesisSell(m.S(),0,type(uint64).max,0);
             assertEq(m.S(),0); assertEq(m.R(),0); assertTrue(checkMarketInvariants(m));
@@ -45,8 +46,8 @@ contract TopicMarketStockCollateralTest is Test {
     function testStock18GraduationFormalAndSettlement() public {
         (StockCollateralMock t,MockCore c,TopicMarket m)=_market(18);
         m.genesisBuy(14e18,0,type(uint64).max,1);
-        assertEq(m.poolBasisWad(),1323e16);
-        assertEq(m.inventoryY(),1323e16);
+        assertEq(m.poolBasisWad(),1386e16);
+        assertEq(m.inventoryY(),1386e16);
         uint256 paid=m.quoteFormalBuy(true,1e18);
         m.formalBuy(true,1e18,paid,type(uint64).max);
         assertEq(m.yes(address(this)),1e18);
@@ -74,7 +75,7 @@ contract TopicMarketStockCollateralTest is Test {
         address user=address(0xa11ce);
         (bool ok,)=address(m).call(abi.encodePacked(abi.encodeCall(m.genesisBuy,(1e18,0,type(uint64).max,0)),user));
         assertTrue(ok); assertGt(m.shares(user),0); assertEq(m.shares(address(this)),0);
-        assertEq(m.bToken().balanceOf(user),45e15);
+        assertEq(removedBBalance(m,user),0);
         vm.warp(m.genesisCutoff());m.closeExpired();
         uint256 before=t.balanceOf(address(this));
         (ok,)=address(m).call(abi.encodePacked(abi.encodeCall(m.claimAll,()),user));

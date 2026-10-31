@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createTopicMarketDemo, topicMarketCreate, topicMarketBuy, topicMarketAddLP, topicMarketQuoteAddLP, topicMarketMaxAddLP,
   topicMarketExitLP, topicMarketQuoteExit, topicMarketAdvanceTime, topicMarketFinalize, topicMarketAssertLedger } from "./topicMarketDemoModel";
-const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo());for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
+const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo({Q:6000}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
 describe("TopicMarket locked LP: deprecated asset withdrawal and liquidity injection APIs",()=>{
  it("disables quote/add/restart in all former addition stages without changing assets",()=>{
   const f=formal();for(const s of [f,topicMarketAdvanceTime(f,f.TF),topicMarketFinalize(topicMarketAdvanceTime(f,f.TC))]){

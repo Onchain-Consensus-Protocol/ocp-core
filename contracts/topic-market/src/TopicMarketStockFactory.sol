@@ -12,6 +12,7 @@ interface IStockRouterBinding { function factory() external view returns (addres
 interface IStockOracleUnits { function unit() external view returns (uint256); }
 /// @notice Shared factory with append-only stock configurations and independent markets.
 contract TopicMarketStockFactory is Ownable2Step {
+    bool public constant singlePool = true;
     struct StockConfig {
         ITopicMarketPriceSnapshot priceOracle;
         address trustedForwarder;
@@ -101,7 +102,7 @@ contract TopicMarketStockFactory is Ownable2Step {
         require(block.timestamp <= type(uint64).max - 4 hours, "TIME");
         require(uint256(coreEnd) > block.timestamp + 4 hours, "DEADLINES");
         uint256 price = _graduationBasis(stock, config);
-        require(price <= (1e30 / (10 ** (18-config.decimals))) / 4, "PRICE");
+        require(price <= (1e30 / (10 ** (18-config.decimals))) * 10 / 42, "PRICE");
         VaultCoreAdapter createdCore = coreDeployer.deploy(token, msg.sender, protocol, coreEnd,
             IUsdCollateralSnapshot(address(config.priceOracle)).collateralForUsd(500e18));
         coreDeployer.configureCore(createdCore, config.trustedForwarder);

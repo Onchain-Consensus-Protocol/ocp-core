@@ -12,7 +12,7 @@ const ledger = (s: State) => {
   expect(topicMarketAccounting(s).error).toBeCloseTo(0, 7);
   expect(topicMarketAccounting(s).total).toBeCloseTo(30000, 7);
 };
-const active = () => topicMarketCreate(createTopicMarketDemo());
+const active = () => topicMarketCreate(createTopicMarketDemo({singlePool:false}));
 const graduated = () => {
   let s = active();
   for (let i = 0; i < 3; i++) { s = topicMarketBuy(s, i, 9000); ledger(s); }
@@ -25,7 +25,7 @@ const rejectsUnchanged = (s: State, action: () => unknown) => {
   ledger(s);
 };
 
-describe("TopicMarket homepage: independent full lifecycle and settlement", () => {
+describe("Legacy dual-pool TopicMarket: independent full lifecycle and settlement", () => {
   it("starts without hidden Core stakes, virtual reserves or external capital", () => {
     const s = createTopicMarketDemo();
     ledger(s);
@@ -80,7 +80,7 @@ describe("TopicMarket homepage: independent full lifecycle and settlement", () =
   });
 
   it("spends only the actual filled Formal budget and never mints beyond inventory", () => {
-    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({ Q: 1 })), 0, 30);
+    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({ singlePool:false, Q: 1 })), 0, 30);
     const beforeWallet = s.accounts[1].wallet;
     const inventory = s.inventory[0];
     const quote = topicMarketQuoteFormalBuyBudget(s, "YES", 100);
@@ -197,7 +197,7 @@ describe("TopicMarket homepage: independent full lifecycle and settlement", () =
 
   it("bounds an underfunded high-depth research scenario by actual B and leaves residual loss to LP", () => {
     // Explicit research configuration; default Q=2000,b=150 cannot exhaust B.
-    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({ Q: 1, b: 150 })), 0, 30);
+    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({ singlePool:false, Q: 1, b: 150 })), 0, 30);
     s = topicMarketFormalBuy(s, 1, "YES", 20);
     s = topicMarketCoreStake(s, 2, "YES", 1);
     const originalB = s.B;
@@ -213,7 +213,7 @@ describe("TopicMarket homepage: independent full lifecycle and settlement", () =
   });
 
   it("does not cap B loss coverage by either LP or B token transfer fractions", () => {
-    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({ Q: 1, b: 150 })), 0, 30);
+    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({ singlePool:false, Q: 1, b: 150 })), 0, 30);
     s = topicMarketFormalBuy(s, 1, "YES", 20);
     s = topicMarketTransferLP(s, 0, 2, s.accounts[0].lp * .9);
     s = topicMarketTransferB(s, 0, 1, s.accounts[0].z * .9);

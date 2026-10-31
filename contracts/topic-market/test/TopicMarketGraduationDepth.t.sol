@@ -16,13 +16,9 @@ contract TopicMarketGraduationDepthTest is TopicMarketBase {
         assertGt(market.initialCollateral(),market.rTarget());
         _accounting();
     }
-    function testSellGraduationUsesRemainingRNotBOrThreshold() public {
-        _buy(alice,9e6);
-        uint256 target=Math.mulDiv(market.bTarget()-market.B(),1000,45,Math.Rounding.Ceil)+3;
-        uint256 quantity=market.S()-Math.sqrt((market.R()-target)*1e30)+1;
-        vm.prank(alice);market.genesisSell(quantity,0,type(uint64).max,1);
-        assertEq(market.bWad(),market.initialCollateral()*market.SCALE());
-        assertEq(market.priceYes(),W/2);_accounting();
+    function testGraduationAfterSellUsesActualRemainingRAndNewBuy() public {
+        _buy(alice,4e6);uint256 sold=market.shares(alice)/10;vm.prank(alice);market.genesisSell(sold,0,type(uint64).max,0);
+        _buy(bob,2e6); assertEq(market.bWad(),market.initialCollateral()*market.SCALE()); assertEq(market.priceYes(),W/2); _accounting();
     }
     function testPriceImpactAndRoundtripKeepDepthAndFunds() public {
         _graduate();uint256 depth=market.bWad();uint256 amount=depth/100;
@@ -59,9 +55,9 @@ contract TopicMarketDepthDecimalsTest is TopicMarketStockCollateralTest {
         for(uint256 d;d<3;d++)for(uint8 outcome=1;outcome<=3;outcome++){
             (StockCollateralMock t,MockCore c,TopicMarket m)=_market(precisions[d]);
             uint256 unit=10**precisions[d];m.genesisBuy(14*unit,0,type(uint64).max,1);
-            assertEq(m.bWad(),1323e16);assertEq(m.bWad(),m.initialCollateral()*m.SCALE());
+            assertEq(m.bWad(),1386e16);assertEq(m.bWad(),m.initialCollateral()*m.SCALE());
             uint256 paid=m.quoteFormalBuy(true,1e18);m.formalBuy(true,1e18,paid,type(uint64).max);
-            assertEq(m.bWad(),1323e16);assertTrue(checkMarketInvariants(m));
+            assertEq(m.bWad(),1386e16);assertTrue(checkMarketInvariants(m));
             vm.warp(m.coreCutoff());c.resolve(outcome);m.finalize();
             uint256 before=t.balanceOf(address(this));(uint256 y,uint256 lp,uint256 reserve,)=m.previewAccount(address(this),outcome);
             m.claimAll();assertEq(t.balanceOf(address(this))-before,y+lp+reserve);

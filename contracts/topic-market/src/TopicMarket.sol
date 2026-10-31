@@ -20,12 +20,13 @@ interface ITopicMarketCore {
     function finalOutcome() external view returns (uint8); // 0 pending,1 YES,2 NO,3 INVALID
 }
 
-/// @notice Isolated locked-liquidity prototype with independent transferable LP/B ERC20 rights.
+/// @notice Isolated locked-liquidity prototype with transferable LP ERC20 rights.
 /// @dev No owner upgrades/rescue. Snapshot supplied at construction, NOT an authenticated oracle.
-/// Genesis/outcomes remain nontransferable internal ledgers; LP/B are market-specific ERC20s.
+/// Genesis/outcomes remain nontransferable internal ledgers; LP is a market-specific ERC20; legacy B getters are always zero.
 contract TopicMarket {
     using Math for uint256;
     bool public constant automaticFeePayout = true;
+    bool public constant singlePool = true;
     address public immutable trustedForwarder;
     uint256 public SCALE; // collateral native units -> outcome WAD
     uint256 public LIMIT; // 1e12 whole collateral-token research bound
@@ -146,14 +147,15 @@ contract TopicMarket {
             require(block.chainid == 46630
                 && address(token_) == 0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E && decimals_ == 18,
                 "PRICE");
-        } else require(ethPrice6 <= (1e30 / scale_) / 4, "PRICE");
+        } else require(ethPrice6 <= LIMIT * 10 / 42, "PRICE");
         require(kWad >= 1e12 && kWad <= 1e24, "PARAMS");
         (bool ok, bytes memory data) = address(core_).staticcall(abi.encodeWithSignature("trustedForwarder()"));
         trustedForwarder = ok && data.length == 32 ? abi.decode(data,(address)) : address(0);
         require(trustedForwarder != protocol_, "FEE_RECIPIENT_FORWARDER");
         token = token_;
         lpToken = new TopicMarketRightsToken("Topic Market LP", "TOPIC-LP");
-        bToken = new TopicMarketRightsToken("Topic Market B Contribution", "TOPIC-B");
+        // 保留旧ABI的零地址getter，不再部署或发行B代币。
+        bToken = TopicMarketRightsToken(address(0));
         core = core_;
         creator = creator_;
         protocol = protocol_;
@@ -161,9 +163,9 @@ contract TopicMarket {
         coreCutoff = coreEnd_;
         formalCutoff = coreEnd_ - 1 hours;
         genesisCutoff = coreEnd_ - 2 hours;
-        rTarget = fixedTestTargets ? 36e14 : Math.mulDiv(ethPrice6, 36, 10);
-        bTarget = fixedTestTargets ? 6e14 : Math.mulDiv(ethPrice6, 6, 10);
-        require(bTarget > 0, "TINY_TARGET");
+        rTarget = fixedTestTargets ? 42e14 : Math.mulDiv(ethPrice6, 42, 10);
+        bTarget = 0; // 兼容旧只读接口；单R不再设置B门槛。
+        require(rTarget > 0, "TINY_TARGET");
         k = kWad;
     }
 
@@ -192,19 +194,13 @@ contract TopicMarket {
         pure
         returns (uint256 net, uint256 reserve, uint256 fee, uint256 remainder)
     {
-        net = Math.mulDiv(base, 945, 1000);
-        reserve = Math.mulDiv(base, 45, 1000);
+        net = Math.mulDiv(base, 99, 100);
+        reserve = 0;
         fee = base / 100;
         remainder = base - net - reserve - fee;
     }
 
-    function _accrueGen(uint256 base, uint256 reserve, uint256 fee, uint256 remainder) private {
-        address user = _actor();
-        B += reserve;
-        contribution[user] += reserve;
-        totalContribution += reserve;
-        // 权重只来自实际进入Genesis B的抵押代币；Formal手续费或LP转让不产生新B权益。
-        if (reserve > 0) bToken.mint(user, reserve * SCALE);
+    function _accrueGen(uint256 base, uint256 fee, uint256 remainder) private {
         // 按同一gross独立向下取整0.7%/0.3%；剩余原始单位明确归dust。
         uint256 creatorPart = Math.mulDiv(base, 7, 1000);
         creatorFees += creatorPart;
@@ -235,14 +231,14 @@ contract TopicMarket {
         );
         uint256 minted = quoteGenesisBuy(paid);
         require(minted >= minTokens, "SLIPPAGE");
-        (uint256 net, uint256 reserve, uint256 fee, uint256 rem) = _splitGen(paid);
-        bool hit = R + net >= rTarget && B + reserve >= bTarget;
+        (uint256 net,, uint256 fee, uint256 rem) = _splitGen(paid);
+        bool hit = R + net >= rTarget;
         _checkIntent(hit, intent);
         _receive(paid);
         R += net;
         S += minted;
         shares[user] += minted;
-        _accrueGen(paid, reserve, fee, rem);
+        _accrueGen(paid, fee, rem);
         emit GenesisTrade(user, true, paid, minted);
         if (hit) _graduate(true);
     }
@@ -252,7 +248,7 @@ contract TopicMarket {
         uint256 left = S - quantity;
         gross = Math.mulDiv(k, S * S - left * left, curveScale);
         require(gross > 0 && gross <= R, "TINY");
-        seller = Math.mulDiv(gross, 945, 1000);
+        seller = Math.mulDiv(gross, 99, 100);
     }
 
     function genesisSell(uint256 quantity, uint256 minOut, uint64 expiry, uint8 intent) external lock {
@@ -263,20 +259,20 @@ contract TopicMarket {
         require(shares[user] >= quantity, "HOLDINGS");
         (uint256 gross, uint256 seller) = quoteGenesisSell(quantity);
         require(seller >= minOut, "SLIPPAGE");
-        (, uint256 reserve, uint256 fee, uint256 rem) = _splitGen(gross);
-        bool hit = R - gross >= rTarget && B + reserve >= bTarget;
+        (,, uint256 fee, uint256 rem) = _splitGen(gross);
+        bool hit = R - gross >= rTarget;
         _checkIntent(hit, intent);
         R -= gross;
         S -= quantity;
         shares[user] -= quantity;
-        _accrueGen(gross, reserve, fee, rem);
+        _accrueGen(gross, fee, rem);
         if (S == 0) {
             dust += R; // isolate only when all Genesis supply has been burned
             R = 0;
         }
         emit GenesisTrade(user, false, gross, quantity);
         if (hit) _graduate(false);
-        _send(msg.sender, Math.mulDiv(gross, 945, 1000));
+        _send(msg.sender, Math.mulDiv(gross, 99, 100));
     }
 
 
@@ -332,8 +328,8 @@ contract TopicMarket {
         private pure returns (uint256 net, uint256 lpFee, uint256 coreFee, uint256 reserve, uint256 rem)
     {
         net = Math.mulDiv(base, 98, 100);
-        lpFee = base / 200;
-        reserve = base / 200;
+        lpFee = base / 100;
+        reserve = 0;
         coreFee = Math.mulDiv(base, 7, 1000);
         rem = base - net - lpFee - reserve - coreFee;
     }
@@ -360,13 +356,11 @@ contract TopicMarket {
         require(block.timestamp <= expiry, "EXPIRED");
         uint256 gross = quoteFormalBuy(isYes, amount);
         require(gross <= maxPaid && gross <= LIMIT, "SLIPPAGE");
-        (uint256 net, uint256 lpFee, uint256 coreFee, uint256 reserve, uint256 rem) = _splitFormal(gross);
+        (uint256 net, uint256 lpFee, uint256 coreFee,, uint256 rem) = _splitFormal(gross);
         _receive(gross);
         cash += net;
         lpFees += lpFee;
-        // 正式交易给原Genesis B持有人增加风险资金/余资收益，不为交易者新铸Btoken。
-        B += reserve;
-        formalBAccrued += reserve;
+        // 单池的全部做市费用计入LP，不再划拨B资金。
         uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
         protocolFees += protocolPart;
         dust += rem - protocolPart;
@@ -424,7 +418,7 @@ contract TopicMarket {
         require((isYes ? yes[user] : no[user]) >= amount, "HOLDINGS");
         (uint256 gross, uint256 seller) = quoteFormalSell(isYes, amount);
         require(seller >= minOut, "SLIPPAGE");
-        (, uint256 lpFee, uint256 coreFee, uint256 reserve, uint256 rem) = _splitFormal(gross);
+        (, uint256 lpFee, uint256 coreFee,, uint256 rem) = _splitFormal(gross);
         if (isYes) {
             yes[user] -= amount;
             inventoryY += amount;
@@ -434,9 +428,7 @@ contract TopicMarket {
         }
         cash -= gross;
         lpFees += lpFee;
-        // 正式交易给原Genesis B持有人增加风险资金/余资收益，不为交易者新铸Btoken。
-        B += reserve;
-        formalBAccrued += reserve;
+        // 单池的全部做市费用计入LP，不再划拨B资金。
         uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
         protocolFees += protocolPart;
         dust += rem - protocolPart;
@@ -487,11 +479,7 @@ contract TopicMarket {
             failedRRemaining = R;
             R = 0;
             failedSupply = S;
-            bBudgetInitial = B;
-            bBudgetRemaining = B;
-            bSnapshotWad = bToken.totalSupply();
-            require(bSnapshotWad == totalContribution * SCALE, "B_SNAPSHOT");
-            B = 0;
+
         } else {
             require(phase == Phase.FORMAL && block.timestamp >= formalCutoff, "EARLY");
             phase = Phase.WAIT_CORE;
@@ -522,19 +510,10 @@ contract TopicMarket {
         uint256 nav = cash + lpFees + inventoryValue;
         cash = 0;
         lpFees = 0;
-        uint256 basis = poolBasisWad / SCALE;
-        uint256 loss = basis > nav ? basis - nav : 0;
-        coverPaid = Math.min(B, loss);
-        B -= coverPaid;
         // 固定原始毕业总份额，不能因物化、转让或已领取销毁而缩小分母。
         lpSnapshot = graduationSupply;
-        lpBudgetInitial = nav + coverPaid;
-        lpBudgetRemaining = lpBudgetInitial;
-        bBudgetInitial = B;
-        bBudgetRemaining = B;
-        bSnapshotWad = bToken.totalSupply();
-        require(bSnapshotWad == totalContribution * SCALE, "B_SNAPSHOT");
-        B = 0;
+        lpBudgetInitial = nav;
+        lpBudgetRemaining = nav;
         emit Finalized(result, coverPaid, lpBudgetInitial, bBudgetInitial);
         _flushFees();
     }
@@ -584,24 +563,9 @@ contract TopicMarket {
         _send(msg.sender, pay);
     }
 
-    function claimB() external lock returns (uint256 pay) {
-        return _claimB(bToken.balanceOf(_actor()));
-    }
-
-    function claimB(uint256 amountWad) external lock returns (uint256 pay) {
-        return _claimB(amountWad);
-    }
-
-    function _claimB(uint256 amountWad) private returns (uint256 pay) {
-        address user = _actor();
-        require(phase == Phase.SETTLED || phase == Phase.FAILED, "PHASE");
-        require(amountWad > 0 && bSnapshotWad > 0 && bToken.balanceOf(user) >= amountWad, "CLAIMED");
-        bToken.burn(user, amountWad);
-        pay = Math.mulDiv(bBudgetInitial, amountWad, bSnapshotWad);
-        bBudgetRemaining -= pay;
-        emit Claimed(user, "B", pay);
-        _send(msg.sender, pay);
-    }
+    // 已部署双池版本保留原领取逻辑；新单池没有B权利。
+    function claimB() external pure returns (uint256) { revert("B_REMOVED"); }
+    function claimB(uint256) external pure returns (uint256) { revert("B_REMOVED"); }
 
     function claimFailed() external lock returns (uint256 pay) {
         return _claimFailed();
@@ -630,9 +594,7 @@ contract TopicMarket {
         }
         require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "PHASE");
         uint256 nav = cash + lpFees + _value(inventoryY, inventoryN, result);
-        uint256 basis = poolBasisWad / SCALE;
-        cover = Math.min(B, basis > nav ? basis - nav : 0);
-        return (nav + cover, B - cover, cover);
+        return (nav, 0, 0);
     }
 
     /// @notice Account payout, including escrowed LP rights.
@@ -642,15 +604,12 @@ contract TopicMarket {
     {
         if (phase == Phase.FAILED) {
             if (failedSupply > 0) failedPay = Math.mulDiv(failedRInitial, shares[account], failedSupply);
-            if (bSnapshotWad > 0) bPay = Math.mulDiv(bBudgetInitial, bToken.balanceOf(account), bSnapshotWad);
             return (0, 0, bPay, failedPay);
         }
-        (uint256 lpBudget, uint256 bBudget,) = previewSettlement(result);
+        (uint256 lpBudget,,) = previewSettlement(result);
         outcomePay = _value(yes[account], no[account], result);
         uint256 denominator = phase == Phase.SETTLED ? lpSnapshot : graduationSupply;
         if (denominator > 0) lpPay = Math.mulDiv(lpBudget, shares[account] + lpToken.balanceOf(account), denominator);
-        uint256 bDenominator = phase == Phase.SETTLED ? bSnapshotWad : bToken.totalSupply();
-        if (bDenominator > 0) bPay = Math.mulDiv(bBudget, bToken.balanceOf(account), bDenominator);
     }
 
     /// @notice Same single market claim action as the demo, never claiming on another wallet's behalf.
@@ -668,8 +627,6 @@ contract TopicMarket {
             if (lp > 0) { hasRights = true; total += _claimLP(lp); }
             if (yes[user] + no[user] > 0) { hasRights = true; total += _claimOutcome(); }
         }
-        uint256 b = bToken.balanceOf(user);
-        if (b > 0) { hasRights = true; total += _claimB(b); }
         require(hasRights, "CLAIMED");
     }
 
@@ -681,8 +638,9 @@ contract TopicMarket {
     function flushFees() external lock { _flushFees(); }
 
     function _flushFees() private {
-        // Insufficient optional payout gas leaves debts available for a separate retry.
-        if (gasleft() < 250000) return;
+        if (creatorFees == 0 && protocolFees == 0) return;
+        // gas不足必须回滚整笔交易，让钱包估算覆盖付款；不得静默跳过。
+        require(gasleft() >= 300000, "FEE_PAYOUT_GAS");
         uint256 amount = creatorFees;
         if (amount > 0) {
             creatorFees = 0;
@@ -712,7 +670,7 @@ contract TopicMarket {
     /// residues and unsolicited surplus become protocol funds. Unclaimed fees remain separate debts.
     function collectDust() external lock returns (uint256 amount) {
         require(phase == Phase.SETTLED || phase == Phase.FAILED, "PHASE");
-        require(bToken.totalSupply() == 0 && (phase == Phase.FAILED ? S == 0 : liquiditySupply == 0 && yesSupply == 0 && noSupply == 0), "OUTSTANDING_RIGHTS");
+        require(phase == Phase.FAILED ? S == 0 : liquiditySupply == 0 && yesSupply == 0 && noSupply == 0, "OUTSTANDING_RIGHTS");
         amount = token.balanceOf(address(this)) - creatorFees - protocolFees;
         R = 0; B = 0; dust = 0; collateralCash = 0; cash = 0; lpFees = 0;
         lpBudgetRemaining = 0; bBudgetRemaining = 0; failedRRemaining = 0;

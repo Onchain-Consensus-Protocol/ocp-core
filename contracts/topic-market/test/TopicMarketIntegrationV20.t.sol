@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
@@ -45,7 +46,7 @@ contract TopicMarketIntegrationV20Test is TopicMarketBase {
         assertEq(usd.balanceOf(who) - before, paid);
         assertEq(market.shares(who), 0);
         assertEq(market.lpToken().balanceOf(who), 0);
-        assertEq(market.bToken().balanceOf(who), 0);
+        assertEq(removedBBalance(market,who), 0);
         assertEq(market.yes(who) + market.no(who), 0);
         vm.prank(who);
         vm.expectRevert();
@@ -91,7 +92,7 @@ contract TopicMarketIntegrationV20Test is TopicMarketBase {
         uint256 paid = usd.balanceOf(alice) + usd.balanceOf(bob) - before;
         assertLe(paid, frozenR + frozenB);
         assertLe(frozenR + frozenB - paid, 3);
-        assertEq(market.bToken().totalSupply(), 0);
+        assertEq(removedBSupply(market), 0);
         _accounting();
     }
 

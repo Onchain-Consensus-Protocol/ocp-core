@@ -13,7 +13,7 @@ const ledger = (s: State) => {
   expect(topicMarketAccounting(s).total).toBeCloseTo(30000, 7);
 };
 const formal = () => {
-  let s = topicMarketCreate(createTopicMarketDemo());
+  let s = topicMarketCreate(createTopicMarketDemo({singlePool:false}));
   for (let id = 0; id < 3; id++) s = topicMarketBuy(s, id, 9000);
   expect(s.phase).toBe("FORMAL");
   return s;

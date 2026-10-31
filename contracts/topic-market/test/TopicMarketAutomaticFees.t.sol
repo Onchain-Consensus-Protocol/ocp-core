@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {TopicMarket,IToken6} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
 import {OCPCore} from "../src/core/OCPCore.sol";
@@ -82,11 +83,64 @@ contract TopicMarketAutomaticFeesTest is Test {
         _graduate();uint256 due=market.protocolFees();token.reject(creator,4);_settle();
         assertEq(uint256(market.phase()),3);assertTrue(core.resolved());assertGt(market.creatorFees(),0);assertEq(token.balanceOf(protocol),due);
     }
-    function testLowGasOptionalRetryLeavesFeesAvailableAndExternalCallerCannotChooseRecipient() public {
-        _graduate();uint256 due=market.creatorFees();market.flushFees{gas:200000}();assertEq(market.creatorFees(),due);
+    function testLowGasRetryRevertsInsteadOfSilentlySkippingAndRecipientIsFixed() public {
+        _graduate();uint256 due=market.creatorFees();vm.expectRevert("FEE_PAYOUT_GAS");market.flushFees{gas:200000}();assertEq(market.creatorFees(),due);
         vm.expectRevert("SELF_ONLY");market.executeFeeTransfer(bob,due);
         vm.expectRevert("SELF_ONLY");core.executeOfficialTransfer(1);
         market.flushFees();assertEq(token.balanceOf(creator),due);
+        market.flushFees{gas:100000}();assertEq(token.balanceOf(creator),due);
+    }
+    function testLowGasCoreOfficialRetryRevertsWithoutErasingItsFixedRecipientDebt() public {
+        _graduate();_trade();vm.warp(market.coreCutoff());core.finalize();
+        uint256 due=core.officialMarketFeesClaimable();assertGt(due,0);
+        vm.expectRevert("FEE_PAYOUT_GAS");core.flushOfficialPayments{gas:200000}();
+        assertEq(core.officialMarketFeesClaimable(),due);assertEq(token.balanceOf(protocol),0);
+        core.flushOfficialPayments();assertEq(core.officialMarketFeesClaimable(),0);assertEq(token.balanceOf(protocol),due);
+        core.flushOfficialPayments{gas:100000}();assertEq(token.balanceOf(protocol),due);
+    }
+    function testLowGasMarketFinalizationRollsBackTheFrozenBudgetsAndFeeDebts() public {
+        _graduate();_trade();uint256 creatorDue=market.creatorFees();uint256 protocolDue=market.protocolFees();
+        vm.warp(market.coreCutoff());core.finalize();
+        vm.expectRevert("FEE_PAYOUT_GAS");market.finalize{gas:350000}();
+        assertEq(uint256(market.phase()),1);assertEq(market.lpBudgetInitial(),0);
+        assertEq(market.creatorFees(),creatorDue);assertEq(market.protocolFees(),protocolDue);
+        adapter.finalizeMarket();assertEq(uint256(market.phase()),3);
+        assertEq(market.creatorFees()+market.protocolFees()+core.officialMarketFeesClaimable(),0);
+    }
+    function testLowGasGenesisFailureCannotConfirmClosureWithoutAttemptingPayment() public {
+        vm.prank(alice);market.genesisBuy(100003,0,type(uint64).max,0);
+        uint256 creatorDue=market.creatorFees();uint256 protocolDue=market.protocolFees();
+        vm.warp(market.genesisCutoff());vm.expectRevert("FEE_PAYOUT_GAS");market.closeExpired{gas:200000}();
+        assertEq(uint256(market.phase()),0);assertEq(market.failedRInitial(),0);assertEq(market.creatorFees(),creatorDue);assertEq(market.protocolFees(),protocolDue);
+        market.closeExpired();assertEq(uint256(market.phase()),4);assertEq(token.balanceOf(creator),creatorDue);assertEq(token.balanceOf(protocol),protocolDue);
+    }
+    /// @dev Actual cap of the user's historical false-success close transaction.
+    function testHistorical410714GasCloseIsAtomicOrPaysBothFees() public {
+        vm.prank(alice);market.genesisBuy(100003,0,type(uint64).max,0);
+        uint256 creatorDue=market.creatorFees();uint256 protocolDue=market.protocolFees();
+        uint256 reserve=market.R();uint256 supply=market.S();uint256 balance=token.balanceOf(address(market));
+        vm.warp(market.genesisCutoff());vm.recordLogs();
+        (bool success,)=address(market).call{gas:410714}(abi.encodeCall(market.closeExpired,()));
+        Vm.Log[] memory logs=vm.getRecordedLogs();
+        if(!success){
+            assertEq(uint256(market.phase()),0);assertEq(market.R(),reserve);assertEq(market.S(),supply);
+            assertEq(market.shares(alice),supply);assertEq(market.failedRInitial()+market.failedRRemaining()+market.failedSupply(),0);
+            assertEq(market.creatorFees(),creatorDue);assertEq(market.protocolFees(),protocolDue);
+            assertEq(token.balanceOf(address(market)),balance);assertEq(token.balanceOf(creator)+token.balanceOf(protocol),0);
+        }else{
+            assertEq(uint256(market.phase()),4);assertEq(market.creatorFees()+market.protocolFees(),0);
+            assertEq(token.balanceOf(creator),creatorDue);assertEq(token.balanceOf(protocol),protocolDue);
+            uint256 attempts;uint256 paidTotal;bool creatorPaid;bool protocolPaid;
+            for(uint256 i;i<logs.length;i++){
+                if(logs[i].emitter!=address(market)||logs[i].topics.length!=2||logs[i].topics[0]!=keccak256("FeePayout(address,uint256,bool)"))continue;
+                (uint256 amount,bool paid)=abi.decode(logs[i].data,(uint256,bool));assertTrue(paid);
+                address recipient=address(uint160(uint256(logs[i].topics[1])));
+                if(recipient==creator){assertFalse(creatorPaid);creatorPaid=true;assertEq(amount,creatorDue);}
+                else{assertEq(recipient,protocol);assertFalse(protocolPaid);protocolPaid=true;assertEq(amount,protocolDue);}
+                attempts++;paidTotal+=amount;
+            }
+            assertEq(attempts,2);assertTrue(creatorPaid&&protocolPaid);assertEq(paidTotal,creatorDue+protocolDue);
+        }
     }
     function testGasBurningBatchItemDoesNotBlockLaterFixedRecipientPayment() public {
         _graduate();uint256 due=market.creatorFees();token.reject(creator,1);_settle();token.reject(creator,0);
@@ -97,7 +151,6 @@ contract TopicMarketAutomaticFeesTest is Test {
         _graduate();vm.prank(bob);core.stake(IOCPCore.Side.YES,100e6);_trade();_settle();
         vm.expectRevert("OUTSTANDING_RIGHTS");market.collectDust();
         vm.prank(alice);market.claimLP();vm.expectRevert("OUTSTANDING_RIGHTS");market.collectDust();
-        vm.prank(alice);market.claimB();vm.expectRevert("OUTSTANDING_RIGHTS");market.collectDust();
         vm.prank(bob);market.claimOutcome();
         uint256 residual=token.balanceOf(address(market));uint256 old=token.balanceOf(protocol);assertEq(market.collectDust(),residual);assertEq(token.balanceOf(protocol)-old,residual);assertEq(market.accountedBalance(),0);assertEq(token.balanceOf(address(market)),0);
         assertEq(market.collectDust(),0);
@@ -107,7 +160,6 @@ contract TopicMarketAutomaticFeesTest is Test {
         vm.prank(alice);market.genesisBuy(100003,0,type(uint64).max,0);token.reject(protocol,1);
         vm.warp(market.genesisCutoff());market.closeExpired();uint256 due=market.protocolFees();
         vm.expectRevert("OUTSTANDING_RIGHTS");market.collectDust();vm.prank(alice);market.claimFailed();
-        vm.expectRevert("OUTSTANDING_RIGHTS");market.collectDust();vm.prank(alice);market.claimB();
         uint256 residual=token.balanceOf(address(market))-due;market.collectDust();assertEq(market.protocolFees(),due+residual);
         token.reject(protocol,0);market.flushFees();assertEq(token.balanceOf(address(market)),0);
     }

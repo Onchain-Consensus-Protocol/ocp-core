@@ -26,8 +26,8 @@ Collateral supports validated6–18 decimal assets. Genesis and YES/NO positions
 
 ## Current source: fixed fee allocation and settlement payments
 
-- Genesis gross: 94.5% reserve, 4.5% B capital, 0.7% creator fees, 0.3% protocol fees.
-- Formal gross: 98% trading value, 0.5% LP fee, 0.5% B capital, 0.7% Core fee, 0.3% protocol fee. Every component uses collateral-native integer units; unallocated rounding units are explicitly accounted as dust.
+- New single-R source: Genesis gross is 99% R, 0.7% creator fees and 0.3% protocol fees; no B capital or B token is created.
+- Formal gross: 98% trading value, 1% LP fee, 0.7% Core fee, 0.3% protocol fee. Every component uses collateral-native integer units; unallocated rounding units are explicitly accounted as dust.
 - `VaultCoreAdapter.finalizeMarket()` is the single-transaction user settlement entry: finalize Core, finalize Market and attempt fixed-beneficiary fee payments. It never lets the executor choose outcomes or recipients. A rejected early request before the original deadline continues to return without forcing settlement.
 - `automaticFeePayout()` identifies new markets. Old immutable markets do not acquire this behavior from a frontend update.
 - Market `claimFees()`/`flushFees()` and Adapter `claimFees()` retry delivery to the fixed beneficiaries. Adapter `batchClaimFees()` accepts at most 20 adapters, caps each call at 600,000 gas, and stops when gas is insufficient; a successful transaction does not prove every pending payment was delivered. Check events and remaining balances.
@@ -44,4 +44,10 @@ Locked `addLP`/`exitLP`, disabled Genesis `transferShares`, and the unused inter
 
 Testnet graduation constants remain in the dedicated chain-46630-only factory; production stock factories retain the live snapshot path. No Keeper is introduced.
 
-Audit-only `checkInvariants()` now lives in `test/MarketInvariantCheck.sol`, with the same assertions over public getters. Production execution guards remain in the market. The UI adds explicit optional-payment gas above wallet estimates; low-gas callers retain the retry path. See [fee and settlement validation](../../validation/2026-10-30-fees-and-settlement.md).
+Audit-only `checkInvariants()` now lives in `test/MarketInvariantCheck.sol`, with the same assertions over public getters. Production execution guards remain in the market. The UI adds 600,000 gas above wallet estimates for settlement/payment paths. With pending fees, insufficient payment gas now reverts the whole call rather than confirming settlement and silently skipping delivery. Both Market and Core use this rule; rejected token transfers remain isolated retryable debts. See [fee and settlement validation](../../validation/2026-10-30-fees-and-settlement.md).
+
+## Single-R patch (2026-11-01)
+
+Only existing Market, Core payment gas handling and factory graduation settings change. The launch threshold is 4.2 ETH equivalent (0.0042 TSLA in the dedicated testnet profile); the creation price domain is bounded so the target fits the existing market limit. Genesis gToken converts proportionally into the same LP token at graduation, with b fixed to the graduated R amount and no later LP issuance. Formal LP receives actual remaining pool NAV without B cover. A failed launch refunds remaining R only. Legacy B getters are zero and claimB reverts B_REMOVED; no B token is deployed or minted. Old immutable markets and their balances are not rewritten.
+
+See validation/2026-11-01-single-r-fee-payment.md for targeted acceptance evidence.

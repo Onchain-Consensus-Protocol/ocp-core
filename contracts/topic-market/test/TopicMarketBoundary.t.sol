@@ -5,7 +5,7 @@ import {TopicMarket} from "../src/TopicMarket.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract TopicMarketBoundaryTest is TopicMarketBase {
-    function testBFirstThenLPLossWhenReserveExhausted() public {
+    function testLPLossHasNoExternalBFirstLossBuffer() public {
         oracle = new MockCore();
         market = new TopicMarket(usd, oracle, creator, protocol, uint64(block.timestamp + 6 hours), 1e6, 1e18);
         oracle.bind(address(market));
@@ -26,20 +26,13 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
         _accounting();
     }
 
-    function testBCompensatesNetOfRetainedLPFees() public {
-        _graduate();
-        _formalBuy(bob, true, market.inventoryY()/20);
-        uint256 nav = market.cash() + market.lpFees() + market.inventoryY()/market.SCALE();
-        uint256 expected = market.initialCollateral() - nav;
-        uint256 z = market.B();
-        _finish(1);
-        assertEq(market.coverPaid(), expected);
-        assertEq(market.lpBudgetInitial(), market.initialCollateral());
-        assertEq(market.bBudgetInitial(), z - expected);
-        _accounting();
+    function testLPReceivesNetAssetsWithoutSyntheticBCompensation() public {
+        _graduate(); _formalBuy(bob,true,market.inventoryY()/20);
+        uint256 nav=market.cash()+market.lpFees()+market.inventoryY()/market.SCALE();
+        _finish(1); assertEq(market.coverPaid(),0); assertEq(market.lpBudgetInitial(),nav); assertEq(market.bBudgetInitial(),0); _accounting();
     }
 
-    function testInvalidDoesNotConsumeB() public {
+    function testInvalidSettlementHasNoBAndPreservesSinglePoolAccounting() public {
         _graduate();
         _formalBuy(bob, true, 5e18);
         uint256 B = market.B();
@@ -50,7 +43,7 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
     }
 
     function testOversizedSellDoesNotGraduateAtIntermediatePoint() public {
-        _buy(alice, 9e6);
+        _buy(alice, 4e6);
         uint256 newR = 2e6;
         uint256 d = market.S() - Math.sqrt(newR * 1e30);
         vm.prank(alice);
@@ -96,7 +89,7 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
         vm.expectRevert("PHASE");
         market.claimLP();
         vm.prank(alice);
-        vm.expectRevert("PHASE");
+        vm.expectRevert("B_REMOVED");
         market.claimB();
     }
 

@@ -83,6 +83,15 @@ describe('chain data adapter for the shared Simulation view',()=>{
     expect(html).toContain('Genesis market contract address');
     expect(html).not.toContain('Actual simulated prices');expect(html).not.toContain('3.6 / 0.6 ETH');
   });
+  it('hides B for new single-pool markets and preserves legacy B holdings',()=>{
+    const props=fixture();props.market.singlePool=true;
+    const html=renderToStaticMarkup(<TestnetSimulation {...props}/>);
+    expect(html).not.toContain('B tokens');expect(html).not.toContain('Market-making risk reserve');
+    expect(buildTestnetRemote(props).state.singlePool).toBe(true);
+    delete props.market.singlePool;
+    expect(renderToStaticMarkup(<TestnetSimulation {...props}/>)).toContain('B tokens');
+    expect(buildTestnetRemote(props).state.accounts[0].z).toBe(4);
+  });
   it('rejects unsupported phases instead of inventing a CREATE demo',()=>{
     const props=fixture();props.market.phase=99;expect(()=>buildTestnetRemote(props)).toThrow('Unsupported');
   });

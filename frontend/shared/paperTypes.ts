@@ -30,7 +30,7 @@ export interface PaperPosition {
  gToken:string;yes:string;no:string;lp:string;B:string;coreSide:Outcome|null;coreStake:string;
  claimMarketUSD:string;claimCoreUSD:string;creatorFeesUSD:string;
 }
-export type PaperPresentation = Pick<TopicMarketState,'config'|'TG'|'TF'|'TC'|'TT'|'Q'|'k'|'S'|'M0'|'cash'|'lpFees'|'basis'|'b'|'lpSupply'|'inventory'|'liquidityClosed'|'lpBudget'|'bBudget'|'failedSupply'> & {
+export type PaperPresentation = Pick<TopicMarketState,'singlePool'|'config'|'TG'|'TF'|'TC'|'TT'|'Q'|'k'|'S'|'M0'|'cash'|'lpFees'|'basis'|'b'|'lpSupply'|'inventory'|'liquidityClosed'|'lpBudget'|'bBudget'|'failedSupply'> & {
  own:TopicMarketAccount|null;claim:TopicMarketPayout|null;corePayout:number;coreFees:number;genesisPnl:number;
  outstanding:[number,number];lpBEstimates:{outcome:Outcome;lp:number;B:number}[];
 };

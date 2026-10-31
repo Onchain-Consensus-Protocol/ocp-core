@@ -92,7 +92,7 @@ contract TopicMarketAdversarialTest is Test {
         vm.prank(a);
         m.genesisBuy(1e6, 0, type(uint64).max, 0);
         uint256 amount = m.shares(a);
-        token.arm(address(m), abi.encodeWithSignature("claimB()"));
+        token.arm(address(m), abi.encodeCall(m.claimFees, ()));
         vm.prank(a);
         m.genesisSell(amount, 0, type(uint64).max, 0);
         assertFalse(token.callbackSuccess());

@@ -8,8 +8,8 @@ import {TopicMarketDeployer} from "./deployers/TopicMarketDeployer.sol";
 contract TopicMarketTestnetStockFactory is TopicMarketStockFactory {
     address public constant TESTNET_TSLA = 0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E;
     bool public constant fixedTestnetGraduation = true;
-    uint256 public constant testRTarget = 36e14; // 0.0036 TSLA
-    uint256 public constant testBTarget = 6e14;  // 0.0006 TSLA
+    uint256 public constant testRTarget = 42e14; // 0.0042 TSLA
+    uint256 public constant testBTarget = 0; // Legacy getter; no B pool
     constructor(address owner_,address protocol_,TopicMarketCoreDeployer cd_,TopicMarketDeployer md_)
         TopicMarketStockFactory(owner_,protocol_,cd_,md_)
     {
