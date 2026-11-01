@@ -9,6 +9,8 @@ export const STOCK_DEMO_ASSETS=[
 export function createStockDemo(price:number,Q=2000,b=150,deadlines:Pick<TopicMarketConfig,"TC">={}) {
  if(!Number.isFinite(price)||price<=0)throw new Error('PRICE');
  const s=createTopicMarketDemo({Q:Q/price,k:1/price,b:b/price,...deadlines,creatorAccount:-1,protocolAccount:-1});
+ // 保证金按创建时固定演示汇率折算：500美元等值股票，不随支付资产切换改变。
+ if(s.early)s.early.bond=500/price;
  s.accounts.forEach(a=>a.wallet=5000/price);
  s.initialCapital=15000/price;
  topicMarketAssertLedger(s);return s;

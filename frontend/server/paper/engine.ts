@@ -1,6 +1,6 @@
 import {validDeadlineTimestamp} from '../../shared/deadlineDate.js';
 import {
- topicMarketCreate,topicMarketAdvanceTime,topicMarketFinalize,topicMarketAssertLedger,topicMarketPrices,topicMarketClaimPreview,
+ topicMarketCoreExit,topicMarketProposeEarly,topicMarketProcessEarly,topicMarketClaimEarlyBond,topicMarketEarlyDue,topicMarketCreate,topicMarketAdvanceTime,topicMarketFinalize,topicMarketAssertLedger,topicMarketPrices,topicMarketClaimPreview,
  topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalSell,topicMarketCoreStake,topicMarketClaim,topicMarketClaimCore,topicMarketClaimFees,
  topicMarketFormalBuy,topicMarketQuoteFormalBuy,topicMarketRedeemPairs,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalSell,
  type TopicMarketState,type TopicMarketAccount,type TopicMarketTradeQuote,
@@ -42,14 +42,16 @@ export function createPaperMarket(id:string,creatorId:string,input:PaperCreateIn
  if(hasHours&&typeof input.coreHours!=='number')throw new Error('TIME');
  const TC=hasDeadline?input.coreDeadline!-createdAt:input.coreHours!*3600;
  if(!Number.isSafeInteger(TC)||TC<=14400||!Number.isSafeInteger(createdAt+TC))throw new Error('TIME');
- const s=createStockDemo(asset.price,2000,150,{TC});s.accounts=[];s.initialCapital=0;s.config={creatorAccount:0,protocolAccount:-1,depthPolicy:"GRADUATION_CAPITAL"};s.accounts.push(emptyAccount());
+ const s=createStockDemo(asset.price,2000,150,{TC});s.early!.bond=500/asset.price;s.accounts=[];s.initialCapital=0;s.config={creatorAccount:0,protocolAccount:-1,depthPolicy:"GRADUATION_CAPITAL"};s.accounts.push(emptyAccount());
  const m:StoredPaperMarket={schemaVersion:2,id,creatorId,title:input.title.trim(),yesRule:input.yesRule.trim(),noRule:input.noRule.trim(),invalidRule:input.invalidRule.trim(),assetSymbol:asset.symbol,assetPriceUSD:asset.price,createdAt:Math.floor(nowMs/1000),revision:0,users:[creatorId],state:topicMarketCreate(s),history:[]};history(m);return m;
 }
 export function advancePaperMarket(market:StoredPaperMarket,nowMs:number):StoredPaperMarket {
  if(market.schemaVersion!==2)throw new Error('UNSUPPORTED_PAPER_SCHEMA');
- const m=structuredClone(market);if(m.state.phase==='GENESIS')m.state.config.depthPolicy="GRADUATION_CAPITAL";const now=Math.max(m.state.now,Math.floor(timestamp(nowMs)/1000)-m.createdAt);
+ const m=structuredClone(market);
+ m.state.early??={bond:500/m.assetPriceUSD,count:0,pending:null,penalty:0,failedBonds:0,forfeited:[0,0,0],terminatedAt:null};
+ if(m.state.phase==='GENESIS')m.state.config.depthPolicy="GRADUATION_CAPITAL";const now=Math.max(m.state.now,Math.floor(timestamp(nowMs)/1000)-m.createdAt);
  const phase=m.state.phase;m.state=topicMarketAdvanceTime(m.state,now);
- if(['FORMAL','WAIT_CORE'].includes(m.state.phase)&&m.state.now>=m.state.TC)m.state=topicMarketFinalize(m.state);
+ if(!m.state.early?.pending&&['FORMAL','WAIT_CORE'].includes(m.state.phase)&&m.state.now>=m.state.TC)m.state=topicMarketFinalize(m.state);
  if(phase!==m.state.phase)m.revision++;
  history(m);return m;
 }
@@ -63,6 +65,10 @@ function execute(m:StoredPaperMarket,id:number,action:PaperAction):void {
  case 'FORMAL_BUY_SHARES':m.state=topicMarketFormalBuy(s,id,action.side,quantity(action.quantity));break;
  case 'REDEEM_PAIRS':m.state=topicMarketRedeemPairs(s,id,quantity(action.quantity));break;
  case 'FORMAL_SELL':m.state=topicMarketFormalSell(s,id,action.side,quantity(action.quantity));break;
+ case 'CORE_EXIT':m.state=topicMarketCoreExit(s,id);break;
+ case 'EARLY_PROPOSE':m.state=topicMarketProposeEarly(s,id,action.side,action.reason);break;
+ case 'EARLY_PROCESS':m.state=topicMarketProcessEarly(s);break;
+ case 'CLAIM_EARLY_BOND':m.state=topicMarketClaimEarlyBond(s,id);break;
  case 'CORE_STAKE':m.state=topicMarketCoreStake(s,id,action.side,budget);break;
  case 'CLAIM_MARKET':m.state=topicMarketClaim(s,id);break;
  case 'CLAIM_CORE':m.state=topicMarketClaimCore(s,id);break;
@@ -88,6 +94,7 @@ export function applyPaperAction(market:StoredPaperMarket,userId:string,walletMi
 }
 export function quotePaperAction(market:StoredPaperMarket,userId:string,action:PaperAction,nowMs:number):PaperQuote {
  const m=advancePaperMarket(market,nowMs),id=actor(m,userId),s=m.state,price=m.assetPriceUSD;
+ if(topicMarketEarlyDue(s)&&['FORMAL_BUY','FORMAL_BUY_SHARES','FORMAL_SELL','CORE_STAKE','CORE_EXIT','REDEEM_PAIRS'].includes(action.type))throw new Error('PROCESS_EARLY_REQUEST');
  let q:TopicMarketTradeQuote|undefined;
  switch(action.type){
  case 'GENESIS_BUY':if(s.phase!=='GENESIS')throw new Error('GENESIS_CLOSED');q=topicMarketQuoteBuy(s,budgetC(action,price));break;
@@ -95,7 +102,7 @@ export function quotePaperAction(market:StoredPaperMarket,userId:string,action:P
  case 'FORMAL_BUY':if(s.phase!=='FORMAL')throw new Error('FORMAL_CLOSED');q=topicMarketQuoteFormalBuyBudget(s,action.side,budgetC(action,price));break;
  case 'FORMAL_BUY_SHARES':if(s.phase!=='FORMAL')throw new Error('FORMAL_CLOSED');q=topicMarketQuoteFormalBuy(s,action.side,quantity(action.quantity));break;
  case 'FORMAL_SELL':if(s.phase!=='FORMAL')throw new Error('FORMAL_CLOSED');if(quantity(action.quantity)>(action.side==='YES'?s.accounts[id].yes:s.accounts[id].no))throw new Error('HOLDINGS');q=topicMarketQuoteFormalSell(s,action.side,quantity(action.quantity));break;
- default:{const temp=structuredClone(m);temp.state.accounts[id].wallet+=budgetC(action,price);temp.state.initialCapital=(temp.state.initialCapital??0)+budgetC(action,price);const before=temp.state.accounts[id].wallet;execute(temp,id,action);const delta=temp.state.accounts[id].wallet-before;return {revision:m.revision,expiresAt:Math.floor(nowMs/1000)+15,payUSD:dollars(-delta*price),receiveUSD:dollars(delta*price),quantity:'0',feeUSD:'0.000000',wouldGraduate:false};}
+ default:{const temp=structuredClone(m);const credit=action.type==='EARLY_PROPOSE'?temp.state.early!.bond:budgetC(action,price);temp.state.accounts[id].wallet+=credit;temp.state.initialCapital=(temp.state.initialCapital??0)+credit;const before=temp.state.accounts[id].wallet;execute(temp,id,action);const delta=temp.state.accounts[id].wallet-before;return {revision:m.revision,expiresAt:Math.floor(nowMs/1000)+15,payUSD:dollars(-delta*price),receiveUSD:dollars(delta*price),quantity:'0',feeUSD:'0.000000',wouldGraduate:false};}
  }
  const buy=action.type==='GENESIS_BUY'||action.type==='FORMAL_BUY'||action.type==='FORMAL_BUY_SHARES';
  return {detail:q,revision:m.revision,expiresAt:Math.floor(nowMs/1000)+15,payUSD:dollars(buy?q.gross*price:0),receiveUSD:dollars(buy?0:q.net*price),quantity:numberString(q.quantity*(action.type.startsWith('GENESIS')?PAPER_GTOKEN_SCALE:1)),feeUSD:dollars((q.creatorFee+q.lpFee+q.coreFee+q.protocolFee)*price),wouldGraduate:q.wouldGraduate};
@@ -110,5 +117,10 @@ export function projectPaperMarket(market:StoredPaperMarket,userId:string|null,n
  own:a?{...a,name:'Player',wallet:0}:null,claim,corePayout:id>=0?s.corePayouts[id]??0:0,coreFees:s.core.feeTotal,genesisPnl:a&&s.phase==='GENESIS'?(a.g>0?topicMarketQuoteSell(s,a.g).net:0)-genesisCost.cost:0,
  outstanding:[s.accounts.reduce((n,a)=>n+a.yes,0),s.accounts.reduce((n,a)=>n+a.no,0)] as [number,number],
  lpEstimates:(['YES','NO','INVALID'] as const).map(outcome=>{const inventory=outcome==='YES'?s.inventory[0]:outcome==='NO'?s.inventory[1]:(s.inventory[0]+s.inventory[1])/2;const nav=s.cash+s.lpFees+inventory;return {outcome,lp:a&&s.lpSupply>0?nav*a.lp/s.lpSupply:0}})};
- return {schemaVersion:2,presentation,id:m.id,title:m.title,yesRule:m.yesRule,noRule:m.noRule,invalidRule:m.invalidRule,assetSymbol:m.assetSymbol,assetPriceUSD:m.assetPriceUSD,createdAt:m.createdAt,serverNow:Math.floor(nowMs/1000),revision:m.revision,phase:s.phase,genesisDeadline:m.createdAt+s.TG,formalDeadline:m.createdAt+s.TF,coreDeadline:m.createdAt+s.TC,topicDeadline:m.createdAt+s.TT,R:numberString(s.R),rTarget:numberString(s.rTarget),genesisPriceUSD:(s.phase==='FAILED'?2*s.k*s.failedSupply:p.genesis)*m.assetPriceUSD/PAPER_GTOKEN_SCALE+'',yesPrice:p.probability?.[0]??.5,noPrice:p.probability?.[1]??.5,coreYes:numberString(s.core.yes),coreNo:numberString(s.core.no),coreInvalid:numberString(s.core.invalid),coreOpenedAt:s.core.openedAt===null?null:m.createdAt+s.core.openedAt,result:s.result,volumeUSD:dollars(s.formalVolume*m.assetPriceUSD),participants:m.users.length,events:s.events.map(e=>({at:m.createdAt+e.at,kind:e.kind,actor:e.actor===undefined?'':`Player ${e.actor+1}`,amount:dollars((e.amount??0)*m.assetPriceUSD),detail:e.detail??''})),history:m.history,position,isCreator:userId===m.creatorId};
+ const e=s.early!,request=e.pending,principal=a?.coreStake??0,exitPenalty=Math.min(principal,Math.ceil(principal*1e18/10)/1e18);
+ const early={bondUSD:dollars(e.bond*m.assetPriceUSD),requestId:request?.id??0,requestedOutcome:request?.side??null,
+ proposedAt:request?m.createdAt+request.proposedAt:0,processAfter:request?m.createdAt+request.processAfter:0,reason:request?.reason??'',due:topicMarketEarlyDue(s),
+ penaltyUSD:dollars(e.penalty*m.assetPriceUSD),failedBondUSD:dollars(e.failedBonds*m.assetPriceUSD),bondRefundUSD:dollars((a?.bondRefund??0)*m.assetPriceUSD),
+ exitRefundUSD:dollars((principal-exitPenalty)*m.assetPriceUSD),exitPenaltyUSD:dollars(exitPenalty*m.assetPriceUSD),effectiveCutoff:m.createdAt+(e.terminatedAt??s.TC)};
+ return {schemaVersion:2,early,presentation,id:m.id,title:m.title,yesRule:m.yesRule,noRule:m.noRule,invalidRule:m.invalidRule,assetSymbol:m.assetSymbol,assetPriceUSD:m.assetPriceUSD,createdAt:m.createdAt,serverNow:Math.floor(nowMs/1000),revision:m.revision,phase:s.phase,genesisDeadline:m.createdAt+s.TG,formalDeadline:m.createdAt+s.TF,coreDeadline:m.createdAt+s.TC,topicDeadline:m.createdAt+s.TT,R:numberString(s.R),rTarget:numberString(s.rTarget),genesisPriceUSD:(s.phase==='FAILED'?2*s.k*s.failedSupply:p.genesis)*m.assetPriceUSD/PAPER_GTOKEN_SCALE+'',yesPrice:p.probability?.[0]??.5,noPrice:p.probability?.[1]??.5,coreYes:numberString(s.core.yes),coreNo:numberString(s.core.no),coreInvalid:numberString(s.core.invalid),coreOpenedAt:s.core.openedAt===null?null:m.createdAt+s.core.openedAt,result:s.result,volumeUSD:dollars(s.formalVolume*m.assetPriceUSD),participants:m.users.length,events:s.events.map(e=>({at:m.createdAt+e.at,kind:e.kind,actor:e.actor===undefined?'':`Player ${e.actor+1}`,amount:dollars((e.amount??0)*m.assetPriceUSD),detail:e.detail??'',source:e.source})),history:m.history,position,isCreator:userId===m.creatorId};
 }

@@ -1,3 +1,4 @@
+import {CoreLifecycleLab} from './components/CoreLifecycleLab';
 import React, { useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import {
@@ -35,7 +36,7 @@ const copy = {
       "Launch a topic at zero initial capital. Trade gToken during Genesis. When the R funding target is met, Genesis ends and the formal market and OCP Core open together.",
     notOracle: "OCP Market is a multiplayer virtual trading game. Markets follow real elapsed time on the server; funds are virtual and no on-chain transactions are required.",
     vault: "OCP Core",
-    vaultDesc: "Opens only after Genesis graduation. Stake on YES, NO or INVALID; your chosen side is locked until settlement. Core capital determines the final result.",
+    vaultDesc: "Opens only after Genesis graduation. Stake on YES, NO or INVALID; add only to your chosen side while staked. Full exit returns 90% and forfeits 10% plus accrued fee rewards; after exit you may choose another side. Core principal determines the result.",
     market: "Market",
     marketDesc: "After graduation, buy and sell YES / NO shares. Trades change market prices; they do not directly change Core stakes or the final result.",
     shared: "Shared final outcome",
@@ -78,7 +79,7 @@ const copy = {
     invalidFee: "Pays the INVALID-conditional ledger to eligible YES / NO stakes. INVALID stakes receive no market-fee rewards.",
     separation: "Two roles, two risks",
     staker: "Core staker",
-    stakerDesc: "Back an outcome with principal, locked until settlement without withdrawals or switching sides. Winners share losing-side principal and fees contributed by the market in proportion to their eligible stakes.",
+    stakerDesc: "Back an outcome with principal. You may fully exit while Core is open, receiving 90% and abandoning the 10% penalty and historical fee rewards; re-entry may choose another side. Winners share losing principal and eligible historical market fees.",
     trader: "Market trader",
     traderDesc: "Takes a priced YES/NO position. Shares can be sold before the deadline or redeemed after settlement.",
     coupling: "The same wallet may be both.",
@@ -95,7 +96,7 @@ const copy = {
     intro: "零初始本金发射话题，在 Genesis 买卖 gToken。R储备达标即毕业，正式市场与 OCP Core 同时开启，最后按 Core 结果结算。",
     notOracle: "OCP Market 是多人虚拟交易游戏。市场按服务器的真实时间运行，资金为虚拟资金，不发起链上交易。",
     vault: "OCP Core",
-    vaultDesc: "Genesis 毕业后才开启。选择 YES、NO 或 INVALID 质押，选定后只能同侧追加，资金锁定至结算；Core 质押资本决定最终结果。",
+    vaultDesc: "Genesis 毕业后才开启。选择 YES、NO 或 INVALID 质押，有仓时只可同侧追加；开放期可按规则全仓退出，退90%、罚没10%并放弃历史手续费，退出后可重新选边。Core本金决定最终结果。",
     market: "市场",
     marketDesc: "毕业后买卖 YES／NO 份额。交易影响市场价格，不会直接改变 Core 质押或最终结果。",
     shared: "共享同一个最终结果",
@@ -129,7 +130,7 @@ const copy = {
     feeSettlement: "Core奖励（0.7%）",
     yesVault: "YES质押者按比例分享Core全部质押本金，其他方向损失本金。",
     noVault: "NO质押者按比例分享Core全部质押本金，其他方向损失本金。",
-    invalidVault: "各账户领取自己的Core质押本金。",
+    invalidVault: "剩余质押本金退还；罚金及失败申请保证金按全部剩余本金比例分配。",
     yesPm: "YES每份兑付1 dUSDC，NO为0。",
     noPm: "NO每份兑付1 dUSDC，YES为0。",
     invalidPm: "YES与NO每份各兑付0.5 dUSDC。",
@@ -138,7 +139,7 @@ const copy = {
     invalidFee: "按INVALID条件账向合格YES／NO质押者分配；INVALID质押不获得市场费用奖励。",
     separation: "两个角色，两套风险",
     staker: "Core质押者",
-    stakerDesc: "用本金支持一个结果，结算前不能撤回或换边。赢方按比例分享输方本金及市场输入的手续费。",
+    stakerDesc: "用本金支持结果；有仓时同侧追加，开放期可全仓退出，退90%、罚没10%并放弃历史费用，之后可重新选边。赢方按规则分享本金及合格费用。",
     trader: "市场交易者",
     traderDesc: "持有按价格买入的 YES/NO 份额；截止前可以卖出，终局后可以兑付。",
     coupling: "同一个钱包可以同时扮演两种角色。",
@@ -312,7 +313,7 @@ function HowPage() {
         <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6" id="genesis-guide"><SectionTitle eyebrow="01 / GENESIS" title={lang==='zh'?'Genesis · 启动与价格发现':'Genesis · Launch and price discovery'}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{lang==='zh'?'通过早期投机交易实现话题冷启动、价格发现和做市资本积累，并筛选有真实市场需求的话题进入 Formal Market。采用二次储备曲线：买入推高价格，卖出降低价格，实际成交按曲线积分计算。':'Early trading bootstraps topics, discovers prices and builds market-making capital, filtering demand into the Formal Market. A quadratic reserve curve raises prices on buys and lowers them on sales; orders execute along the curve.'}</p><details className="mb-5 text-xs text-text-muted"><summary className="cursor-pointer">{lang==='zh'?'价格曲线与毕业条件':'Price curve and graduation rules'}</summary><p className="mt-3 leading-7">{lang==='zh'?'R = kS²，边际价格 P = 2kS。R 是真实储备，S 是内部计量供应量，k 是固定曲线参数；展示面额为每个内部份额 1,000 万枚 gToken，页面单价相应除以 1,000 万。零供应时价格为零。R 达到 4.2 ETH 等值时毕业，目标按创建时价格快照固定；达标立即毕业。':'R = kS²; marginal price P = 2kS. R is real reserve, S is internal supply and k is fixed. Each internal unit displays as 10 million gToken, with the displayed price divided accordingly. Price starts at zero supply. Graduation requires R ≥ 4.2 ETH equivalent, fixed at creation; graduation is immediate when the target is reached.'}</p></details><GenesisLab lang={lang}/><div className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6" id="graduation-guide"><h3 className="font-display text-xl font-bold mb-3">{lang==='zh'?'毕业转换':'Graduation conversion'}</h3><p className="text-sm leading-7 text-text">{lang==='zh'?'gToken → 正式LMSR二元市场的 LP 代币':'gToken → LP tokens in the formal LMSR binary market'}</p><p className="mt-2 text-sm leading-7 text-text-muted">{lang==='zh'?'按你持有的 gToken 占总供应量的比例，转换为 LP 代币，代表正式市场流动性池的份额，享有做市资产及 LP 费用的相应权益。':'Your share of the total gToken supply converts into LP tokens, representing proportional rights to the Formal Market liquidity pool’s assets and LP fees.'}</p><p className="mt-2 text-sm leading-7 text-text-muted">{lang==='zh'?'gToken 不直接转换为 YES／NO 份额；毕业时将b固定为实际入池R，正式交易不增发LP。':'gToken does not convert directly into YES / NO shares. At graduation, b is fixed to actual R; formal trades do not mint LP.'}</p></div></section>
 
         <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="02 / FORMAL" title={t.marketLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.marketLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'毕业后与 Core 同时开启。买卖 YES／NO 份额，截止前可卖出，最终按 Core 结果兑付。交易费用合计 2%：LP 1%、Core 0.7%、协议 0.3%。交易在创建时设定的Core截止前1小时停止，按服务器真实时间计算。':'Opens with Core at graduation. Trade YES / NO shares until the trading deadline; settlement follows Core. Trading fees total 2%: LP 1%, Core 0.7%, protocol 0.3%. Trading closes one hour before the Core deadline set at creation, following real elapsed server time.'}</p><LmsrLab lang={lang}/></section>
-        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="03 / OCP CORE" title={t.capitalLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.capitalLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'用本金支持一个结果，结算前不能撤回或换边。赢方按比例分享输方本金及参与期间符合条件的市场费用。毕业后开启，在创建时设定的最终截止时间结束质押并确定结果，比市场交易晚1小时。':'Commit principal to an outcome; stakes cannot be withdrawn or switched before settlement. Winners share losing principal and eligible market fees accrued while participating. Opens at graduation. Staking closes and the result is determined at the final deadline set at creation, one hour after trading closes.'}</p><CapitalLab lang={lang}/></section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="03 / OCP CORE" title={t.capitalLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.capitalLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'用本金支持结果，有仓时仅可同侧追加。毕业后开放，原 Core 截止比 Formal 交易晚1小时；Formal 截止不代表 Core 不能继续质押或退出。YES 或 NO 必须严格超过全部活跃本金的一半（包含 INVALID 本金），否则为 INVALID。赢方分享输方本金及符合条件的历史费用。':'Back an outcome with principal and add only to that side while staked. Core opens at graduation and its original cutoff is one hour after Formal trading closes; the Formal cutoff does not stop Core staking or exits. YES or NO must strictly exceed half of all active principal, including INVALID stakes, or the result is INVALID. Winners share losing principal and eligible historical fees.'}</p><CapitalLab lang={lang}/><div className="mt-6 grid gap-4 text-sm leading-7"><details className="rounded-xl border border-border bg-white p-5"><summary className="cursor-pointer font-bold">{lang==='zh'?'全仓退出与重新选边':'Full exit and re-entry'}</summary><p className="mt-3">{lang==='zh'?'Core开放期间可全仓解除质押：罚没本金10%并按抵押代币原始单位向上取整，其余约90%退还，同时放弃该仓位全部历史条件手续费奖励。退出本金立即从各方向总额及多数分母中移除，罚没资金不参与投票。退出后可重新选择 YES、NO 或 INVALID，但不恢复旧奖励。原 Core 截止或提前申请确认期到期后，不能先退出再改变结算状态。':'While Core is open, fully exit by forfeiting 10% of principal rounded up in collateral-native units; the remainder, approximately 90%, is refunded. All historical conditional fee rewards for that position are abandoned. The principal leaves side totals and the majority denominator immediately; penalties have no voting weight. Re-entry may choose YES, NO or INVALID without restoring old rewards. Exit is unavailable after the original Core cutoff or a pending confirmation window ends.'}</p></details><details className="rounded-xl border border-border bg-white p-5"><summary className="cursor-pointer font-bold">{lang==='zh'?'500 USD保证金与提前结算':'500 USD bond and early settlement'}</summary><p className="mt-3">{lang==='zh'?'任何玩家均可申请 YES 或 NO，包括当前不领先的方向；只须 Core 有活跃本金。保证金是创建时按价格快照固定的500 USD等值抵押代币，模拟市场使用虚拟USD。一次只允许一个不可撤回申请，确认期1小时，结束时间必须严格早于原 Core 截止，不能申请 INVALID。':'Any player may propose YES or NO, including a non-leading side, provided Core has active principal. The bond is a fixed amount of collateral worth 500 USD at the creation snapshot; paper markets use virtual USD. Only one non-withdrawable request may be pending. Its one-hour window must end strictly before the original Core cutoff. INVALID cannot be proposed.'}</p><p className="mt-3">{lang==='zh'?'确认期内，尚未到各自原截止时间的操作照常开放。确认期一到，买卖、质押与退出暂停；任意玩家点击处理，无需另交保证金，也不能指定结果。冻结本金的实际结果匹配申请方向则立即结算，生效截止固定为确认期结束时刻，即使晚处理也不改变。全额保证金记为申请者独立可领取退款，不混入赢方收入。':'During the window, operations remain available before their own original deadlines. When it ends, trades, stakes and exits pause until any player processes the request without another bond or choosing the result. If the frozen principal result matches the proposal, settlement takes effect at the window end even when processed later. The full bond becomes a separate refund claim for the proposer, not winner income.'}</p><p className="mt-3">{lang==='zh'?'不匹配（含平局或 INVALID）时保证金罚没，并仅恢复原截止仍未到的操作；若处理时已过原 Core 截止，则按原截止正常结算。罚金及失败保证金最终按结果分配，INVALID时按全部剩余本金分；历史手续费仍只分给合格YES/NO参与者。所有处理与结算由玩家发起，不需要Keeper。':'A mismatch, including ties or INVALID, forfeits the bond and reopens only operations whose original deadlines remain. If the original Core cutoff has passed, regular settlement follows. Penalties and failed bonds follow the final result; under INVALID they are shared by all remaining principal. Historical fee rewards remain limited to eligible YES/NO participants. Players trigger processing and settlement; no Keeper is required.'}</p></details></div><CoreLifecycleLab lang={lang}/></section>
 
 
 

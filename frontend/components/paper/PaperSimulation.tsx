@@ -1,4 +1,5 @@
-import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import type {SimulationCoreLifecycle} from '../SimulationCoreActions';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Simulation,type RemoteSimulation} from '../Simulation';
 import {createStockDemo} from '../stockDemoRouting';
 import {createPaperClient} from '../../shared/paperClient';
@@ -7,12 +8,33 @@ import type {Side,Outcome} from '../topicMarketDemoModel';
 
 type Input={tab:'MARKET'|'PROTOCOL';mode:'BUY'|'SELL';amount:number;useStable:boolean};
 type Props={market:PaperMarket;balanceUSD:string;lang:'zh'|'en';signedIn:boolean;pending:boolean;now:number;getToken:()=>Promise<string|null>;onLogin:()=>void;onOrder:(order:PaperTradeInput)=>void;onError:(error:unknown)=>void};
+export function buildPaperLifecycle(m:PaperMarket,now:number,submit:(action:PaperAction)=>void):SimulationCoreLifecycle|undefined {
+ const early=m.early;if(!early)return undefined;
+ const terminal=m.phase==='SETTLED'||m.phase==='FAILED',native=(usd:string)=>Number(usd)/m.assetPriceUSD;
+ const paused=early.requestId>0&&now>=early.processAfter;
+ const coreOpen=m.coreOpenedAt!==null&&!terminal&&now<m.coreDeadline&&!paused;
+ return {bond:native(early.bondUSD),bondRefund:native(early.bondRefundUSD),exitRefund:native(early.exitRefundUSD),exitPenalty:native(early.exitPenaltyUSD),
+  request:early.requestId>0&&early.requestedOutcome?{id:early.requestId,side:early.requestedOutcome,processAfter:early.processAfter-m.createdAt,reason:early.reason}:undefined,
+  canExit:coreOpen&&Number(m.position?.coreStake??0)>0,canPropose:coreOpen&&!early.requestId&&Number(m.coreYes)+Number(m.coreNo)+Number(m.coreInvalid)>0&&now+3600<m.coreDeadline,
+  canProcess:early.requestId>0&&now>=early.processAfter&&!terminal,paused,
+  exit:()=>submit({type:'CORE_EXIT'}),propose:(side,reason)=>submit({type:'EARLY_PROPOSE',side,reason}),
+  process:()=>submit({type:'EARLY_PROCESS'}),claimBond:()=>submit({type:'CLAIM_EARLY_BOND'}),
+ };
+}
+/** Every lifecycle click obtains a server quote and submits its actual action with revision guards. */
+export async function submitPaperLifecycle(m:PaperMarket,action:PaperAction,api:Pick<ReturnType<typeof createPaperClient>,'quote'>,now:number,onOrder:(input:PaperTradeInput)=>void){
+ const started=Date.now(),quote=await api.quote(m.id,action);
+ if(quote.revision!==m.revision||quote.expiresAt<=now+(Date.now()-started)/1000)throw new Error('QUOTE_STALE');
+ onOrder({marketId:m.id,requestId:crypto.randomUUID(),expectedRevision:quote.revision,action,
+  ...(Number(quote.payUSD)>0?{maxPayUSD:quote.payUSD}:{}),...(Number(quote.receiveUSD)>0?{minReceiveUSD:quote.receiveUSD}:{})});
+}
 const noop=()=>{};
 /** 首页与多人市场共用 Simulation；这里仅把服务器的公开视图、报价和订单接入它。 */
 export function PaperSimulation({market:m,balanceUSD,lang,signedIn,pending,now,getToken,onLogin,onOrder,onError}:Props){
  const [input,setInput]=useState<Input>({tab:'MARKET',mode:'BUY',amount:10,useStable:true});
  const [quotes,setQuotes]=useState<Record<string,{quote:PaperQuote;action:PaperAction}>>({});
  const [refresh,setRefresh]=useState(0);
+ const [lifecyclePending,setLifecyclePending]=useState(false),lifecycleLock=useRef(false);
  useEffect(()=>{const timer=window.setInterval(()=>setRefresh(v=>v+1),8000);return()=>window.clearInterval(timer);},[]);
  const api=useMemo(()=>createPaperClient(getToken),[getToken]);
  const onInput=useCallback((next:Input)=>setInput(prev=>JSON.stringify(prev)===JSON.stringify(next)?prev:next),[]);
@@ -43,7 +65,7 @@ export function PaperSimulation({market:m,balanceUSD,lang,signedIn,pending,now,g
  state.accounts=[{...state.accounts[0],...(p.own??{}),wallet:Number(balanceUSD)/m.assetPriceUSD}];
  state.core={...state.core,openedAt:m.coreOpenedAt===null?null:m.coreOpenedAt-m.createdAt,yes:Number(m.coreYes),no:Number(m.coreNo),invalid:Number(m.coreInvalid),feeTotal:p.coreFees};
  state.corePayouts=[p.corePayout];
- state.events=m.events.map((e,id)=>({id,at:e.at-m.createdAt,kind:e.kind,amount:Number(e.amount),detail:e.detail}));
+ state.events=m.events.map((e,id)=>({id,at:e.at-m.createdAt,kind:e.kind,amount:Number(e.amount),detail:e.detail,source:e.source}));
  const send=(key:string)=>{
   if(!signedIn){onLogin();return;}
   const entry=quotes[key],q=entry?.quote,action=entry?.action;if(pending||!q||!action||JSON.stringify(action)!==JSON.stringify(actions[key])||q.revision!==m.revision||q.expiresAt<=now)return;
@@ -52,7 +74,13 @@ export function PaperSimulation({market:m,balanceUSD,lang,signedIn,pending,now,g
    ...(Number(q.receiveUSD)>0?{minReceiveUSD:(Number(q.receiveUSD)*.99).toFixed(6)}:{})});
  };
  const claim=(type:'CLAIM_MARKET'|'CLAIM_CORE')=>onOrder({marketId:m.id,requestId:crypto.randomUUID(),expectedRevision:m.revision,action:{type}});
- const remote:RemoteSimulation={input,state,assetSymbol:m.assetSymbol,balanceUSD:Number(balanceUSD),topic:{title:m.title,YES:m.yesRule,NO:m.noRule,INVALID:m.invalidRule},pending,
+ const lifecycle=buildPaperLifecycle(m,now,action=>{
+  if(!signedIn){onLogin();return;}
+  if(pending||lifecycleLock.current)return;
+  lifecycleLock.current=true;setLifecyclePending(true);
+  void submitPaperLifecycle(m,action,api,now,onOrder).catch(onError).finally(()=>{lifecycleLock.current=false;setLifecyclePending(false);});
+ });
+ const remote:RemoteSimulation={input,state,assetSymbol:m.assetSymbol,balanceUSD:Number(balanceUSD),topic:{title:m.title,YES:m.yesRule,NO:m.noRule,INVALID:m.invalidRule},pending:pending||lifecyclePending,lifecycle,
   prices:{genesis:Number(m.genesisPriceUSD)*PAPER_GTOKEN_SCALE/m.assetPriceUSD,probability:gen||m.phase==='FAILED'?null:[m.yesPrice,m.noPrice]},
   preview:p.claim??{outcomes:0,lp:0,failed:0,total:0},genesisPnl:p.genesisPnl,lpEstimates:p.lpEstimates,outstanding:p.outstanding,
   chart:m.history.map(v=>({price:v.genesisPriceUSD*PAPER_GTOKEN_SCALE/m.assetPriceUSD,at:v.at-m.createdAt,kind:'TRADE'})),onInput,

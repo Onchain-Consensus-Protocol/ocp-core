@@ -3,6 +3,10 @@ import type {TopicMarketState, TopicMarketAccount, TopicMarketPayout, TopicMarke
 export const PAPER_INITIAL_USD = '100000.000000';
 export const PAPER_GTOKEN_SCALE = 10_000_000;
 export type PaperAction =
+ | {type:'CORE_EXIT'}
+ | {type:'EARLY_PROPOSE';side:Side;reason:string}
+ | {type:'EARLY_PROCESS'}
+ | {type:'CLAIM_EARLY_BOND'}
  | {type:'GENESIS_BUY';budgetUSD:string}
  | {type:'GENESIS_SELL';quantity:string}
  | {type:'FORMAL_BUY';side:Side;budgetUSD:string}
@@ -41,8 +45,9 @@ export interface PaperMarket { schemaVersion:2;
  R:string;rTarget:string;genesisPriceUSD:string;
  yesPrice:number;noPrice:number;coreYes:string;coreNo:string;coreInvalid:string;
  coreOpenedAt:number|null;result:Outcome|null;volumeUSD:string;participants:number;
+ early?:{bondUSD:string;requestId:number;requestedOutcome:Side|null;proposedAt:number;processAfter:number;reason:string;due:boolean;penaltyUSD:string;failedBondUSD:string;bondRefundUSD:string;exitRefundUSD:string;exitPenaltyUSD:string;effectiveCutoff:number};
  presentation?:PaperPresentation;
- events:{at:number;kind:string;actor:string;amount:string;detail:string}[];
+ events:{at:number;kind:string;actor:string;amount:string;detail:string;source?:'CORE'|'MARKET'}[];
  history:StoredPaperMarket['history'];position:PaperPosition|null;isCreator:boolean;
 }
 export interface PaperQuote {

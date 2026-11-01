@@ -4,7 +4,9 @@ export type Outcome = Side | "INVALID";
 export type TopicMarketPhase = "CREATE" | "GENESIS" | "FORMAL" | "WAIT_CORE" | "FAILED" | "SETTLED";
 export type TopicMarketScenario = "GENESIS" | "BUY_GRADUATE" | "FAILURE";
 export interface TopicMarketConfig {  depthPolicy?: "GRADUATION_CAPITAL"; Q?: number; k?: number; b?: number; TF?: number; TC?: number; TT?: number; creatorAccount?: number; protocolAccount?: number }
-export interface TopicMarketAccount {
+export interface EarlyRequest {id:number;proposer:number;side:Side;proposedAt:number;processAfter:number;reason:string;bond:number}
+export interface EarlyState {bond:number;count:number;pending:EarlyRequest|null;penalty:number;failedBonds:number;forfeited:[number,number,number];terminatedAt:number|null}
+export interface TopicMarketAccount { bondRefund?:number;
   name: string; wallet: number; g: number; lp: number; yes: number; no: number;
   coreSide: Outcome | null; coreStake: number; coreRewards: [number, number, number]; claimed: boolean; coreClaimed: boolean; paid: number; received: number;
 }
@@ -12,7 +14,7 @@ export interface TopicMarketPayout { outcomes: number; lp: number; failed: numbe
 export interface TopicMarketEvent { id: number; at: number; kind: string; actor?: number; amount?: number; quantity?: number; detail?: string; wallet?: string; transactionHash?: string; source?: "MARKET" | "CORE"; timestamp?: number; side?: string }
 export interface TopicMarketLiquidityReference { lpSupply:number; basis:number; b:number; cash:number; lpFees:number; inventory:[number,number] }
 export interface TopicMarketAddQuote { lp:number; money:number; cash:number; lpFee:number; yes:number; no:number; basis:number; b:number; restart:boolean }
-export interface TopicMarketState {
+export interface TopicMarketState { early?:EarlyState;
    initialCapital?:number; phase: TopicMarketPhase; now: number; TG: number; TF: number; TC: number; TT: number; Q: number; k: number;
   rTarget: number; R: number; S: number; M0: number; redeemedPairs: number;
   collateral: number; cash: number; lpFees: number; lpFeesEarned:number; formalVolume:number; creatorFees: number; protocolFees: number;
@@ -35,7 +37,7 @@ const sideIndex = (s: Side): 0 | 1 => { if (s !== "YES" && s !== "NO") throw new
 const outcomeValue = (y: number, n: number, r: Outcome) => r === "YES" ? y : r === "NO" ? n : (y + n) / 2;
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 function copy(s: TopicMarketState): TopicMarketState {
-  return { ...s, inventory: [...s.inventory], accounts: s.accounts.map(a => ({ ...a, coreRewards: [...a.coreRewards] })),
+  return { ...s, early:s.early?{...s.early,pending:s.early.pending?{...s.early.pending}:null,forfeited:[...s.early.forfeited]}:undefined, inventory: [...s.inventory], accounts: s.accounts.map(a => ({ ...a, coreRewards: [...a.coreRewards] })),
     restartLiquidity:s.restartLiquidity?{...s.restartLiquidity,inventory:[...s.restartLiquidity.inventory]}:null,
     core: { ...s.core, officialRewards: [...s.core.officialRewards] }, events: [...s.events], config: { ...s.config },
     payouts: s.payouts?.map(p => ({ ...p })) ?? null, corePayouts: [...s.corePayouts] };
@@ -44,12 +46,15 @@ function account(s: TopicMarketState, id: number): TopicMarketAccount {
   if (!Number.isInteger(id) || !s.accounts[id]) throw new Error("ACCOUNT"); return s.accounts[id];
 }
 function record(s: TopicMarketState, kind: string, actor?: number, amount?: number, quantity?: number, detail?: string) {
-  s.events.push({ id: (s.events.at(-1)?.id ?? 0) + 1, at: s.now, kind, actor, amount, quantity, detail });
+  s.events.push({source:kind.startsWith('CORE_')||kind.startsWith('EARLY_')||kind.startsWith('CLAIM_CORE')||kind==='CLAIM_EARLY_BOND'?'CORE':'MARKET', id: (s.events.at(-1)?.id ?? 0) + 1, at: s.now, kind, actor, amount, quantity, detail });
   if (s.events.length > 200) s.events.splice(0, s.events.length - 200);
 }
 function result(s: TopicMarketState): TopicMarketState { topicMarketAssertLedger(s); return s; }
 function requireGen(s: TopicMarketState) { if (s.phase !== "GENESIS" || s.now >= s.TG) throw new Error("GENESIS_CLOSED"); }
+export function topicMarketEarlyDue(s:TopicMarketState){return !!s.early?.pending && s.now>=s.early.pending.processAfter;}
+function requireCoreOpen(s:TopicMarketState){if(!["FORMAL","WAIT_CORE"].includes(s.phase)||s.now>=s.TC||s.core.openedAt===null)throw new Error("CORE_CLOSED");if(topicMarketEarlyDue(s))throw new Error("PROCESS_EARLY_REQUEST");}
 function requireFormal(s: TopicMarketState) {
+  if(topicMarketEarlyDue(s))throw new Error("PROCESS_EARLY_REQUEST");
   if (s.phase !== "FORMAL" || s.now >= s.TF || s.liquidityClosed) throw new Error("FORMAL_CLOSED");
 }
 function pay(s: TopicMarketState, id: number, amount: number) {
@@ -92,7 +97,7 @@ export function createTopicMarketDemo(config: TopicMarketConfig = {}): TopicMark
   // -1表示演示账户以外的独立费用收款桶；不向账户1/2/3赋予收款角色。
   const creatorAccount = config.creatorAccount ?? 1, protocolAccount = config.protocolAccount ?? 2;
   if (![creatorAccount, protocolAccount].every(x => Number.isInteger(x) && x >= -1 && x < 3)) throw new Error("ACCOUNT");
-  return { phase: "CREATE", now: 0, TG, TF, TC, TT, Q, k,
+  return { early:{bond:500,count:0,pending:null,penalty:0,failedBonds:0,forfeited:[0,0,0],terminatedAt:null},phase: "CREATE", now: 0, TG, TF, TC, TT, Q, k,
     rTarget: 4.2 * Q, R: 0, S: 0, M0: 0, redeemedPairs: 0, collateral: 0,
     cash: 0, lpFees: 0, lpFeesEarned:0,formalVolume:0, creatorFees: 0, protocolFees: 0, basis: 0, b, lpSupply: 0,
     inventory: [0, 0], liquidityClosed: false, restartLiquidity:null,
@@ -216,17 +221,17 @@ export function topicMarketExitLP(_s:TopicMarketState,_id:number,_lp:number):Top
 export function topicMarketQuoteAddLP(_s:TopicMarketState,_lp:number):TopicMarketAddQuote {throw new Error("LP_ADDITION_DISABLED");}
 export function topicMarketMaxAddLP(_s:TopicMarketState,_id:number):number{return 0;}
 export function topicMarketAddLP(_s:TopicMarketState,_id:number,_lp:number):TopicMarketState {throw new Error("LP_ADDITION_DISABLED");}
-function transferRight(state:TopicMarketState,from:number,to:number,amount:number,kind:"lp"):TopicMarketState {
+export function topicMarketTransferLP(state:TopicMarketState,from:number,to:number,amount:number):TopicMarketState {
   const a=account(state,from);account(state,to);
-  if(!positive(amount)||amount>a[kind]||from===to)throw new Error("HOLDINGS");
-  if(kind==="lp"?!["FORMAL","WAIT_CORE","SETTLED"].includes(state.phase):state.phase==="CREATE")throw new Error("PHASE");
-  const s=copy(state);s.accounts[from][kind]-=amount;s.accounts[to][kind]+=amount;
+  if(!positive(amount)||amount>a.lp||from===to)throw new Error("HOLDINGS");
+  if(!["FORMAL","WAIT_CORE","SETTLED"].includes(state.phase))throw new Error("PHASE");
+  const s=copy(state);s.accounts[from].lp-=amount;s.accounts[to].lp+=amount;
   record(s,"TRANSFER_LP",from,undefined,amount,String(to));return result(s);
 }
-export const topicMarketTransferLP=(s:TopicMarketState,from:number,to:number,amount:number)=>transferRight(s,from,to,amount,"lp");
 
 /** 完整组合的抵押赎回：每对YES+NO所有结果都值1，不能从做市现金重复提款。 */
 export function topicMarketRedeemPairs(state: TopicMarketState, id: number, pairs: number): TopicMarketState {
+  if(topicMarketEarlyDue(state))throw new Error("PROCESS_EARLY_REQUEST");
   if (state.phase !== "FORMAL" && state.phase !== "WAIT_CORE") throw new Error("PHASE");
   if (!positive(pairs)) throw new Error("AMOUNT");
   const a = account(state, id);
@@ -253,12 +258,43 @@ export function topicMarketMaxFormalSellTokens(s: TopicMarketState, id: number, 
 }
 export function topicMarketCoreStake(state: TopicMarketState, id: number, side: Outcome, amount: number): TopicMarketState {
   if (!["YES", "NO", "INVALID"].includes(side)) throw new Error("SIDE");
-  if (state.core.openedAt === null || state.now >= state.TC || (state.phase !== "FORMAL" && state.phase !== "WAIT_CORE")) throw new Error("CORE_CLOSED");
+  requireCoreOpen(state);
   const a = account(state, id); if (a.coreSide && a.coreSide !== side) throw new Error("SIDE_LOCKED");
   const s = copy(state); pay(s, id, amount); s.accounts[id].coreSide = side; s.accounts[id].coreStake += amount;
   s.core.cash += amount;
   if (side === "YES") s.core.yes += amount; else if (side === "NO") s.core.no += amount; else s.core.invalid += amount;
   record(s, "CORE_STAKE", id, amount, undefined, side); return result(s);
+}
+export function topicMarketCoreExit(state:TopicMarketState,id:number):TopicMarketState {
+ requireCoreOpen(state);const a=account(state,id);if(!(a.coreStake>0)||!a.coreSide)throw new Error("NO_STAKE");
+ const s=copy(state),user=s.accounts[id],principal=user.coreStake;
+ const penalty=Math.min(principal,Math.ceil(principal*1e18/10)/1e18),refund=principal-penalty;
+ const e=s.early!;e.penalty+=penalty;
+ for(let i=0;i<3;i++){e.forfeited[i]+=user.coreRewards[i];user.coreRewards[i]=0;}
+ if(user.coreSide==='YES')s.core.yes-=principal;else if(user.coreSide==='NO')s.core.no-=principal;else s.core.invalid-=principal;
+ s.core.cash-=principal;user.coreStake=0;user.coreSide=null;user.coreClaimed=false;
+ receive(s,id,refund);record(s,'CORE_EXIT',id,refund,principal);return result(s);
+}
+export function topicMarketProposeEarly(state:TopicMarketState,id:number,side:Side,reason:string):TopicMarketState {
+ requireCoreOpen(state);if(side!=='YES'&&side!=='NO')throw new Error('EARLY_OUTCOME');
+ if(!reason.trim())throw new Error('MISSING_REASON');if(state.early?.pending)throw new Error('EARLY_PENDING');
+ if(!(state.core.cash>0))throw new Error('NO_PRINCIPAL');if(state.now+3600>=state.TC)throw new Error('EARLY_WINDOW');
+ const s=copy(state),e=s.early!;pay(s,id,e.bond);
+ e.pending={id:++e.count,proposer:id,side,proposedAt:s.now,processAfter:s.now+3600,reason:reason.trim(),bond:e.bond};
+ record(s,'EARLY_PROPOSE',id,e.bond,undefined,side);return result(s);
+}
+export function topicMarketProcessEarly(state:TopicMarketState):TopicMarketState {
+ if(!['FORMAL','WAIT_CORE'].includes(state.phase))throw new Error('CORE_CLOSED');
+ const request=state.early?.pending;if(!request)throw new Error('NO_EARLY_REQUEST');if(state.now<request.processAfter)throw new Error('EARLY_PENDING_WINDOW');
+ const s=copy(state),e=s.early!;e.pending=null;
+ const total=s.core.yes+s.core.no+s.core.invalid,actual=s.core.yes>total/2?'YES':s.core.no>total/2?'NO':'INVALID';
+ if(actual===request.side){s.accounts[request.proposer].bondRefund=(s.accounts[request.proposer].bondRefund??0)+request.bond;e.terminatedAt=request.processAfter;settle(s);}
+ else {e.failedBonds+=request.bond;if(s.now>=s.TC)settle(s);}
+ record(s,'EARLY_PROCESS',undefined,request.bond,undefined,actual);return result(s);
+}
+export function topicMarketClaimEarlyBond(state:TopicMarketState,id:number):TopicMarketState {
+ const amount=account(state,id).bondRefund??0;if(!(amount>0))throw new Error('NO_BOND_REFUND');
+ const s=copy(state);s.accounts[id].bondRefund=0;receive(s,id,amount);record(s,'CLAIM_EARLY_BOND',id,amount);return result(s);
 }
 function distributeOfficialFees(s:TopicMarketState){
  if(s.config.protocolAccount<0)return;
@@ -278,9 +314,16 @@ function settle(s: TopicMarketState) {
   s.lpBudgetInitial=s.lpBudget;
   s.payouts=[];
   const rewardIndex = outcome === "YES" ? 0 : outcome === "NO" ? 1 : 2;
-  s.corePayouts = s.accounts.map(a => (outcome === "INVALID" ? a.coreStake
-    : a.coreSide === outcome ? s.core.cash * a.coreStake / (outcome === "YES" ? s.core.yes : s.core.no) : 0) + a.coreRewards[rewardIndex]);
-  s.coreBudget = sum(s.corePayouts); s.coreOfficialBudget = s.core.officialRewards[rewardIndex];
+  const penalty=(s.early?.penalty??0)+(s.early?.failedBonds??0),forfeited=s.early?.forfeited[rewardIndex]??0;
+  const eligible=outcome==='YES'?s.core.yes:outcome==='NO'?s.core.no:s.core.yes+s.core.no;
+  s.corePayouts = s.accounts.map(a => {
+    const principal=outcome==='INVALID'?(totalStake>0?(s.core.cash+penalty)*a.coreStake/totalStake:0)
+      :a.coreSide===outcome?(s.core.cash+penalty)*a.coreStake/eligible:0;
+    const feeEligible=outcome==='INVALID'?(a.coreSide==='YES'||a.coreSide==='NO'):a.coreSide===outcome;
+    return principal+a.coreRewards[rewardIndex]+(feeEligible&&eligible>0?forfeited*a.coreStake/eligible:0);
+  });
+  s.coreBudget=sum(s.corePayouts);s.coreOfficialBudget=s.core.officialRewards[rewardIndex]+(eligible===0?forfeited:0)+(totalStake===0?penalty:0);
+  if(s.early){s.early.penalty=0;s.early.failedBonds=0;s.early.forfeited=[0,0,0];}
   s.core.fees = 0; s.core.cash = 0; s.cash = 0; s.lpFees = 0; s.inventory = [0, 0];
   record(s, "SETTLE", undefined, undefined, undefined, outcome);
   distributeOfficialFees(s);
@@ -309,6 +352,7 @@ export function topicMarketAdvanceTime(state: TopicMarketState, to: number): Top
 }
 export function topicMarketFinalize(state: TopicMarketState): TopicMarketState {
   if ((state.phase !== "FORMAL" && state.phase !== "WAIT_CORE") || state.now < state.TC) throw new Error("CORE_PENDING");
+  if(state.early?.pending)return topicMarketProcessEarly(state);
   const s = copy(state); settle(s); return result(s);
 }
 export function topicMarketClaimLP(state:TopicMarketState,id:number,amount:number):TopicMarketState {
@@ -357,7 +401,8 @@ export function topicMarketMaxFormalBuyTokens(s: TopicMarketState, id: number, s
 }
 export function topicMarketAccounting(s: TopicMarketState) {
   const wallets = sum(s.accounts.map(a => a.wallet));
-  const reserves = s.R + s.collateral + s.cash + s.lpFees + s.creatorFees + s.protocolFees
+  const earlyFunds=(s.early?.pending?.bond??0)+(s.early?.penalty??0)+(s.early?.failedBonds??0)+sum(s.accounts.map(a=>a.bondRefund??0));
+  const reserves = earlyFunds+s.R + s.collateral + s.cash + s.lpFees + s.creatorFees + s.protocolFees
     + s.core.cash + s.core.fees + s.coreOfficialBudget + s.lpBudget + s.outcomeBudget + s.failedBudget + s.coreBudget;
   return { wallets, reserves, total: wallets + reserves, initialTotal: s.initialCapital ?? 30000, error: wallets + reserves - (s.initialCapital ?? 30000) };
 }

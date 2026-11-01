@@ -2,6 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {STOCK_DEMO_ASSETS,createStockDemo,routeStockDemo} from './stockDemoRouting';
 import {topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketAdvanceTime,topicMarketClaim,topicMarketAccounting,topicMarketCoreStake,topicMarketFormalBuy,topicMarketFormalSell,topicMarketFinalize,topicMarketClaimCore} from './topicMarketDemoModel';
 describe('stock collateral demo routes',()=>{
+ it('fixes the early request bond to 500 USD for every stock',()=>{for(const asset of STOCK_DEMO_ASSETS)expect(createStockDemo(asset.price).early!.bond*asset.price).toBeCloseTo(500,8);});
  for(const asset of STOCK_DEMO_ASSETS)it(asset.symbol+' preserves units and roundtrip / failed claim',()=>{
   let s=topicMarketCreate(createStockDemo(asset.price)),u=[5000,5000,5000];
   const total=()=>topicMarketAccounting(s).total*asset.price+u.reduce((a,b)=>a+b,0);

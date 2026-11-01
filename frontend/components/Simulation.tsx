@@ -1,3 +1,4 @@
+import {SimulationCoreActions,SimulationEarlyNotice,buildLocalCoreLifecycle,type SimulationCoreLifecycle} from './SimulationCoreActions';
 import {ContractAddress} from './ContractAddress';
 import {config} from '../config';
 import {ActivityRecords} from './ActivityRecords';
@@ -12,6 +13,7 @@ import {genesisTokens,genesisShares,genesisPrice} from './genesisDisplay';
 import type {Language} from '../types';
 import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalBuy,topicMarketFormalSell,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalBuy,topicMarketQuoteFormalSell,topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketClaim,topicMarketClaimCore,topicMarketClaimPreview,topicMarketRedeemPairs,topicMarketPrices,type TopicMarketState,type TopicMarketTradeQuote,type Side,type Outcome} from './topicMarketDemoModel';
 export interface RemoteSimulation {
+ lifecycle?:SimulationCoreLifecycle;
  chain?:{contractAddresses?:{market:string;core:string};poolBalances?:{yes:string;no:string;stock:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
  input:{tab:'MARKET'|'PROTOCOL';mode:'BUY'|'SELL';amount:number;useStable:boolean};state:TopicMarketState;assetSymbol:string;balanceUSD:number;topic:{title:string;YES:string;NO:string;INVALID:string};pending:boolean;
  prices:{genesis:number;probability:[number,number]|null};preview:ReturnType<typeof topicMarketClaimPreview>;
@@ -48,8 +50,9 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const deadlinesValid=validDeadlineTimestamp(coreDeadline)&&coreDeadline-Math.floor(createNow/1000)>14400;
  useEffect(()=>{if(s.phase!=='CREATE')return;const timer=window.setInterval(()=>setCreateNow(Date.now()),1000);return()=>window.clearInterval(timer)},[s.phase]);
  const a=s.accounts[id],names=[t('账户1','Account 1'),t('账户2','Account 2'),t('账户3','Account 3')];
- const gen=s.phase==='GENESIS'&&s.now<s.TG,formal=s.phase==='FORMAL'&&s.now<s.TF,terminal=['SETTLED','FAILED'].includes(s.phase);
- const coreOpen=!remote?.pending&&s.core.openedAt!==null&&s.now<s.TC&&!terminal,ticking=!['CREATE','FAILED','SETTLED'].includes(s.phase)&&s.now<s.TC;
+ const earlyDue=remote?.lifecycle?.paused??!!(s.early?.pending&&s.now>=s.early.pending.processAfter);
+ const gen=s.phase==='GENESIS'&&s.now<s.TG,formal=s.phase==='FORMAL'&&s.now<s.TF&&!earlyDue,terminal=['SETTLED','FAILED'].includes(s.phase);
+ const coreOpen=!remote?.pending&&s.core.openedAt!==null&&s.now<s.TC&&!terminal&&!earlyDue,ticking=!['CREATE','FAILED','SETTLED'].includes(s.phase)&&s.now<s.TC;
  const cut=gen?s.TG:s.now<s.TF?s.TF:s.TC,stage=gen?'Genesis':s.now<s.TF?'Formal':'Core';
  const phases={CREATE:t('待创建','Not created'),GENESIS:'Genesis',FORMAL:'Formal',WAIT_CORE:t('等待Core结果','Awaiting Core'),SETTLED:t('已结算','Settled'),FAILED:t('未毕业清算','Funding failed')};
  const px=remote?.prices??topicMarketPrices(s),preview=remote?.preview??topicMarketClaimPreview(s,id);
@@ -68,7 +71,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const reset=()=>{try{setS(createStockDemo(asset.price,snapshot,depth));setCoreDateTime(defaultDeadlineLocal());setCreateNow(Date.now());setStableWallets([5000,5000,5000]);setRunning(false);setNotice('');setId(0);setTab('MARKET');setMode('BUY');setAmount(10)}catch{setNotice(t('请检查创建参数。','Check creation parameters.'))}};
  const paymentAmount=useStable?amount/asset.price:amount;
  const spendable=useStable?stableWallets[id]/asset.price:a.wallet;
- const quote=(side:Side|'G'):TopicMarketTradeQuote|null=>{try{if(!(amount>0)||!Number.isFinite(amount))return null;if(remote){if(remote.pending||remote.input.tab!==tab||remote.input.mode!==mode||remote.input.amount!==amount||remote.input.useStable!==useStable)return null;const q=remote.quote(side);if(!q||mode==='BUY'&&q.gross>a.wallet||mode==='SELL'&&(gen?genesisShares(amount)>a.g:amount>(side==='YES'?a.yes:a.no)))return null;return q;}if(gen){if(mode==='BUY'&&paymentAmount>spendable||mode==='SELL'&&genesisShares(amount)>a.g)return null;return mode==='BUY'?topicMarketQuoteBuy(s,paymentAmount):topicMarketQuoteSell(s,genesisShares(amount))}if(!formal||side==='G')return null;if(mode==='BUY'){const q=topicMarketQuoteFormalBuy(s,side,amount);if(q.gross>spendable)return null;return q}if(amount>(side==='YES'?a.yes:a.no))return null;return topicMarketQuoteFormalSell(s,side,amount)}catch{return null}};
+ const quote=(side:Side|'G'):TopicMarketTradeQuote|null=>{try{if(earlyDue)return null;if(!(amount>0)||!Number.isFinite(amount))return null;if(remote){if(remote.pending||remote.input.tab!==tab||remote.input.mode!==mode||remote.input.amount!==amount||remote.input.useStable!==useStable)return null;const q=remote.quote(side);if(!q||mode==='BUY'&&q.gross>a.wallet||mode==='SELL'&&(gen?genesisShares(amount)>a.g:amount>(side==='YES'?a.yes:a.no)))return null;return q;}if(gen){if(mode==='BUY'&&paymentAmount>spendable||mode==='SELL'&&genesisShares(amount)>a.g)return null;return mode==='BUY'?topicMarketQuoteBuy(s,paymentAmount):topicMarketQuoteSell(s,genesisShares(amount))}if(!formal||side==='G')return null;if(mode==='BUY'){const q=topicMarketQuoteFormalBuy(s,side,amount);if(q.gross>spendable)return null;return q}if(amount>(side==='YES'?a.yes:a.no))return null;return topicMarketQuoteFormalSell(s,side,amount)}catch{return null}};
  const execute=(side:Side|'G')=>remote?remote.trade(side):act(v=>gen?(mode==='BUY'?topicMarketBuy(v,id,paymentAmount):topicMarketSell(v,id,genesisShares(amount))):mode==='BUY'?topicMarketFormalBuy(v,id,side as Side,amount):topicMarketFormalSell(v,id,side as Side,amount),t('交易完成。','Trade completed.'));
  const routePanel=<div className={box+' space-y-2 text-xs'} data-testid="stock-route-panel"><strong>{asset.symbol} {t('股票代币底池','stock-token pool')}</strong><label className="flex justify-between items-center gap-2">{t('支付／收款资产','Pay / receive')}<select aria-label="Payment asset" value={useStable?'STABLE':'STOCK'} onChange={e=>setUseStable(e.target.value==='STABLE')} className="border border-border rounded p-2 bg-white"><option value="STABLE">dUSDC</option><option value="STOCK">{asset.symbol}</option></select></label><div>{remote?<>{num(remote.balanceUSD)} {t("虚拟USD","virtual USD")} ≈ {num(a.wallet,6)} {asset.symbol}</>:<>{num(a.wallet,6)} {asset.symbol} · {num(stableWallets[id])} dUSDC</>}</div><p className="text-text-muted">{t('固定演示价：1','Fixed demo rate: 1')} {asset.symbol} = {asset.price} dUSDC</p><p className="text-text-muted">{t('仅模拟兑换，零兑换费、零滑点；不代表真实行情、资产可用性或兑换流动性。','Mock swaps only: zero swap fee/slippage; not live prices, asset availability or executable liquidity.')}</p>{useStable&&<p>{gen&&mode==='BUY'||tab==='PROTOCOL'?`${num(amount)} dUSDC → ${num(paymentAmount,6)} ${asset.symbol}`:t('按股票数量报价；卖出／领取净款兑换为稳定币。','Quotes use stock units; sale / claim proceeds convert to stablecoin.')}</p>}</div>;
  const Row=({label,value}:{label:string,value:React.ReactNode})=><div className="flex justify-between gap-3 py-1"><span className="text-text-muted">{label}</span><strong className="tabular-nums text-right break-words">{value}</strong></div>;
@@ -80,6 +83,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const balance=a.wallet,userShares={YES:a.yes,NO:a.no},userStake=a.coreStake,userVaultSide=a.coreSide;
  const stakes={YES:s.core.yes,NO:s.core.no,INVALID:s.core.invalid},totalStake=stakeTotal;
  const phase=s.phase==='CREATE'?'CREATE':terminal?'FINALIZED':s.now>=s.TC?'READY':'STAKING';
+ const lifecycle=remote?remote.lifecycle:buildLocalCoreLifecycle(s,id,act);
  const finalOutcome=s.result,vaultClaimed=a.coreClaimed,marketRedeemed=!hasClaim;
  const corePending=activeTab==='PROTOCOL'&&s.core.openedAt===null;
  const phaseLabel=corePending?t(s.phase==='FAILED'?'Core未开启':'毕业后开启',s.phase==='FAILED'?'Core never opened':'Opens after graduation'):phases[s.phase],phaseBadgeClass='border-accent/50 text-accent bg-accent/10';
@@ -93,7 +97,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const totalVolume=s.formalVolume??0,vaultFees=s.core.feeTotal,feeRoi=totalStake?vaultFees/totalStake*100:0;
  const formatAmount=num,sideTextColor=(side:Outcome)=>side==='YES'?'text-success':side==='NO'?'text-danger':'text-yellow-700';
  const primaryActionTitle=corePending?t('Core未开启','Core not open'):terminal?t('领取结算资金','Claim settlement'):activeTab==='MARKET'?(gen?t('交易gToken','Trade gToken'):t('交易','Trade')):t('选择方向并质押','Choose a side and stake');
- const primaryActionDescription=corePending?t('等待Genesis毕业。','Waiting for Genesis graduation.'):activeTab==='MARKET'?t('输入数量，查看成交报价与价格影响。','Enter an amount to preview execution and price impact.'):remote?.chain?t('选择方向质押；可按规则退出并放弃累计手续费。','Choose a side and stake; exits forfeit accrued fees.'):t('选择方向后只能同侧追加，资金锁定至结算。','Once selected, add only to the same side until settlement.');
+ const primaryActionDescription=corePending?t('等待Genesis毕业。','Waiting for Genesis graduation.'):activeTab==='MARKET'?t('输入数量，查看成交报价与价格影响。','Enter an amount to preview execution and price impact.'):remote?.chain?t('选择方向质押；可按规则退出并放弃累计手续费。','Choose a side and stake; exits forfeit accrued fees.'):t('有仓时仅同侧追加；可按规则全仓退出，或申请提前结算。','Add to the same side while staked; full exit and early settlement follow the rules.');
  const MIN_STAKE=0.01;
  const stake=(side:Outcome)=>{if(remote){if(remote.input.amount!==amount||remote.input.tab!==tab||remote.input.useStable!==useStable)return false;remote.stake(side);return true}if(paymentAmount<MIN_STAKE){setNotice(t('低于最小质押数量。','Below minimum stake.'));return false}return act(v=>topicMarketCoreStake(v,id,side,paymentAmount))};
  const trade=(side:Side)=>execute(gen?'G':side);
@@ -116,6 +120,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const activityPanel=<ActivityRecords events={s.events} core={activeTab==='PROTOCOL'} lang={lang} symbol={asset.symbol} names={names} onchain={!!remote?.chain}/>;
   if(s.phase==='CREATE')return <div className="max-w-xl mx-auto bg-white/80 border border-border rounded-2xl p-6 sm:p-8" data-testid="launch-market-card"><h2 className="text-xl font-display font-bold mb-5">{t('0成本发射你的市场','Launch your market at zero cost')}</h2><form className="space-y-4" onSubmit={e=>{e.preventDefault();const TC=parseLocalDeadline(coreDateTime)-Math.floor(Date.now()/1000);if(!Object.values(topic).every(v=>v.trim())||!deadlinesValid||TC<=14400)return;if(act(()=>topicMarketCreate(createStockDemo(asset.price,snapshot,depth,{TC})),t('已发射，Genesis倒计时开始。','Launched; Genesis countdown started.'))){setTopic(v=>({title:v.title.trim(),YES:v.YES.trim(),NO:v.NO.trim(),INVALID:v.INVALID.trim()}));setRunning(true);setTab('MARKET')}}}><label className="block text-sm">{t('底池股票代币','Pool stock token')}<select aria-label="Pool stock token" value={assetIndex} onChange={e=>{const i=Number(e.target.value);setAssetIndex(i);setS(createStockDemo(STOCK_DEMO_ASSETS[i].price));setStableWallets([5000,5000,5000])}} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white">{STOCK_DEMO_ASSETS.map((v,i)=><option key={v.symbol} value={i}>{zh?v.name:v.en} · {v.symbol}</option>)}</select></label><p className="text-xs text-text-muted">{t('Robinhood Chain 模拟 · 全部为演示资产及固定价格；SpaceX仅为模拟占位，不代表真实代币已可用。','Robinhood Chain simulation · All assets and prices are illustrative; SpaceX is a mock placeholder, not a claim of token availability.')}</p><label className="block text-sm">{t('话题内容','Market question')}<textarea required maxLength={300} rows={2} value={topic.title} onChange={e=>setTopic(v=>({...v,title:e.target.value}))} placeholder={t('输入你想发射的市场话题','Enter your market question')} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white"/></label>{(['YES','NO','INVALID'] as const).map(side=><label key={side} className="block text-sm">{side} {t('判定条件','resolution criteria')}<textarea required maxLength={1000} rows={2} value={topic[side]} onChange={e=>setTopic(v=>({...v,[side]:e.target.value}))} placeholder={t(side==='INVALID'?'什么情况下无法有效判定？':'什么情况下判定为 '+side+'？','When should the result be '+side+'?')} className="block w-full border border-border rounded-lg p-3 mt-2 bg-white"/></label>)}<FinalDeadlineInput lang={lang} value={coreDateTime} onChange={setCoreDateTime} now={Math.floor(createNow/1000)}/><p className="text-xs text-text-muted">{t('Genesis在最终截止前2小时截止，市场在最终截止前1小时停止交易；Core与话题同时截止。最终截止须晚于创建后4小时。','Genesis closes 2 hours before the final deadline. Market trading closes 1 hour before the final deadline; Core and the topic end together. The final deadline must be more than 4 hours after creation.')}</p>{!deadlinesValid&&<p role="alert" className="text-xs text-danger">{t('最终截止须晚于4小时。','The final deadline must be later than 4 hours.')}</p>}<Button type="submit" className="w-full" disabled={!Object.values(topic).every(v=>v.trim())||!deadlinesValid}>{t('发射市场，开始模拟','Launch market and start demo')}</Button><p className="text-xs text-text-muted">{t('本地模拟演示，不会发起链上交易。','Local simulation; no on-chain transactions.')}</p></form></div>;
   return (
+    <>
+    {!remote?.chain&&lifecycle&&<SimulationEarlyNotice lifecycle={lifecycle} now={s.now} lang={lang} busy={!!remote?.pending} connected={isWalletConnected} onConnect={connectWallet}/>}
     <div data-testid="homepage-lifecycle" className="vault-shell bg-white/80 border-y sm:border border-border sm:rounded-2xl shadow-sm sm:shadow-2xl flex flex-col md:flex-row max-w-6xl mx-auto md:min-h-[600px] overflow-hidden backdrop-blur-xl relative">
       <div className="absolute top-10 right-10 w-72 sm:w-96 h-72 sm:h-96 bg-accent/5 rounded-full blur-[100px] pointer-events-none" />
 
@@ -192,6 +198,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
 
         {!remote&&<label className="flex justify-between items-center text-xs font-mono text-text-muted">{t("当前账户","Account")}<select aria-label={t("当前模拟账户","Demo account")} value={id} onChange={e=>{setId(Number(e.target.value));setNotice('')}} className="border border-border rounded-lg p-2 bg-white">{names.map((n,i)=><option key={n} value={i}>{n}</option>)}</select></label>}
 
+        {!remote?.chain&&lifecycle&&activeTab==='PROTOCOL'&&<SimulationCoreActions lifecycle={lifecycle} lang={lang} symbol={asset.symbol} busy={!!remote?.pending} connected={isWalletConnected} available={spendable} onConnect={connectWallet}/>}
         {remote?.chain ? <>
           {remote.chain.controls}
           {activeTab==='PROTOCOL'&&remote.chain.coreActions}
@@ -206,7 +213,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
                 {zh ? "OCP Core" : "OCP Core"}
               </h5>
               <p className="leading-relaxed font-mono">
-                {zh ? "质押资本决定最终结果。资金锁定至结算；市场交易不会改变结果。" : "Staked capital decides the result. Funds remain locked until settlement; market trades do not change it."}
+                {zh ? "质押本金决定最终结果；允许按退出规则全仓解除质押，市场交易不直接决定结果。" : "Staked principal decides the result. Full unstaking follows the exit rules; market trades do not directly determine it."}
               </p>
             </div>
             <div className="text-xs font-mono text-text-muted">
@@ -241,7 +248,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
               />
             </label>
             <p className="text-[10px] leading-5 text-text-muted font-mono">
-              {zh ? "YES、NO、INVALID 全程开放。选定方向后只能同侧追加，不能撤回或换边。" : "YES, NO and INVALID stay open until the deadline. Once selected, you may only add to that side."}
+              {zh ? "YES、NO、INVALID 在原截止前开放；同侧可追加，按规则全仓退出后可重新选边。提前结算确认期到期后需先处理申请。" : "YES, NO and INVALID are available before the original cutoff. Add to the same side, or fully exit under the rules before choosing another side. Due early requests must be processed first."}
             </p>
             <div className="grid grid-cols-2 gap-3">
               <Button onClick={() => stake("YES")} disabled={!coreOpen||!!remote&&!remote.canStake("YES")||Boolean(userVaultSide && userVaultSide !== "YES")} variant="success" className="w-full">
@@ -524,5 +531,6 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
    {remote&&<>{activityPanel}{remote.chain?.contractAddresses&&<ContractAddress key={activeTab==='PROTOCOL'?remote.chain.contractAddresses.core:remote.chain.contractAddresses.market} address={activeTab==='PROTOCOL'?remote.chain.contractAddresses.core:remote.chain.contractAddresses.market} label={activeTab==='PROTOCOL'?t('Core 合约地址','Core contract address'):s.phase==='GENESIS'||s.phase==='FAILED'?t('Genesis 市场合约地址','Genesis market contract address'):t('Formal 市场合约地址','Formal market contract address')} explorer={config.explorer} lang={lang}/>}</>}
    {!remote&&<details className={box+' text-xs'} data-testid="demo-details"><summary className="cursor-pointer font-bold">{t('演示场景','Demo scenarios')}</summary><div className="mt-4 space-y-5"><div className="grid grid-cols-3 gap-3 text-center font-mono">{[['Genesis',s.TG],['Formal',s.TF],['Core',s.TC]].map(([label,v])=><div key={String(label)}>{label} {t('截止','closes')}<strong className="block mt-2">{clock(Number(v))}</strong></div>)}</div><p className="text-text-muted">{t('Formal与Core在毕业时同时开启，截止时间固定。','Formal and Core open together at graduation. Deadlines stay fixed.')}</p><details><summary className="cursor-pointer">{t('演示参数','Demo parameters')}</summary><label className="block my-3">{t('ETH固定快照','Fixed ETH snapshot')}<input aria-label="ETH snapshot" type="number" value={snapshot} onChange={e=>setSnapshot(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><label>{t('正式深度','Formal depth')}<input aria-label="Formal depth" type="number" value={depth} onChange={e=>setDepth(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><p className="text-text-muted mt-2">{t('仅在下次创建生效，非实时价格或生产参数。','Applies at next creation; illustrative parameters only.')}</p></details>{activityPanel}</div></details>}      </div>
     </div>
+    </>
   );
 };

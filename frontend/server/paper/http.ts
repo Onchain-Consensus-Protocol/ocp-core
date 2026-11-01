@@ -39,7 +39,8 @@ async function body(req:IncomingMessage):Promise<Record<string,unknown>>{
 function action(value:unknown):PaperAction{
  if(!record(value)||typeof value.type!=='string')throw failure('ACTION',400);
  const type=value.type;
- if(['CLAIM_MARKET','CLAIM_CORE','CLAIM_CREATOR_FEES'].includes(type))return {type} as PaperAction;
+ if(type==='EARLY_PROPOSE'){if(value.side!=='YES'&&value.side!=='NO')throw failure('SIDE',400);if(typeof value.reason!=='string'||!value.reason.trim()||value.reason.length>512)throw failure('MISSING_REASON',400);return {type,side:value.side,reason:value.reason.trim()};}
+ if(['CORE_EXIT','EARLY_PROCESS','CLAIM_EARLY_BOND','CLAIM_MARKET','CLAIM_CORE','CLAIM_CREATOR_FEES'].includes(type))return {type} as PaperAction;
  if(!['GENESIS_BUY','GENESIS_SELL','FORMAL_BUY','FORMAL_BUY_SHARES','FORMAL_SELL','CORE_STAKE','REDEEM_PAIRS'].includes(type))throw failure('ACTION',400);
  const side=value.side;
  if(['FORMAL_BUY','FORMAL_BUY_SHARES','FORMAL_SELL','CORE_STAKE'].includes(type)&&!['YES','NO',...(type==='CORE_STAKE'?['INVALID']:[])].includes(String(side)))throw failure('SIDE',400);
@@ -72,7 +73,7 @@ function allowedOrigins(env:NodeJS.ProcessEnv):string[]{
  return origins;
 }
 // Only explicit engine validation codes are public. Database/Clerk/internal messages may contain secrets.
-const validationCodes=new Set(['USD_AMOUNT','USD_RANGE','AMOUNT','QUANTITY','METADATA','ASSET','TIME','CONFIG','BALANCE','HOLDINGS','INVENTORY','CAPACITY','CASH','CLAIM','CORE_CLAIM','CORE_CLOSED','CORE_PENDING','FORMAL_CLOSED','GENESIS_CLOSED','PHASE','SIDE','SIDE_LOCKED','FEE_OWNER','NO_FEES','TINY','COLLATERAL']);
+const validationCodes=new Set(['NO_STAKE','MISSING_REASON','EARLY_OUTCOME','EARLY_PENDING','NO_PRINCIPAL','EARLY_WINDOW','NO_EARLY_REQUEST','EARLY_PENDING_WINDOW','PROCESS_EARLY_REQUEST','NO_BOND_REFUND','USD_AMOUNT','USD_RANGE','AMOUNT','QUANTITY','METADATA','ASSET','TIME','CONFIG','BALANCE','HOLDINGS','INVENTORY','CAPACITY','CASH','CLAIM','CORE_CLAIM','CORE_CLOSED','CORE_PENDING','FORMAL_CLOSED','GENESIS_CLOSED','PHASE','SIDE','SIDE_LOCKED','FEE_OWNER','NO_FEES','TINY','COLLATERAL']);
 function canonical(value:unknown):unknown {return Array.isArray(value)?value.map(canonical):record(value)?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;}
 
 /** Dependencies are server composition only; no request field can replace authentication or storage. */

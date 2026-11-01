@@ -2,7 +2,7 @@ import {Readable} from 'node:stream';
 import type {IncomingMessage,ServerResponse} from 'node:http';
 import {describe,it,expect,vi} from 'vitest';
 import {createPaperHandler,type PaperHandlerDependencies} from './http';
-import {createPaperMarket,projectPaperMarket} from './engine';
+import {createPaperMarket,projectPaperMarket,applyPaperAction} from './engine';
 import {PaperStoreError,type PaperMutationContext,type PaperMutationUpdate} from './store';
 import {STOCK_DEMO_ASSETS} from '../../components/stockDemoRouting';
 import {createShareSnapshot} from '../share/snapshot';
@@ -46,6 +46,24 @@ describe('paper HTTP security boundary',()=>{
   for(const extra of [{pnl:999999},{userId:'victim'},{theme:'url(https://evil.test)'}])expect((await request(configured.handler,'share',{payload:{...payload,...extra}})).status).toBe(400);
   expect((await request(configured.handler,'share',{payload,headers:{authorization:undefined}})).status).toBe(401);
   expect(save).not.toHaveBeenCalled();
+ });
+ it('executes early settlement and Core exit through real API actions',async()=>{
+  let nowMs=1_000_000,stored=createPaperMarket('market-1',user.id,createBody,nowMs),wallet=user.balanceMicros;
+  stored=applyPaperAction(stored,'liquidity',wallet,{type:'GENESIS_BUY',budgetUSD:'10000'},nowMs).market;
+  const store={ensureUser:async()=>({...user,balanceMicros:wallet}),listMarkets:async()=>[stored],getMarket:async()=>stored,
+   mutate:async(_u:string,_r:string,_h:string,_m:string|null,callback:(context:PaperMutationContext)=>PaperMutationUpdate)=>{const next=await callback({user:{...user,balanceMicros:wallet},market:structuredClone(stored)});stored=next.market;wallet=next.walletMicros;return next.response;}};
+  const handler=createPaperHandler({env,getStore:()=>store,verifySession:async()=>({sub:'clerk-subject',azp:origin}),getIdentity:async()=>identity(),now:()=>nowMs});
+  let nonce=0;
+  const trade=async(action:unknown)=>{const q=await request(handler,'quote',{payload:{marketId:stored.id,action}});expect(q.status).toBe(200);return request(handler,'trade',{payload:{marketId:stored.id,requestId:`early_action_${++nonce}000000`,expectedRevision:q.body.revision,action,maxPayUSD:'1000',minReceiveUSD:'0'}});};
+  expect((await trade({type:'CORE_STAKE',side:'NO',budgetUSD:'100'})).status).toBe(200);
+  const exited=await trade({type:'CORE_EXIT'});expect(exited.status).toBe(200);expect(Number(exited.body.market.early.exitRefundUSD)).toBe(0);
+  expect((await trade({type:'CORE_STAKE',side:'YES',budgetUSD:'100'})).status).toBe(200);
+  const proposal=await trade({type:'EARLY_PROPOSE',side:'YES',reason:'Conditions met'});expect(proposal.status).toBe(200);expect(proposal.body.market.early.requestId).toBe(1);
+  nowMs+=3600_000;
+  const frozen=await request(handler,'quote',{payload:{marketId:stored.id,action:{type:'CORE_EXIT'}}});expect(frozen.body.error).toBe('PROCESS_EARLY_REQUEST');
+  const processed=await trade({type:'EARLY_PROCESS'});expect(processed.status).toBe(200);expect(processed.body.market.phase).toBe('SETTLED');expect(processed.body.market.early.bondRefundUSD).toBe('500.000000');
+  const refunded=await trade({type:'CLAIM_EARLY_BOND'});expect(refunded.status).toBe(200);expect(refunded.body.market.early.bondRefundUSD).toBe('0.000000');
+  const malformed=await request(handler,'quote',{payload:{marketId:stored.id,action:{type:'EARLY_PROPOSE',side:'INVALID',reason:'bad'}}});expect(malformed.status).toBe(400);
  });
  it('executes a quoted buy with zero receive floor, then sells and updates holdings/balance',async()=>{
   const nowMs=1_000_000;let stored=createPaperMarket('market-1',user.id,createBody,nowMs),wallet=user.balanceMicros;
