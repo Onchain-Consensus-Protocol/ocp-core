@@ -1,6 +1,6 @@
 import {readCoreHistory,type CoreHistory} from '../testnet/coreHistory';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {BrowserProvider, JsonRpcProvider, Interface, ZeroAddress, formatUnits, isAddress, parseUnits} from 'ethers';
+import {BrowserProvider, JsonRpcProvider, Interface, ZeroAddress, ZeroHash, formatUnits, isAddress, parseUnits} from 'ethers';
 import {ArrowLeft, RefreshCw, Share2, Search, Plus} from 'lucide-react';
 import {TestnetSimulation} from './TestnetSimulation';
 import {EarlyTerminationNotice} from './EarlyTerminationNotice';
@@ -272,7 +272,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     const direction=genesis?0:tradeSide;
     const quantity=parseUnits(amount,genesis?mode==='BUY'?payDecimals:11:18);if(quantity<=0n)return {};
     let cash:bigint,limit:bigint,shares:bigint|undefined,route:RouterRequest|undefined;
-    const request=(action:RouterAction):RouterRequest=>({market:market.address,action,paymentAsset:paymentRoute!.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(Math.floor(Date.now()/1000)+chainTimeOffset.current+600),side:direction,graduationIntent:0});
+    const request=(action:RouterAction):RouterRequest=>({market:market.address,action,paymentAsset:paymentRoute!.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(Math.floor(Date.now()/1000)+chainTimeOffset.current+600),side:direction,graduationIntent:0,reasonHash:ZeroHash});
     if(genesis&&mode==='BUY'){
       if(usingStable){const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,quantity,'input');const floor=swap.amountOut*995n/1000n;shares=await reader.quoteGenesisBuy(market.address,swap.amountOut);limit=(await reader.quoteGenesisBuy(market.address,floor))*995n/1000n;cash=quantity;route={...request(RouterAction.GenesisBuy),inputAmount:quantity,minCollateral:floor,businessLimit:limit};}
       else{shares=await reader.quoteGenesisBuy(market.address,quantity);cash=quantity;limit=shares*99n/100n;}
@@ -291,6 +291,41 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   const stakeRouteQuote=quoteState.expired?undefined:quoteState.data?.stake;
   const sideErrors:Partial<Record<0|1,string>>=quoteState.error?{[tab==='CORE'||genesis?0:tradeSide]:errorText(quoteState.error,zh)}:{};
 
+  const canProposeEarly=!!market?.early&&coreOpen&&market.early.requestId===0n&&now+3600<Number(market.coreCutoff)
+    &&market.totalStakeYes+market.totalStakeNo+market.totalStakeInvalid>0n;
+  const proposalKey=`${selected}:${wallet?.address}:${wallet?.chainId}:${payAsset}:${proposalSide}:${earlyReason.trim()}:${market?.early?.bond}:${canProposeEarly}:${paymentRoute?.router}:${paymentRoute?.stable}:${confirmedRevision}`;
+  const proposalIdentity=useRef(proposalKey);proposalIdentity.current=proposalKey;
+  const proposalQuoteState=useAsyncQuote(usingStable&&reader&&market&&paymentRoute&&canProposeEarly&&earlyReason.trim()?proposalKey:null,async()=>{
+    const value=await reader!.quoteEarlyProposalStable(market!.address,proposalSide,earlyReason,BigInt(Math.floor(Date.now()/1000)+chainTimeOffset.current+600));
+    return {...value,key:proposalKey};
+  });
+  const proposalQuote=proposalQuoteState.expired?undefined:proposalQuoteState.data;
+  const refundKey=`${selected}:${wallet?.address}:${wallet?.chainId}:${payAsset}:${market?.early?.bondRefund}:${paymentRoute?.router}:${paymentRoute?.stable}:${confirmedRevision}`;
+  const refundIdentity=useRef(refundKey);refundIdentity.current=refundKey;
+  function requireCurrentProposal(q:NonNullable<typeof proposalQuote>){
+    if(q.key!==proposalIdentity.current||Date.now()-q.quotedAt>90000)throw new Error(t('保证金报价已变化，请重新报价。','Bond quote changed. Request a new quote.'));
+  }
+  function submitEarlyProposal(){
+    if(!market?.early||!canProposeEarly||!earlyReason.trim()||pending.current)return;
+    if(!usingStable){void transact(c=>c.proposeEarlyTermination(market.address,proposalSide===0?1:2,earlyReason));return;}
+    const q=proposalQuote;if(!paymentRoute||!q||q.key!==proposalKey)return;
+    requireCurrentProposal(q);
+    if((paymentRoute.stableAllowance??0n)<q.request.inputAmount){void transact(c=>{requireCurrentProposal(q);return c.approveRouterAsset(market.address,paymentRoute.stable,q.request.inputAmount);});return;}
+    void transact(c=>{requireCurrentProposal(q);return c.executeRouter(q.request);});
+  }
+  function claimEarlyBondSelected(){
+    if(!market||pending.current)return;
+    if(!usingStable){void transact(c=>c.claimEarlyBond(market.address));return;}
+    if(!paymentRoute)return;
+    const key=refundKey;
+    void transact(async c=>{
+      const request:RouterRequest={market:market.address,action:RouterAction.ClaimEarlyBond,paymentAsset:paymentRoute.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(now+600),side:0,graduationIntent:0,reasonHash:ZeroHash};
+      const expected=await c.previewRouter(request);
+      if(key!==refundIdentity.current)throw new Error(t('退款资产或钱包已变化，请重试。','Refund asset or wallet changed. Retry.'));
+      if(expected<=0n)throw new Error(t('当前没有可兑换的保证金退款。','No convertible bond refund is available.'));
+      return c.executeRouter({...request,minOutput:expected*99n/100n});
+    });
+  }
   let coreAmount = 0n;
   try {if (stock && amount) coreAmount = parseUnits(amount, payDecimals);} catch {/* The input remains editable. */}
   const quoteFor=(direction:0|1)=>sideQuotes[direction]?.key===quoteKey+':'+direction?sideQuotes[direction]:undefined;
@@ -318,7 +353,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
       if(!coreOpen||coreAmount<=0n||!balanceEnough)return;
       const lockedSide=market.position&&[market.position.coreYes,market.position.coreNo,market.position.coreInvalid].findIndex(v=>v>0n);
       if(lockedSide!==undefined&&lockedSide>=0&&lockedSide!==direction)return;
-      if(usingStable){const q=stakeRouteQuote;if(!paymentRoute||!q||q.key!==quoteKey)return;if((paymentRoute.stableAllowance??0n)<q.input){void transact(c=>c.approveRouterAsset(market.address,paymentRoute.stable,q.input));return;}void transact(c=>c.executeRouter({market:market.address,action:RouterAction.CoreStake,paymentAsset:paymentRoute.stable,inputAmount:q.input,quantity:0n,minCollateral:q.minCollateral,businessLimit:0n,minOutput:0n,deadline:BigInt(now+600),side:direction,graduationIntent:0}));return;}
+      if(usingStable){const q=stakeRouteQuote;if(!paymentRoute||!q||q.key!==quoteKey)return;if((paymentRoute.stableAllowance??0n)<q.input){void transact(c=>c.approveRouterAsset(market.address,paymentRoute.stable,q.input));return;}void transact(c=>c.executeRouter({market:market.address,action:RouterAction.CoreStake,paymentAsset:paymentRoute.stable,inputAmount:q.input,quantity:0n,minCollateral:q.minCollateral,businessLimit:0n,minOutput:0n,deadline:BigInt(now+600),side:direction,graduationIntent:0,reasonHash:ZeroHash}));return;}
       const position=market.position;const locked=position&&[position.coreYes,position.coreNo,position.coreInvalid].findIndex(v=>v>0n);
       if(locked!==undefined&&locked>=0&&locked!==direction)return;
       if((position?.vaultAllowance??0n)<coreAmount){void transact(c=>c.approveStock(market.address,'vault',coreAmount));return;}
@@ -346,7 +381,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     if(!market)return;
     if(!usingStable){void transact(c=>kind==='market'?c.claimMarket(market.address):c.claimCore(market.address));return;}
     if(!paymentRoute)return;
-    void transact(async c=>{const request:RouterRequest={market:market.address,action:kind==='market'?RouterAction.ClaimMarket:RouterAction.ClaimCore,paymentAsset:paymentRoute.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(now+600),side:0,graduationIntent:0};const expected=await c.previewRouter(request);if(expected<=0n)throw new Error(t('当前没有可兑换的结算款。','No convertible payout is available.'));return c.executeRouter({...request,minOutput:expected*99n/100n});});
+    void transact(async c=>{const request:RouterRequest={market:market.address,action:kind==='market'?RouterAction.ClaimMarket:RouterAction.ClaimCore,paymentAsset:paymentRoute.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(now+600),side:0,graduationIntent:0,reasonHash:ZeroHash};const expected=await c.previewRouter(request);if(expected<=0n)throw new Error(t('当前没有可兑换的结算款。','No convertible payout is available.'));return c.executeRouter({...request,minOutput:expected*99n/100n});});
   }
   const fees=market?.feeClaims;
   const recipientMarketFees=fees&&wallet?(wallet.address.toLowerCase()===fees.creator.toLowerCase()?fees.creatorAmount:0n)+(wallet.address.toLowerCase()===fees.protocol.toLowerCase()?fees.protocolAmount:0n):0n;
@@ -385,8 +420,8 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     <details className={box+' text-xs'} aria-label={t('解除质押','Unstake')} data-testid="core-unstake-panel"><summary className="cursor-pointer font-bold text-sm">{t('解除质押','Unstake')}</summary><div className="space-y-3 mt-3">{row(t('退回本金','Principal refunded'),`${units(market.early.refund,stock.decimals)} ${stock.symbol}`)}{row(t('罚没本金','Penalty'),`${units(market.early.penalty,stock.decimals)} ${stock.symbol}`)}<p>{t('全仓退出：退90%，罚没10%，放弃累计手续费。','Full exit: refund 90%, forfeit 10% and accrued fees.')}</p>{!wallet?<p className="text-text-muted">{t('请先连接钱包查看可退出本金。','Connect your wallet to view your stake.')}</p>:earlyDue?<p className="text-text-muted">{t('提前结算确认期已结束，请先处理申请，再根据处理结果继续操作。','The early settlement confirmation period has ended. Process the request before continuing.')}</p>:!coreOpen?<p className="text-text-muted">{t('当前阶段不能解除质押。','Unstaking is unavailable in this stage.')}</p>:(market.early.refund??0n)+(market.early.penalty??0n)===0n?<p className="text-text-muted">{t('当前钱包没有可解除的 Core 质押。','This wallet has no Core stake to unstake.')}</p>:null}<Button variant="outline" disabled={!canAct||!coreOpen||(market.early.refund??0n)+(market.early.penalty??0n)===0n} onClick={()=>void transact(c=>c.exitCore(market.address))}>{t('确认解除全部质押','Confirm full unstake')}</Button></div></details>
     <details className={box+' text-xs'}><summary className="cursor-pointer font-bold">{t('提前结算申请','Early settlement request')}</summary><div className="space-y-3 mt-3">
       {row(t('申请保证金（500U等值）','Proposal bond (500 USD equivalent)'),`${units(market.early.bond,stock.decimals)} ${stock.symbol}`)}
-      {market.early.requestId>0n?<>{row(t('申请结果','Requested outcome'),market.early.requestedOutcome===1?'YES':'NO')}{row(t('确认期结束','Confirmation ends'),date(market.early.processAfter))}<Button disabled={!canAct||now<Number(market.early.processAfter)} onClick={()=>void transact(c=>c.processEarlyTermination(market.address))}>{t('执行结算检查','Check early settlement')}</Button></>:!hasCorePrincipal?<p>{t('Core 尚无质押本金，不能提交申请。','Core has no staked principal. Requests are unavailable.')}</p>:coreOpen&&now+3600<Number(market.coreCutoff)?<><label className="block">{t('申请结果','Requested outcome')}<select className={field} value={proposalSide} disabled={busy} onChange={e=>setProposalSide(Number(e.target.value) as 0|1)}><option value={0}>YES</option><option value={1}>NO</option></select></label><label className="block">{t('提前结算原因','Reason')}<input className={field} value={earlyReason} disabled={busy} onChange={e=>setEarlyReason(e.target.value)}/></label><p className="text-text-muted">{t('可申请 YES 或 NO。确认期1小时；到期未匹配（含平局或INVALID）将罚没保证金，尚未截止的操作恢复。','Request YES or NO. After 1 hour a mismatch, including a tie or INVALID, forfeits the bond; operations resume only if their original deadlines have not passed.')}</p>{(market.position?.vaultAllowance??0n)<market.early.bond?<Button disabled={!canAct} onClick={()=>void transact(c=>c.approveStock(market.address,'vault',market.early!.bond))}>{t('授权申请保证金','Approve proposal bond')}</Button>:<Button disabled={!canAct||!earlyReason.trim()||(market.position?.balance??0n)<market.early.bond} onClick={()=>void transact(c=>c.proposeEarlyTermination(market.address,proposalSide===0?1:2,earlyReason))}>{t('申请提前结算','Request early settlement')}</Button>}</>:<p>{t('当前阶段不能发起申请。','Requests are unavailable in this stage.')}</p>}
-      {(market.early.bondRefund??0n)>0n&&<Button disabled={!canAct} onClick={()=>void transact(c=>c.claimEarlyBond(market.address))}>{t('领取退还保证金','Claim refunded bond')}</Button>}
+      {market.early.requestId>0n?<>{row(t('申请结果','Requested outcome'),market.early.requestedOutcome===1?'YES':'NO')}{row(t('确认期结束','Confirmation ends'),date(market.early.processAfter))}<Button disabled={!canAct||now<Number(market.early.processAfter)} onClick={()=>void transact(c=>c.processEarlyTermination(market.address))}>{t('执行结算检查','Check early settlement')}</Button></>:!hasCorePrincipal?<p>{t('Core 尚无质押本金，不能提交申请。','Core has no staked principal. Requests are unavailable.')}</p>:coreOpen&&now+3600<Number(market.coreCutoff)?<><label className="block">{t('申请结果','Requested outcome')}<select className={field} value={proposalSide} disabled={busy} onChange={e=>setProposalSide(Number(e.target.value) as 0|1)}><option value={0}>YES</option><option value={1}>NO</option></select></label><label className="block">{t('提前结算原因','Reason')}<input className={field} value={earlyReason} disabled={busy} onChange={e=>setEarlyReason(e.target.value)}/></label><p className="text-text-muted">{t('可申请 YES 或 NO。确认期1小时；到期未匹配（含平局或INVALID）将罚没保证金，尚未截止的操作恢复。','Request YES or NO. After 1 hour a mismatch, including a tie or INVALID, forfeits the bond; operations resume only if their original deadlines have not passed.')}</p>{usingStable?<div className="space-y-2">{proposalQuote? <><p>{t('预计保证金支付','Estimated bond payment')}: {units(proposalQuote.cash,payDecimals)} {paySymbol}</p><p>{t('最大支付（1%滑点）','Maximum payment (1% slippage)')}: {units(proposalQuote.request.inputAmount,payDecimals)} {paySymbol}</p><p className="text-text-muted">{t('仅锁定固定股票保证金；兑换多余股票退回钱包。','Only the fixed stock bond is locked; surplus stock is returned to your wallet.')}</p></>:<p>{proposalQuoteState.error?errorText(proposalQuoteState.error,zh):t('填写原因后读取保证金兑换报价…','Enter a reason to quote the bond swap…')}</p>}<Button disabled={!canAct||!proposalQuote||proposalQuote.key!==proposalKey||!earlyReason.trim()||(paymentRoute?.stableBalance??0n)<proposalQuote.request.inputAmount} onClick={submitEarlyProposal}>{proposalQuote&&(paymentRoute?.stableAllowance??0n)<proposalQuote.request.inputAmount?t('授权 USDG 申请保证金','Approve USDG proposal bond'):t('用 USDG 申请提前结算','Request early settlement with USDG')}</Button></div>:(market.position?.vaultAllowance??0n)<market.early.bond?<Button disabled={!canAct} onClick={()=>void transact(c=>c.approveStock(market.address,'vault',market.early!.bond))}>{t('授权申请保证金','Approve proposal bond')}</Button>:<Button disabled={!canAct||!earlyReason.trim()||(market.position?.balance??0n)<market.early.bond} onClick={submitEarlyProposal}>{t('申请提前结算','Request early settlement')}</Button>}</>:<p>{t('当前阶段不能发起申请。','Requests are unavailable in this stage.')}</p>}
+      {(market.early.bondRefund??0n)>0n&&<Button disabled={!canAct} onClick={claimEarlyBondSelected}>{usingStable?t('领取保证金并兑换 USDG','Claim bond as USDG'):t('领取退还保证金','Claim refunded bond')}</Button>}
     </div></details>
   </div>:null;
 

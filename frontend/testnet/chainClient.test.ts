@@ -1,10 +1,13 @@
+import {ZeroHash} from 'ethers';
 import { describe, expect, it, vi } from 'vitest';
-import { Interface, type Provider, type Signer } from 'ethers';
+import { Interface, id, type Provider, type Signer } from 'ethers';
 import { createChainClient, nonzeroAddress, RouterAction } from './chainClient';
 import factoryAbi from '../../contracts/topic-market/abi/TopicMarketStockFactory.json';
 import marketAbi from '../../contracts/topic-market/abi/TopicMarket.json';
 import routerAbi from '../../contracts/topic-market/abi/TopicMarketAssetRouter.json';
 import vaultAbi from './abi/OCPCore.json';
+import {quoteExchange} from './exchangeQuote';
+vi.mock('./exchangeQuote',()=>({quoteExchange:vi.fn()}));
 
 const factory='0x0000000000000000000000000000000000001234';
 const market='0x0000000000000000000000000000000000005678';
@@ -15,7 +18,7 @@ function transactionFixture(){
   const abi=new Interface([...factoryAbi,...marketAbi,...routerAbi].filter(item=>item.type==='function').concat(['function interfaceVersion() view returns(uint256)'] as never));
   const p={...provider(46630n),getBlock:vi.fn(async()=>({timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
     const fragment=abi.getFunction(tx.data.slice(0,10))!;
-    const results:Record<string,unknown[]>={interfaceVersion:[2n],isMarket:[true],marketCollateral:[market],
+    const results:Record<string,unknown[]>={interfaceVersion:[3n],isMarket:[true],marketCollateral:[market],
       marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
       stocks:[market,market,1n,18,true],trustedForwarder:[market],factory:[factory],stablecoin:[true]};
     return abi.encodeFunctionResult(fragment,results[fragment.name]);
@@ -39,7 +42,7 @@ describe('testnet transaction boundary',()=>{
       const fragment=abi.getFunction(tx.data.slice(0,10))!;calls.push(fragment.name);
       if(fragment.name==='ethPrice6')throw new Error('ETH feed unavailable');
       const results:Record<string,unknown[]>={owner:[factory],stockCount:[1n],marketCount:[0n],
-        fixedTestnetGraduation:[true],interfaceVersion:[2n],stockTokens:[stock],stocks:[market,market,1n,18,true],
+        fixedTestnetGraduation:[true],interfaceVersion:[3n],stockTokens:[stock],stocks:[market,market,1n,18,true],
         symbol:['TSLA'],decimals:[18],collateralForUsd:[2n*10n**18n]};
       return abi.encodeFunctionResult(fragment,results[fragment.name]);
     })};
@@ -58,7 +61,7 @@ describe('testnet transaction boundary',()=>{
     const p={...provider(46630n),call:vi.fn(async(tx:{data:string;to:string})=>{
       seen.push(tx.to);if(BigInt(tx.to)===0n)throw new Error('ZERO_TOKEN_CALL');
       const f=abi.getFunction(tx.data.slice(0,10))!;
-      const results:Record<string,unknown[]>={interfaceVersion:[2n],isMarket:[true],marketCollateral:[market],
+      const results:Record<string,unknown[]>={interfaceVersion:[3n],isMarket:[true],marketCollateral:[market],
         marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
         phase:[0n],outcome:[0n],R:[1n],S:[1n],rTarget:[42n],k:[1n],cash:[0n],lpFees:[0n],
         lpBudgetRemaining:[0n],resolved:[false],settlementReady:[false],totalStakeYes:[0n],totalStakeNo:[0n],totalStakeInvalid:[0n],
@@ -71,13 +74,47 @@ describe('testnet transaction boundary',()=>{
     expect(state.position?.lp).toBe(7n);
     expect(seen.every(to=>BigInt(to)!==0n)).toBe(true);
   });
-  it.each([1n,0n])('rejects unsupported factory version %s before any wallet signature',async(version)=>{
+  it.each([2n,0n])('rejects unsupported factory version %s before any wallet signature',async(version)=>{
     const abi=new Interface(['function interfaceVersion() view returns(uint256)']);
     const p={...provider(46630n),call:vi.fn(async()=>abi.encodeFunctionResult('interfaceVersion',[version]))};
     const sendTransaction=vi.fn();const client=createChainClient(p as unknown as Provider,factory);
-    await expect(client.readDirectory()).rejects.toThrow('interfaceVersion 2');
-    await expect(client.withSigner({provider:p,sendTransaction} as unknown as Signer).claimMarket(market)).rejects.toThrow('interfaceVersion 2');
+    await expect(client.readDirectory()).rejects.toThrow('interfaceVersion 3');
+    await expect(client.withSigner({provider:p,sendTransaction} as unknown as Signer).claimMarket(market)).rejects.toThrow('interfaceVersion 3');
     expect(sendTransaction).not.toHaveBeenCalled();
+  });
+  it('quotes USDG for the fixed stock bond with exact-output conversion and a rounded 1% input ceiling',async()=>{
+    const stable='0x0000000000000000000000000000000000009999',bond=1250000000000000000n;
+    const abi=new Interface([...factoryAbi,...marketAbi,...vaultAbi,...routerAbi].filter(item=>item.type==='function').concat([
+      'function interfaceVersion() view returns(uint256)','function stock() view returns(address)','function stable() view returns(address)',
+      'function symbol() view returns(string)','function decimals() view returns(uint8)',
+    ] as never));
+    const p={...provider(46630n),call:vi.fn(async(tx:{data:string})=>{
+      const f=abi.getFunction(tx.data.slice(0,10))!;
+      const results:Record<string,unknown[]>={interfaceVersion:[3n],isMarket:[true],marketCollateral:[market],
+        marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
+        phase:[1n],outcome:[0n],R:[0n],S:[1n],rTarget:[42n],k:[1n],cash:[0n],lpFees:[0n],lpBudgetRemaining:[0n],
+        resolved:[false],settlementReady:[false],totalStakeYes:[100n],totalStakeNo:[0n],totalStakeInvalid:[0n],
+        earlyTerminationBondRequired:[bond],pendingEarlyTermination:[[0n,market,0n,0n,0n,0n,ZeroHash]],earlyTerminationProcessingDue:[false],effectiveResolutionTime:[23600n],
+        trustedForwarder:[market],factory:[factory],exchange:[market],stock:[market],stable:[stable],stablecoin:[true],symbol:['USDG'],decimals:[6n]};
+      if(!results[f.name])throw new Error('optional metric unavailable');return abi.encodeFunctionResult(f,results[f.name]);
+    })};
+    vi.mocked(quoteExchange).mockResolvedValueOnce({amountIn:500000001n,amountOut:bond} as never);
+    const client=createChainClient(p as unknown as Provider,factory),q=await client.quoteEarlyProposalStable(market,1,'  Conditions met  ',2000n);
+    expect(quoteExchange).toHaveBeenLastCalledWith(p,market,stable,market,bond,'output');
+    expect(q.request).toMatchObject({action:11,paymentAsset:stable,inputAmount:505000002n,minCollateral:bond,businessLimit:bond,side:1,reasonHash:id('Conditions met'),deadline:2000n});
+    expect(q.cash).toBe(500000001n);expect(q.quotedAt).toBeGreaterThan(0);
+    await expect(client.quoteEarlyProposalStable(market,0,' ',2000n)).rejects.toThrow('原因');
+  });
+  it('encodes routed early actions with reason hash, testnet chain and protected refund output',async()=>{
+    const {writer,sendTransaction}=transactionFixture();
+    const request={market,action:RouterAction.ProposeEarly,paymentAsset:market,inputAmount:100n,quantity:0n,minCollateral:99n,businessLimit:99n,minOutput:0n,deadline:2000n,side:1 as const,graduationIntent:0 as const,reasonHash:id('reason')};
+    await writer.executeRouter(request);
+    await writer.executeRouter({...request,action:RouterAction.ClaimEarlyBond,inputAmount:0n,minCollateral:0n,businessLimit:0n,minOutput:98n,reasonHash:ZeroHash});
+    const abi=new Interface(routerAbi);
+    const first=sendTransaction.mock.calls[0][0] as {data:string;chainId:bigint},second=sendTransaction.mock.calls[1][0] as {data:string;chainId:bigint};
+    expect(first.chainId).toBe(46630n);expect(second.chainId).toBe(46630n);
+    const a=abi.decodeFunctionData('execute',first.data)[0];expect(a.action).toBe(11n);expect(a.reasonHash).toBe(id('reason'));expect(a.minCollateral).toBe(99n);
+    const b=abi.decodeFunctionData('execute',second.data)[0];expect(b.action).toBe(12n);expect(b.minOutput).toBe(98n);expect(b.reasonHash).toBe(ZeroHash);
   });
   it('rejects a missing factory before creating a client',()=>{
     expect(()=>nonzeroAddress('0x0000000000000000000000000000000000000000')).toThrow('未配置');
@@ -115,7 +152,7 @@ describe('testnet transaction boundary',()=>{
     await writer.createMarket({stock:market,topic:'t',yesRule:'y',noRule:'n',invalidRule:'i',coreEnd:20000n});
     await writer.approveStock(market,'market',1n);
     await writer.approveRouterAsset(market,market,1n);
-    await writer.executeRouter({market,action:RouterAction.GenesisBuy,paymentAsset:market,inputAmount:1n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0});
+    await writer.executeRouter({market,action:RouterAction.GenesisBuy,paymentAsset:market,inputAmount:1n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0,reasonHash:ZeroHash});
     await writer.claimMarketFees(market);
     await writer.claimProtocolFees(market);
     await writer.closeExpired(market);

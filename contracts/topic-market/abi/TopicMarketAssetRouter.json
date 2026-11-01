@@ -96,6 +96,11 @@
             "name": "graduationIntent",
             "type": "uint8",
             "internalType": "uint8"
+          },
+          {
+            "name": "reasonHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       }

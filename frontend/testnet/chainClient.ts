@@ -1,5 +1,5 @@
 import {loadHistoryCheckpoint,saveHistoryCheckpoint} from './historyCache';
-import { Contract, ZeroAddress, getAddress, id, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
+import { Contract, ZeroAddress, ZeroHash, getAddress, id, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
 import factoryAbi from './abi/TopicMarketStockFactory.json';
 import marketAbi from './abi/TopicMarket.json';
 import vaultAbi from './abi/OCPCore.json';
@@ -26,8 +26,8 @@ export interface MarketState extends MarketSummary { feeClaims?:{creator:string;
 export interface DirectoryState { factory:string; owner:string; fixedTestTargets?:boolean; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
 export interface PaymentRoute {router:string;exchange:string;stock:string;stable:string;stableSymbol:string;stableDecimals:number;stableBalance?:bigint;stableAllowance?:bigint}
 export interface CreateMarketInput { stock:string; topic:string; yesRule:string; noRule:string; invalidRule:string; coreEnd:bigint }
-export enum RouterAction { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket, ClaimOutcome, ClaimLP, ClaimFailed, ClaimCore, RedeemPairs }
-export interface RouterRequest { market:string; action:RouterAction; paymentAsset:string; inputAmount:bigint; quantity:bigint; minCollateral:bigint; businessLimit:bigint; minOutput:bigint; deadline:bigint; side:0|1|2; graduationIntent:0|1|2 }
+export enum RouterAction { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket, ClaimOutcome, ClaimLP, ClaimFailed, ClaimCore, RedeemPairs, ProposeEarly, ClaimEarlyBond }
+export interface RouterRequest { market:string; action:RouterAction; paymentAsset:string; inputAmount:bigint; quantity:bigint; minCollateral:bigint; businessLimit:bigint; minOutput:bigint; deadline:bigint; side:0|1|2; graduationIntent:0|1|2; reasonHash:string }
 
 export function nonzeroAddress(value:string):string {
   const address=getAddress(value);
@@ -46,7 +46,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     await assertTestnet(provider);
     if(await provider.getCode(address)==='0x') throw new Error('测试网工厂地址没有合约代码');
     const version=await new Contract(address,['function interfaceVersion() view returns(uint256)'],provider).interfaceVersion().catch(()=>0n);
-    if(version!==2n)throw new Error('测试网合约版本不支持：需要 interfaceVersion 2，请更新部署配置');
+    if(version!==3n)throw new Error('测试网合约版本不支持：需要 interfaceVersion 3，请更新部署配置');
   }
   async function summary(marketAddress:string,includePresentation=false):Promise<MarketSummary> {
     const market=nonzeroAddress(marketAddress);
@@ -159,6 +159,15 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const route=await readPaymentRoute(marketAddress);
     return quoteV3Exchange(provider,route.exchange,input,output,amount,exact);
   }
+  async function quoteEarlyProposalStable(marketAddress:string,side:0|1,reason:string,deadline:bigint){
+    if(!reason.trim())throw new Error('请填写提前结算原因');
+    const [state,route]=await Promise.all([readMarket(marketAddress),readPaymentRoute(marketAddress)]);
+    if(!state.early || state.early.requestId>0n || state.vaultResolved || ![1,2].includes(state.phase))throw new Error('提前结算申请当前不可用');
+    const bond=state.early.bond;
+    const swap=await quoteV3Exchange(provider,route.exchange,route.stable,route.stock,bond,'output');
+    return {quotedAt:Date.now(),cash:swap.amountIn,request:{market:state.address,action:RouterAction.ProposeEarly,paymentAsset:route.stable,
+      inputAmount:(swap.amountIn*101n+99n)/100n,quantity:0n,minCollateral:bond,businessLimit:bond,minOutput:0n,deadline,side,graduationIntent:0,reasonHash:id(reason.trim())} as RouterRequest};
+  }
   async function readPriceHistory(marketAddress:string):Promise<ChainPriceHistory> {
     await ready();
     const base=await summary(marketAddress);
@@ -258,7 +267,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       },
     };
   }
-  return {readDirectory,readMarket,readPriceHistory,readCachedPriceHistory,readPaymentRoute,quotePaymentSwap,withSigner,
+  return {readDirectory,readMarket,readPriceHistory,readCachedPriceHistory,readPaymentRoute,quotePaymentSwap,quoteEarlyProposalStable,withSigner,
     quoteGenesisBuy:(market:string,paid:bigint):Promise<bigint>=>quote(market,'quoteGenesisBuy',[paid]),
     async quoteGenesisSell(market:string,quantity:bigint,account?:string):Promise<{gross:bigint;seller:bigint}>{const r=await quote(market,'quoteGenesisSell',[quantity]);return {gross:r[0],seller:r[1]};},
     quoteFormalBuy:(market:string,isYes:boolean,quantity:bigint):Promise<bigint>=>quote(market,'quoteFormalBuy',[isYes,quantity]),

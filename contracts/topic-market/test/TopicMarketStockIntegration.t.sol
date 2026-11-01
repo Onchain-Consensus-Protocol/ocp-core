@@ -87,8 +87,27 @@ contract TopicMarketStockIntegrationTest is Test {
         assertEq(OCPCore(nextVault).earlyTerminationBondRequired(),1e18);
         assertEq(vault.earlyTerminationBondRequired(),2e18); // Existing market never reprices.
     }
+    function testEarlyStableProposalRefundAndAtomicFailure() public {
+        graduate();vm.prank(alice);vault.stake(IOCPCore.Side.YES,10e18);
+        TopicMarketAssetRouter.Request memory r=req(TopicMarketAssetRouter.Action.ProposeEarly);
+        r.inputAmount=499e6;r.minCollateral=2e18;r.reasonHash=keccak256("finished");
+        uint256 beforeUsd=u.balanceOf(alice);vm.prank(alice);vm.expectRevert("SLIPPAGE");router.execute(r);
+        assertEq(u.balanceOf(alice),beforeUsd);assertEq(vault.pendingEarlyTermination().id,0);
+        r.minCollateral=0;vm.prank(alice);vm.expectRevert();router.execute(r);
+        assertEq(u.balanceOf(alice),beforeUsd);assertEq(vault.pendingEarlyTermination().id,0);r.minCollateral=2e18;
+        r.inputAmount=505e6;uint256 beforeStock=c.balanceOf(alice);vm.prank(alice);router.execute(r);
+        assertEq(vault.pendingEarlyTermination().proposer,alice);assertEq(vault.pendingEarlyTermination().bond,2e18);
+        assertEq(c.balanceOf(alice),beforeStock+2e16);assertEq(c.allowance(address(router),address(vault)),0);
+        vm.warp(vault.pendingEarlyTermination().processAfter);vm.prank(bob);adapter.finalizeMarket();
+        assertEq(vault.claimableEarlyBond(alice),2e18);assertEq(vault.claimableEarlyBond(address(router)),0);
+        r=req(TopicMarketAssetRouter.Action.ClaimEarlyBond);r.minOutput=500e6;ex.setFail(true);
+        vm.prank(alice);vm.expectRevert("SWAP_UNAVAILABLE");router.execute(r);assertEq(vault.claimableEarlyBond(alice),2e18);
+        ex.setFail(false);beforeUsd=u.balanceOf(alice);vm.prank(alice);router.execute(r);
+        assertEq(u.balanceOf(alice),beforeUsd+500e6);assertEq(vault.claimableEarlyBond(alice),0);
+        assertEq(c.balanceOf(address(router)),0);assertEq(u.balanceOf(address(router)),0);
+    }
     function testRealFactoryRegistrationForwarderAndUnits() public view {
-        assertEq(factory.interfaceVersion(),2);assertTrue(factory.isMarket(address(m)));assertEq(m.rTarget(),336e17);assertTrue(m.isTrustedForwarder(address(router)));assertTrue(vault.isTrustedForwarder(address(router)));
+        assertEq(factory.interfaceVersion(),3);assertTrue(factory.isMarket(address(m)));assertEq(m.rTarget(),336e17);assertTrue(m.isTrustedForwarder(address(router)));assertTrue(vault.isTrustedForwarder(address(router)));
         assertEq(address(m.token()),address(c));assertEq(address(vault.stakeToken()),address(c));
         assertLe(address(m).code.length,24576);
     }
@@ -160,7 +179,7 @@ contract TopicMarketStockIntegrationTest is Test {
     function testStockDisableReenablePreservesMarketsAndConfig() public {
         (ITopicMarketPriceSnapshot price,address route,uint256 coefficient,,)=factory.stocks(address(c));
         factory.setStockEnabled(address(c),false);
-        assertEq(factory.interfaceVersion(),2);assertTrue(factory.isMarket(address(m)));
+        assertEq(factory.interfaceVersion(),3);assertTrue(factory.isMarket(address(m)));
         assertEq(factory.marketCollateral(address(m)),address(c));
         vm.expectRevert(bytes("STOCK_DISABLED"));
         factory.createMarket(address(c),"disabled","yes","no","invalid",uint64(block.timestamp+6 hours));

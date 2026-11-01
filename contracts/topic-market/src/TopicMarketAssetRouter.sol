@@ -26,7 +26,7 @@ interface ITopicMarketRouterForwarded { function isTrustedForwarder(address forw
 contract TopicMarketAssetRouter {
     using SafeERC20 for IERC20;
     enum Action { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket,
-        ClaimOutcome, ClaimLP, ClaimFailed, ClaimCore, RedeemPairs }
+        ClaimOutcome, ClaimLP, ClaimFailed, ClaimCore, RedeemPairs, ProposeEarly, ClaimEarlyBond }
     /// @dev quantity is exact Formal outcome shares, Genesis sell shares, or pair-redemption money.
     /// businessLimit is Genesis buy minShares / Formal buy maxCollateral / sell minCollateral.
     /// minCollateral protects entry conversion; minOutput protects exit conversion.
@@ -44,6 +44,7 @@ contract TopicMarketAssetRouter {
         uint64 deadline;
         uint8 side;
         uint8 graduationIntent;
+        bytes32 reasonHash;
     }
     ITopicMarketRouterRegistry public immutable factory;
     ITopicMarketAssetExchange public immutable exchange;
@@ -72,9 +73,9 @@ contract TopicMarketAssetRouter {
         require(r.paymentAsset == collateral || stablecoin[r.paymentAsset], "ASSET");
         uint256 collateralBefore = IERC20(collateral).balanceOf(address(this));
         uint256 paymentBefore = IERC20(r.paymentAsset).balanceOf(address(this));
-        bool funding = uint8(r.action) <= uint8(Action.CoreStake);
+        bool funding = uint8(r.action) <= uint8(Action.CoreStake) || r.action == Action.ProposeEarly;
         address target = r.market;
-        if (r.action == Action.CoreStake || r.action == Action.ClaimCore) {
+        if (r.action == Action.CoreStake || r.action == Action.ClaimCore || r.action == Action.ProposeEarly || r.action == Action.ClaimEarlyBond) {
             target = ITopicMarketRouterCore(market.core()).vault();
             require(ITopicMarketRouterForwarded(target).isTrustedForwarder(address(this)), "CORE_FORWARDER");
         }
@@ -118,6 +119,12 @@ contract TopicMarketAssetRouter {
             require(r.side < 3, "SIDE");
             return abi.encodeWithSignature("stake(uint8,uint256)", r.side, funded);
         }
+        if (r.action == Action.ProposeEarly) {
+            require(r.side < 2, "SIDE");
+            require(r.reasonHash != bytes32(0), "REASON");
+            return abi.encodeWithSignature("proposeEarlyTermination(uint8,bytes32)", r.side + 1, r.reasonHash);
+        }
+        if (r.action == Action.ClaimEarlyBond) return abi.encodeWithSignature("claimEarlyTerminationBond()");
         if (r.action == Action.GenesisSell) return abi.encodeWithSignature("genesisSell(uint256,uint256,uint64,uint8)", r.quantity, r.businessLimit, r.deadline, r.graduationIntent);
         if (r.action == Action.FormalSell) {
             require(r.side < 2, "SIDE");
