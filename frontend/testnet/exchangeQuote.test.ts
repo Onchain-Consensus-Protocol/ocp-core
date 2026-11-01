@@ -20,12 +20,12 @@ const ABI=new Interface([
   'function token0() view returns(address)','function token1() view returns(address)',
   'function tickSpacing() view returns(int24)','function liquidity() view returns(uint128)',
   'function slot0() view returns(uint160,int24,uint16,uint16,uint16,uint8,bool)',
-  'function decimals() view returns(uint8)','function symbol() view returns(string)',
+  'function balanceOf(address) view returns(uint256)','function decimals() view returns(uint8)','function symbol() view returns(string)',
   'function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint24 fee,uint160 sqrtPriceLimitX96)) returns(uint256,uint160,uint32,uint256)',
   'function quoteExactOutputSingle((address tokenIn,address tokenOut,uint256 amount,uint24 fee,uint160 sqrtPriceLimitX96)) returns(uint256,uint160,uint32,uint256)',
 ]);
 interface Options {
-  chain?:bigint;wrongQuoter?:boolean;wrongPoolFactory?:boolean;reverseMismatch?:boolean;
+  outputBalance?:bigint;chain?:bigint;wrongQuoter?:boolean;wrongPoolFactory?:boolean;reverseMismatch?:boolean;
   missingPool?:boolean;wrongTokens?:boolean;wrongSpacing?:boolean;locked?:boolean;
   zeroQuote?:boolean;priceLimit?:boolean;reorgAfterQuote?:boolean;router02?:boolean;
 }
@@ -59,7 +59,7 @@ function fixture(options:Options={}){
         else if(name==='liquidity')values=[1000000000000000000n];
         else values=[Q96,0,0,1,1,0,!options.locked];
       }else if(to===getAddress(STOCK)||to===getAddress(STABLE)){
-        values=name==='decimals'?[to===getAddress(STOCK)?18:6]:[to===getAddress(STOCK)?'TSLA':'USDG'];
+        values=name==='balanceOf'?[options.outputBalance??((1n<<255n)-1n)]:name==='decimals'?[to===getAddress(STOCK)?18:6]:[to===getAddress(STOCK)?'TSLA':'USDG'];
       }else if(to===getAddress(TESTNET_V3_QUOTER)){
         if(name==='factory')values=[options.wrongQuoter?OTHER:FACTORY];
         else {
@@ -144,3 +144,5 @@ describe('read-only QuoterV2 exact input/output',()=>{
     await expect(quoteExchange(fixture({reorgAfterQuote:true}).provider,EXCHANGE,STABLE,STOCK,100n,'input')).rejects.toThrow('BLOCK_REORG');
   });
 });
+
+it('rejects exact output exceeding the real token balance before asking the quoter',async()=>{const {provider,calls}=fixture({outputBalance:99n});await expect(quoteExchange(provider,EXCHANGE,STABLE,STOCK,100n,'output')).rejects.toThrow('EXCHANGE_OUTPUT_BALANCE');expect(calls.some(c=>c.name==='quoteExactOutputSingle')).toBe(false);});

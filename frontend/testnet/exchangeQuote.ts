@@ -22,7 +22,7 @@ const POOL_ABI=[
   'function tickSpacing() view returns(int24)','function liquidity() view returns(uint128)',
   'function slot0() view returns(uint160 sqrtPriceX96,int24 tick,uint16 observationIndex,uint16 observationCardinality,uint16 observationCardinalityNext,uint8 feeProtocol,bool unlocked)',
 ];
-const TOKEN_ABI=['function decimals() view returns(uint8)','function symbol() view returns(string)'];
+const TOKEN_ABI=['function decimals() view returns(uint8)','function symbol() view returns(string)','function balanceOf(address) view returns(uint256)'];
 const QUOTER_ABI=[
   'function factory() view returns(address)',
   'function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint24 fee,uint160 sqrtPriceLimitX96) params) returns(uint256 amountOut,uint160 sqrtPriceX96After,uint32 initializedTicksCrossed,uint256 gasEstimate)',
@@ -117,10 +117,16 @@ export async function quoteExchange(
   const tokenIn=address(input),tokenOut=address(output);
   if(!((tokenIn===assets.stock&&tokenOut===assets.stable)
     ||(tokenIn===assets.stable&&tokenOut===assets.stock)))throw new Error('EXCHANGE_UNSUPPORTED_ASSET');
+  if(exact==='output'){
+    const available=await new Contract(tokenOut,TOKEN_ABI,provider).balanceOf(assets.pool,{blockTag:assets.blockNumber});
+    if(amount>BigInt(available))throw new Error('EXCHANGE_OUTPUT_BALANCE');
+  }
   const quoter=new Contract(assets.quoter,QUOTER_ABI,provider);
-  const result=exact==='input'
+  let result;
+  try{result=exact==='input'
     ?await quoter.quoteExactInputSingle.staticCall([tokenIn,tokenOut,amount,assets.fee,0n],{blockTag:assets.blockNumber})
     :await quoter.quoteExactOutputSingle.staticCall([tokenIn,tokenOut,amount,assets.fee,0n],{blockTag:assets.blockNumber});
+  }catch(error){if((error as {code?:string})?.code==='CALL_EXCEPTION')throw new Error('EXCHANGE_QUOTE_REVERTED');throw error;}
   const quoted=BigInt(result[0]),sqrtPriceAfter=BigInt(result[1]);
   if(quoted<=0n)throw new Error('EXCHANGE_NO_LIQUIDITY');
   // A quote reaching the implicit pool price limit may consume only part of exact-input funds.

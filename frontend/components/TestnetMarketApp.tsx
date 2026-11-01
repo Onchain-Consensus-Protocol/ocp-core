@@ -28,6 +28,8 @@ type Quote = {key: string; quantity: bigint; cash: bigint; limit: bigint; shares
 function errorText(error: unknown, zh = true): string {
   const value = error as {shortMessage?: string; reason?: string; message?: string};
   const message=value?.reason || value?.shortMessage || value?.message || String(error);
+  if(/EXCHANGE_OUTPUT_BALANCE/.test(message))return zh?'兑换池股票或稳定币库存不足，请减少数量，或改用股票交易。':'The exchange pool has insufficient output tokens. Reduce the amount or trade with stock.';
+  if(/EXCHANGE_QUOTE_REVERTED|EXCHANGE_NO_LIQUIDITY|EXCHANGE_PRICE_LIMIT/.test(message))return zh?'兑换池无法完成这笔兑换，请减少数量，或改用股票交易。':'The exchange pool cannot fill this swap. Reduce the amount or trade with stock.';
   if(/\bINVENTORY\b/.test(message))return zh?'可买份额不足，请减少数量。':'Not enough shares available. Reduce the buy amount.';
   if(/\bCAPACITY\b/.test(message))return zh?'卖出数量超出可用范围，请减少数量。':'Sell amount exceeds the available range. Reduce the amount.';
   return message;
