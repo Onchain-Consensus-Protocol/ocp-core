@@ -1,3 +1,5 @@
+> 2026-11-01: Single-R interface v3 deployed on Robinhood testnet 46630. Factory `0x3A42205E931753B5e3F80dbf9536b048e7427113`, market `0xeeE8F99cBdBccBc506FA180424638c95c038bA54`. Graduation target 0.0042 TSLA; stock bond 1.25 TSLA fixed at creation. See deployments/46630.json for verification status. User performs frontend transaction testing.
+
 > 2026-10-30: Fee release deployed on Robinhood testnet 46630. New factory `0xCef7fCb7e4B3d5A273A9e5c6D84C2886cE93C3Aa`; fresh Genesis market `0xb11B7A34E540B6a66701C281408F510fF556078C`. See deployments/46630.json for verification status and the archived legacy deployment.
 
 > 2026-10-29: Latest OCPCore/module release is deployed on Robinhood testnet 46630 with fixed TSLA test targets and a separate testnet website. Live 0.1 USDG routing, graduation and Core exit passed. Some source verification is confirmed and some remains pending; see deployments/46630.json. Historical local-only notes below are superseded for this testnet deployment. No mainnet deployment.

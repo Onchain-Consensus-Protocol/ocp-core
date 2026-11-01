@@ -1,4 +1,4 @@
-export const CURRENT_TESTNET_FACTORY='0xCef7fCb7e4B3d5A273A9e5c6D84C2886cE93C3Aa';
+export const CURRENT_TESTNET_FACTORY='0x3A42205E931753B5e3F80dbf9536b048e7427113';
 export function resolveTestnetFactory(configured:string):string {
  return configured||CURRENT_TESTNET_FACTORY;
 }
