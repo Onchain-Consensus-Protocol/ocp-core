@@ -49,7 +49,7 @@ export function SimulationCoreActions({lifecycle:l,lang,symbol,busy,connected,av
    {!l.canPropose&&<p className="text-text-muted">{t('Core须有活跃本金、尚未截止，并保留完整1小时确认期。','Core must have active principal and more than one hour before its original cutoff.')}</p>}
    {available<l.bond&&connected&&<p className="text-text-muted">{t('可用余额不足以支付保证金。','Insufficient available balance for the bond.')}</p>}
    <Button variant="outline" disabled={busy||connected&&(!l.canPropose||!reason.trim()||available<l.bond)} onClick={()=>connected?l.propose(side,reason.trim()):onConnect()}>{connected?t('提交提前结算申请','Submit early settlement request'):t('登录后申请','Sign in to propose')}</Button></>}
-   <p className="text-text-muted">{t('成功时保证金全额记为申请者可单独领取的退款；失败时加入最终赔付资金。处理者不能指定结果，也无需 Keeper。','On success the full bond becomes a separate refund claim for the proposer; on failure it funds final payouts. The processing player cannot choose the result. No Keeper is required.')}</p>
+   <p className="text-text-muted">{t('股票数量按创建时500U等值固定；成功退还相同数量股票，失败加入股票赔付资金。USDG实际兑换金额随报价变化，模拟使用固定汇率。处理者不能指定结果，也无需 Keeper。','The stock quantity is fixed at creation using 500 USD. Success refunds the same stock quantity; failure funds stock payouts. USDG values follow swap quotes; simulations use fixed rates. The processing player cannot choose the result. No Keeper is required.')}</p>
    {l.bondRefund>0&&<><div>{row(t('可退保证金','Refundable bond'),l.bondRefund)}</div><Button disabled={busy||!connected} onClick={l.claimBond}>{t('领取退还保证金','Claim bond refund')}</Button></>}
   </div></details>
  </div>;
