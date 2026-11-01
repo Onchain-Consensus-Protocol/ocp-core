@@ -20,7 +20,7 @@ const CHAIN_ID = 46630;
 const field = 'block w-full border border-border rounded-lg p-3 mt-2 bg-white text-text';
 const box = 'rounded-xl border border-border p-4';
 const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
-const units = (value: bigint | undefined, decimals = 18) => value === undefined ? '—' : formatUnits(value, decimals);
+const units = (value: bigint | undefined, decimals = 18) => value === undefined ? '—' : (()=>{const [whole,fraction='']=formatUnits(value,decimals).split('.');return whole+'.'+fraction.padEnd(18,'0').slice(0,18);})();
 type Directory = Awaited<ReturnType<ReturnType<typeof createChainClient>['readDirectory']>>;
 type Wallet = {provider: BrowserProvider; address: string; chainId: number};
 type Quote = {key: string; quantity: bigint; cash: bigint; limit: bigint; shares?:bigint;route?:RouterRequest};

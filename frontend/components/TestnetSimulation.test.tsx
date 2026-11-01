@@ -31,9 +31,9 @@ describe('chain data adapter for the shared Simulation view',()=>{
     expect(s.core.feeTotal).toBe(.12);expect(remote.prices.probability).toEqual([.6,.4]);
     expect(remote.outstanding).toEqual([3,1]);expect(remote.prices.genesis).toBe(18);
     expect(remote.chain?.contractAddresses).toEqual({market:fixture().market.address,core:fixture().market.vault});
-    expect(remote.chain?.poolBalances).toEqual({yes:'7.0',no:'9.0',stock:'—'});
+    expect(remote.chain?.poolBalances).toEqual({yes:'7.000000000000000000',no:'9.000000000000000000',stock:'—'});
     const props=fixture();props.market.poolStockBalance=1234567n;
-    expect(buildTestnetRemote(props).chain?.poolBalances?.stock).toBe('1.234567');
+    expect(buildTestnetRemote(props).chain?.poolBalances?.stock).toBe('1.234567000000000000');
   });
   it('counts pending materialization as LP after graduation, preserving raw holdings',()=>{
     const props=fixture();const remote=buildTestnetRemote(props);
@@ -87,3 +87,5 @@ describe('chain data adapter for the shared Simulation view',()=>{
     const props=fixture();props.market.phase=99;expect(()=>buildTestnetRemote(props)).toThrow('Unsupported');
   });
 });
+
+it('keeps exact raw precision for tiny outstanding shares',()=>{const props=fixture();props.market.presentation!.totalYes=props.market.presentation!.inventoryYes+1n;expect(buildTestnetRemote(props).chain?.outstandingShares?.yes).toBe('0.000000000000000001');});

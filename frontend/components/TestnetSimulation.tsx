@@ -23,6 +23,7 @@ const outcome=(value:number):Outcome|null=>value===1?'YES':value===2?'NO':value=
 const amount=(value:bigint|undefined,decimals:number)=>value===undefined?0:Number(formatUnits(value,decimals));
 
 /** Adapt reads for the shared view; never seed a demo account, infer USD value, or execute a model trade. */
+const fixed18=(value:string)=>{if(value==='—')return value;const [whole,fraction='']=value.split('.');return whole+'.'+fraction.padEnd(18,'0').slice(0,18);};
 export function buildTestnetRemote(
   props:TestnetSimulationProps,input:RemoteSimulation['input']=emptyInput,onInput:RemoteSimulation['onInput']=noop,
 ):RemoteSimulation {
@@ -79,7 +80,7 @@ export function buildTestnetRemote(
     chart:props.history??[],onInput,
     // Parent-supplied controls are the sole write surface; the display adapter has no transaction callbacks.
     quote:()=>null,trade:noop,stake:noop,canStake:()=>false,claimMarket:noop,claimCore:noop,redeemPairs:noop,
-    chain:{contractAddresses:{market:m.address,core:m.vault},poolBalances:{yes:p?formatUnits(p.inventoryYes,18):'—',no:p?formatUnits(p.inventoryNo,18):'—',stock:props.market.poolStockBalance===undefined?'—':formatUnits(props.market.poolStockBalance,stock.decimals)},controls:props.controls,coreActions:props.coreActions,status:props.status,stockSymbol:stock.symbol,
+    chain:{outstandingShares:{yes:p?fixed18(formatUnits(p.totalYes-p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.totalNo-p.inventoryNo,18)):'—'},contractAddresses:{market:m.address,core:m.vault},poolBalances:{yes:p?fixed18(formatUnits(p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.inventoryNo,18)):'—',stock:props.market.poolStockBalance===undefined?'—':fixed18(formatUnits(props.market.poolStockBalance,stock.decimals))},controls:props.controls,coreActions:props.coreActions,status:props.status,stockSymbol:stock.symbol,
       readOnlyMetrics:true,volumeAvailable:p?.formalVolume!==undefined,onTabChange:props.onTabChange},
   };
 }
