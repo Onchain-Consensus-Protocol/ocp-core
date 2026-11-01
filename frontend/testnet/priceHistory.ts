@@ -21,9 +21,9 @@ export interface ChainPriceHistory {
   genesis:ChainGenesisPoint[];events:ChainActivity[];creationBlock:number;latestBlock:number;
   complete:true;formalVolume:bigint;checkpoint?:HistoryCheckpoint;cacheStatus?:'local'|'updated';
 }
-export interface HistoryCheckpoint {version:1;factory:string;market:string;createdAt:string;k:string;creation:TimestampedMarketLog;logs:TimestampedMarketLog[];latestBlock:number;latestHash:string}
+export interface HistoryCheckpoint {version:2;factory:string;market:string;createdAt:string;k:string;creation:TimestampedMarketLog;logs:TimestampedMarketLog[];latestBlock:number;latestHash:string}
 export function replayCheckpoint(v:HistoryCheckpoint,factory:string,market:string):ChainPriceHistory {
- if(v.version!==1||getAddress(v.factory)!==getAddress(factory)||getAddress(v.market)!==getAddress(market)||!Number.isSafeInteger(v.latestBlock)||v.latestBlock<v.creation.log.blockNumber||v.logs.length>100000)throw Error('Invalid cache');
+ if(v.version!==2||getAddress(v.factory)!==getAddress(factory)||getAddress(v.market)!==getAddress(market)||!Number.isSafeInteger(v.latestBlock)||v.latestBlock<v.creation.log.blockNumber||v.logs.length>100000)throw Error('Invalid cache');
  for(const x of [v.creation,...v.logs]){const l=x.log;if(!Number.isSafeInteger(l.blockNumber)||l.blockNumber<v.creation.log.blockNumber||l.blockNumber>v.latestBlock||!Number.isSafeInteger(x.timestamp)||!/^0x[0-9a-fA-F]{64}$/.test(l.blockHash)||!/^0x[0-9a-fA-F]{64}$/.test(l.transactionHash)||!Number.isSafeInteger(l.index)||l.index<0)throw Error('Invalid cached log');}
  if(getAddress(v.creation.log.address)!==getAddress(factory)||v.logs.some(x=>getAddress(x.log.address)!==getAddress(market)))throw Error('Cache address mismatch');
  const e=factoryInterface.parseLog(v.creation.log);if(e?.name!=='MarketCreated'||getAddress(e.args.market)!==getAddress(market)||BigInt(v.creation.timestamp)!==BigInt(v.createdAt))throw Error('Invalid cache origin');
@@ -31,7 +31,7 @@ export function replayCheckpoint(v:HistoryCheckpoint,factory:string,market:strin
 }
 export interface TimestampedMarketLog {log:Log;timestamp:number}
 
-/** Replay only the current TopicMarket ABI. No current-state backfill, invented timestamps or legacy feeds. */
+/** Replay only the current TopicMarket ABI. No current-state backfill, invented timestamps or substituted feeds. */
 export function replayMarketPriceHistory(
   creation:TimestampedMarketLog, marketLogs:TimestampedMarketLog[], k:bigint, latestBlock:number,
 ):ChainPriceHistory {
@@ -181,5 +181,5 @@ export async function readChainPriceHistory(
   if(!confirmedHead || confirmedHead.hash!==latest.hash)throw new Error('读取期间链头已重组，请重试');
   const plain=(x:TimestampedMarketLog):TimestampedMarketLog=>({timestamp:x.timestamp,log:{address:x.log.address,blockNumber:x.log.blockNumber,blockHash:x.log.blockHash,transactionHash:x.log.transactionHash,transactionIndex:x.log.transactionIndex,index:x.log.index,data:x.log.data,topics:[...x.log.topics],removed:false} as unknown as Log});
   const origin=plain({log:creation,timestamp:creationHeader.timestamp});
-  return {...replayMarketPriceHistory(origin,timestamped,k,latest.number),cacheStatus:usedCache?'updated':undefined,checkpoint:{version:1,factory:getAddress(factory),market:getAddress(market),createdAt:String(createdAt),k:String(k),creation:origin,logs:timestamped.map(plain),latestBlock:latest.number,latestHash:latest.hash}};
+  return {...replayMarketPriceHistory(origin,timestamped,k,latest.number),cacheStatus:usedCache?'updated':undefined,checkpoint:{version:2,factory:getAddress(factory),market:getAddress(market),createdAt:String(createdAt),k:String(k),creation:origin,logs:timestamped.map(plain),latestBlock:latest.number,latestHash:latest.hash}};
 }

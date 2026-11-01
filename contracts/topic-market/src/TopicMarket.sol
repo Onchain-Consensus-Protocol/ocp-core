@@ -22,11 +22,10 @@ interface ITopicMarketCore {
 
 /// @notice Isolated locked-liquidity prototype with transferable LP ERC20 rights.
 /// @dev No owner upgrades/rescue. Snapshot supplied at construction, NOT an authenticated oracle.
-/// Genesis/outcomes remain nontransferable internal ledgers; LP is a market-specific ERC20; legacy B getters are always zero.
+/// Genesis/outcomes remain nontransferable internal ledgers; LP is the only market-specific liquidity-rights ERC20.
 contract TopicMarket {
     using Math for uint256;
     bool public constant automaticFeePayout = true;
-    bool public constant singlePool = true;
     address public immutable trustedForwarder;
     uint256 public SCALE; // collateral native units -> outcome WAD
     uint256 public LIMIT; // 1e12 whole collateral-token research bound
@@ -41,9 +40,7 @@ contract TopicMarket {
     IToken6 public immutable token;
     ITopicMarketCore public immutable core;
     TopicMarketRightsToken public immutable lpToken;
-    TopicMarketRightsToken public immutable bToken;
     uint256 public unmaterializedLP;
-    uint256 public bSnapshotWad;
     address public immutable creator;
     address public immutable protocol;
     uint64 public immutable topicCutoff;
@@ -51,16 +48,12 @@ contract TopicMarket {
     uint64 public immutable formalCutoff;
     uint64 public immutable genesisCutoff;
     uint256 public immutable rTarget;
-    uint256 public immutable bTarget;
     uint256 public immutable k;
     Phase public phase;
     uint256 private entered = 1;
     uint256 public R;
-    uint256 public B;
     uint256 public S;
     mapping(address => uint256) public shares; // Genesis余额；毕业后仅作为尚未物化的LP分配记录
-    mapping(address => uint256) public contribution;
-    uint256 public totalContribution;
     uint256 public protocolFees;
     uint256 public creatorFees;
     uint256 public dust;
@@ -75,7 +68,6 @@ contract TopicMarket {
     uint256 public cash;
     uint256 public lpFees;
     uint256 public coreFeesSent;
-    uint256 public formalBAccrued; // Formal只增加B资金，不增加Genesis Btoken权重
     uint256 public redeemedPairs; // collateral native units: 用户主动完整组合赎回
     struct LiquidityReference {
         uint256 lp; uint256 basis; uint256 depth; uint256 y; uint256 n; uint256 money; uint256 fees;
@@ -88,18 +80,15 @@ contract TopicMarket {
     uint256 public yesSupply;
     uint256 public noSupply;
     uint8 public outcome;
-    uint256 public coverPaid;
     uint256 public lpSnapshot;
     uint256 public lpBudgetInitial;
     uint256 public lpBudgetRemaining;
-    uint256 public bBudgetInitial;
-    uint256 public bBudgetRemaining;
     uint256 public failedRInitial;
     uint256 public failedRRemaining;
     uint256 public failedSupply;
     event LPMaterialized(address indexed account, uint256 amount);
     event GenesisTrade(address indexed user, bool buy, uint256 base, uint256 quantity);
-    event Graduated(address indexed trigger, bool buy, uint256 collateral, uint256 reserve);
+    event Graduated(address indexed trigger, bool buy, uint256 collateral);
     event FormalTrade(address indexed user, bool buy, bool isYes, uint256 amount, uint256 base);
     event LiquidityAdded(address indexed user,uint256 lp,uint256 money,uint256 yesIn,uint256 noIn,bool restart);
     event Exited(address indexed user, uint256 lp, uint256 money, uint256 yesOut, uint256 noOut);
@@ -107,7 +96,7 @@ contract TopicMarket {
     event PairsMerged(uint256 cashReleased, uint256 tokensBurned);
     event PairsRedeemed(address indexed user, uint256 cashReleased, uint256 tokensBurned);
     event CoreFeeSent(uint256 amount);
-    event Finalized(uint8 result, uint256 cover, uint256 lpBudget, uint256 bBudget);
+    event Finalized(uint8 result, uint256 lpBudget);
     event Claimed(address indexed user, bytes32 kind, uint256 amount); // gross entitlement
     modifier lock() {
         _lockBefore();
@@ -154,8 +143,6 @@ contract TopicMarket {
         require(trustedForwarder != protocol_, "FEE_RECIPIENT_FORWARDER");
         token = token_;
         lpToken = new TopicMarketRightsToken("Topic Market LP", "TOPIC-LP");
-        // 保留旧ABI的零地址getter，不再部署或发行B代币。
-        bToken = TopicMarketRightsToken(address(0));
         core = core_;
         creator = creator_;
         protocol = protocol_;
@@ -164,7 +151,6 @@ contract TopicMarket {
         formalCutoff = coreEnd_ - 1 hours;
         genesisCutoff = coreEnd_ - 2 hours;
         rTarget = fixedTestTargets ? 42e14 : Math.mulDiv(ethPrice6, 42, 10);
-        bTarget = 0; // 兼容旧只读接口；单R不再设置B门槛。
         require(rTarget > 0, "TINY_TARGET");
         k = kWad;
     }
@@ -192,12 +178,11 @@ contract TopicMarket {
     function _splitGen(uint256 base)
         private
         pure
-        returns (uint256 net, uint256 reserve, uint256 fee, uint256 remainder)
+        returns (uint256 net, uint256 fee, uint256 remainder)
     {
         net = Math.mulDiv(base, 99, 100);
-        reserve = 0;
         fee = base / 100;
-        remainder = base - net - reserve - fee;
+        remainder = base - net - fee;
     }
 
     function _accrueGen(uint256 base, uint256 fee, uint256 remainder) private {
@@ -217,7 +202,7 @@ contract TopicMarket {
 
     function quoteGenesisBuy(uint256 paid) public view returns (uint256 minted) {
         require(paid > 0 && paid <= LIMIT, "AMOUNT");
-        (uint256 net,,,) = _splitGen(paid);
+        (uint256 net,,) = _splitGen(paid);
         require(net > 0 && R + net <= LIMIT, "AMOUNT");
         uint256 next = TopicMarketMath.sqrt((R + net) * curveScale / k);
         require(next > S, "TINY");
@@ -231,7 +216,7 @@ contract TopicMarket {
         );
         uint256 minted = quoteGenesisBuy(paid);
         require(minted >= minTokens, "SLIPPAGE");
-        (uint256 net,, uint256 fee, uint256 rem) = _splitGen(paid);
+        (uint256 net, uint256 fee, uint256 rem) = _splitGen(paid);
         bool hit = R + net >= rTarget;
         _checkIntent(hit, intent);
         _receive(paid);
@@ -259,7 +244,7 @@ contract TopicMarket {
         require(shares[user] >= quantity, "HOLDINGS");
         (uint256 gross, uint256 seller) = quoteGenesisSell(quantity);
         require(seller >= minOut, "SLIPPAGE");
-        (,, uint256 fee, uint256 rem) = _splitGen(gross);
+        (, uint256 fee, uint256 rem) = _splitGen(gross);
         bool hit = R - gross >= rTarget;
         _checkIntent(hit, intent);
         R -= gross;
@@ -296,7 +281,7 @@ contract TopicMarket {
         bWad = poolBasisWad;
         core.open(coreCutoff);
         require(core.deadline() == coreCutoff && core.openedAt() == block.timestamp, "CORE_OPEN");
-        emit Graduated(_actor(), buy, initialCollateral, B);
+        emit Graduated(_actor(), buy, initialCollateral);
     }
 
     function isFormalMarket() external view returns (bool) {
@@ -325,13 +310,12 @@ contract TopicMarket {
     }
 
     function _splitFormal(uint256 base)
-        private pure returns (uint256 net, uint256 lpFee, uint256 coreFee, uint256 reserve, uint256 rem)
+        private pure returns (uint256 net, uint256 lpFee, uint256 coreFee, uint256 rem)
     {
         net = Math.mulDiv(base, 98, 100);
         lpFee = base / 100;
-        reserve = 0;
         coreFee = Math.mulDiv(base, 7, 1000);
-        rem = base - net - lpFee - reserve - coreFee;
+        rem = base - net - lpFee - coreFee;
     }
 
     /// @dev 扩展深度至1e30 WAD后，误差保护随深度保守放大；普通资金规模仍至少为1e-6整枚C。
@@ -356,11 +340,11 @@ contract TopicMarket {
         require(block.timestamp <= expiry, "EXPIRED");
         uint256 gross = quoteFormalBuy(isYes, amount);
         require(gross <= maxPaid && gross <= LIMIT, "SLIPPAGE");
-        (uint256 net, uint256 lpFee, uint256 coreFee,, uint256 rem) = _splitFormal(gross);
+        (uint256 net, uint256 lpFee, uint256 coreFee, uint256 rem) = _splitFormal(gross);
         _receive(gross);
         cash += net;
         lpFees += lpFee;
-        // 单池的全部做市费用计入LP，不再划拨B资金。
+        // 全部做市费用计入LP。
         uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
         protocolFees += protocolPart;
         dust += rem - protocolPart;
@@ -418,7 +402,7 @@ contract TopicMarket {
         require((isYes ? yes[user] : no[user]) >= amount, "HOLDINGS");
         (uint256 gross, uint256 seller) = quoteFormalSell(isYes, amount);
         require(seller >= minOut, "SLIPPAGE");
-        (, uint256 lpFee, uint256 coreFee,, uint256 rem) = _splitFormal(gross);
+        (, uint256 lpFee, uint256 coreFee, uint256 rem) = _splitFormal(gross);
         if (isYes) {
             yes[user] -= amount;
             inventoryY += amount;
@@ -428,7 +412,7 @@ contract TopicMarket {
         }
         cash -= gross;
         lpFees += lpFee;
-        // 单池的全部做市费用计入LP，不再划拨B资金。
+        // 全部做市费用计入LP。
         uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
         protocolFees += protocolPart;
         dust += rem - protocolPart;
@@ -514,7 +498,7 @@ contract TopicMarket {
         lpSnapshot = graduationSupply;
         lpBudgetInitial = nav;
         lpBudgetRemaining = nav;
-        emit Finalized(result, coverPaid, lpBudgetInitial, bBudgetInitial);
+        emit Finalized(result, lpBudgetInitial);
         _flushFees();
     }
 
@@ -563,9 +547,6 @@ contract TopicMarket {
         _send(msg.sender, pay);
     }
 
-    // 已部署双池版本保留原领取逻辑；新单池没有B权利。
-    function claimB() external pure returns (uint256) { revert("B_REMOVED"); }
-    function claimB(uint256) external pure returns (uint256) { revert("B_REMOVED"); }
 
     function claimFailed() external lock returns (uint256 pay) {
         return _claimFailed();
@@ -586,27 +567,27 @@ contract TopicMarket {
 
     /// @notice Frozen/current-state budgets in collateral native units, excluding future trades and fees.
     /// @dev Uses the same integer settlement arithmetic; no state or entitlement is changed.
-    function previewSettlement(uint8 result) public view returns (uint256 lpBudget, uint256 bBudget, uint256 cover) {
+    function previewSettlement(uint8 result) public view returns (uint256 lpBudget) {
         require(result >= 1 && result <= 3, "RESULT");
         if (phase == Phase.SETTLED) {
             require(result == outcome, "FINAL_RESULT");
-            return (lpBudgetInitial, bBudgetInitial, coverPaid);
+            return lpBudgetInitial;
         }
         require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "PHASE");
         uint256 nav = cash + lpFees + _value(inventoryY, inventoryN, result);
-        return (nav, 0, 0);
+        return nav;
     }
 
     /// @notice Account payout, including escrowed LP rights.
     /// @dev Failed launches ignore result because no YES/NO market ever opened.
     function previewAccount(address account, uint8 result)
-        external view returns (uint256 outcomePay, uint256 lpPay, uint256 bPay, uint256 failedPay)
+        external view returns (uint256 outcomePay, uint256 lpPay, uint256 failedPay)
     {
         if (phase == Phase.FAILED) {
             if (failedSupply > 0) failedPay = Math.mulDiv(failedRInitial, shares[account], failedSupply);
-            return (0, 0, bPay, failedPay);
+            return (0, 0, failedPay);
         }
-        (uint256 lpBudget,,) = previewSettlement(result);
+        uint256 lpBudget = previewSettlement(result);
         outcomePay = _value(yes[account], no[account], result);
         uint256 denominator = phase == Phase.SETTLED ? lpSnapshot : graduationSupply;
         if (denominator > 0) lpPay = Math.mulDiv(lpBudget, shares[account] + lpToken.balanceOf(account), denominator);
@@ -672,8 +653,8 @@ contract TopicMarket {
         require(phase == Phase.SETTLED || phase == Phase.FAILED, "PHASE");
         require(phase == Phase.FAILED ? S == 0 : liquiditySupply == 0 && yesSupply == 0 && noSupply == 0, "OUTSTANDING_RIGHTS");
         amount = token.balanceOf(address(this)) - creatorFees - protocolFees;
-        R = 0; B = 0; dust = 0; collateralCash = 0; cash = 0; lpFees = 0;
-        lpBudgetRemaining = 0; bBudgetRemaining = 0; failedRRemaining = 0;
+        R = 0; dust = 0; collateralCash = 0; cash = 0; lpFees = 0;
+        lpBudgetRemaining = 0; failedRRemaining = 0;
         protocolFees += amount;
         emit DustCollected(amount);
         _flushFees();
@@ -681,7 +662,7 @@ contract TopicMarket {
 
     /// @notice Retained liabilities, excluding unsolicited donations. Player budgets and pending fee liabilities remain protected until all rights are burned.
     function accountedBalance() public view returns (uint256) {
-        return R + B + protocolFees + creatorFees + dust + collateralCash + cash + lpFees + lpBudgetRemaining
-            + bBudgetRemaining + failedRRemaining;
+        return R + protocolFees + creatorFees + dust + collateralCash + cash + lpFees + lpBudgetRemaining
+            + failedRRemaining;
     }
 }

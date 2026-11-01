@@ -11,10 +11,10 @@ function fixture():TestnetSimulationProps {
   const market:MarketState={address:'0x0000000000000000000000000000000000000004',stock:stock.address,
     creator:stock.address,adapter:stock.address,vault:stock.address,topic:'Chain topic',yesRule:'yes',noRule:'no',invalidRule:'invalid',
     createdAt:1000n,genesisCutoff:15000n,formalCutoff:18600n,coreCutoff:22200n,snapshot:0n,
-    phase:1,outcome:0,R:0n,B:600000n,S:9n*W,rTarget:3600000n,bTarget:600000n,k:W,cash:1200000n,
-    lpFees:10000n,lpBudgetRemaining:0n,bBudgetRemaining:0n,vaultResolved:false,vaultOutcome:0,vaultSettlementReady:false,
+    phase:1,outcome:0,R:0n,S:9n*W,rTarget:3600000n,k:W,cash:1200000n,
+    lpFees:10000n,lpBudgetRemaining:0n,vaultResolved:false,vaultOutcome:0,vaultSettlementReady:false,
     totalStakeYes:3000000n,totalStakeNo:1000000n,totalStakeInvalid:2000000n,
-    position:{balance:7000000n,genesisShares:2n*W,yes:3n*W,no:W,lp:W,b:4n*W,
+    position:{balance:7000000n,genesisShares:2n*W,yes:3n*W,no:W,lp:W,
       coreYes:0n,coreNo:1000000n,coreInvalid:0n,marketAllowance:0n,vaultAllowance:0n,routerAllowance:0n},
     presentation:{priceYes:6n*W/10n,priceNo:4n*W/10n,basisWad:10n*W,bWad:10n*W,
       inventoryYes:7n*W,inventoryNo:9n*W,totalYes:10n*W,totalNo:10n*W,totalFees:120000n,
@@ -25,7 +25,7 @@ function fixture():TestnetSimulationProps {
 describe('chain data adapter for the shared Simulation view',()=>{
   it('uses real stock precision for money and WAD for shares, with one actual account',()=>{
     const remote=buildTestnetRemote(fixture());const s=remote.state,a=s.accounts[0];
-    expect(s.accounts).toHaveLength(1);expect(a.wallet).toBe(7);expect(a.yes).toBe(3);expect(a.z).toBe(4);
+    expect(s.accounts).toHaveLength(1);expect(a.wallet).toBe(7);expect(a.yes).toBe(3);
     expect(a.coreSide).toBe('NO');expect(a.coreStake).toBe(1);expect(a.coreRewards).toEqual([.011,.022,.033]);
     expect(s.core.yes).toBe(3);expect(s.core.no).toBe(1);expect(s.core.invalid).toBe(2);
     expect(s.core.feeTotal).toBe(.12);expect(remote.prices.probability).toEqual([.6,.4]);
@@ -47,7 +47,7 @@ describe('chain data adapter for the shared Simulation view',()=>{
     const props=fixture();delete props.market.presentation;delete props.market.position;
     const remote=buildTestnetRemote(props);
     expect(remote.balanceUSD).toBe(0);expect(remote.prices.probability).toBeNull();expect(remote.chart).toEqual([]);
-    expect(remote.state.events).toEqual([]);expect(remote.lpBEstimates).toEqual([]);expect(remote.state.corePayouts).toEqual([]);
+    expect(remote.state.events).toEqual([]);expect(remote.lpEstimates).toEqual([]);expect(remote.state.corePayouts).toEqual([]);
     expect(remote.chain?.readOnlyMetrics).toBe(true);expect(remote.state.accounts[0].wallet).toBe(0);
     expect(remote.prices.genesis).toBe(18); // Derived only from the real k/S state, not a fake trade.
   });
@@ -82,15 +82,6 @@ describe('chain data adapter for the shared Simulation view',()=>{
     expect(html).toContain('On-chain price history has not loaded');expect(html).toContain('Fixed testnet targets');
     expect(html).toContain('Genesis market contract address');
     expect(html).not.toContain('Actual simulated prices');expect(html).not.toContain('3.6 / 0.6 ETH');
-  });
-  it('hides B for new single-pool markets and preserves legacy B holdings',()=>{
-    const props=fixture();props.market.singlePool=true;
-    const html=renderToStaticMarkup(<TestnetSimulation {...props}/>);
-    expect(html).not.toContain('B tokens');expect(html).not.toContain('Market-making risk reserve');
-    expect(buildTestnetRemote(props).state.singlePool).toBe(true);
-    delete props.market.singlePool;
-    expect(renderToStaticMarkup(<TestnetSimulation {...props}/>)).toContain('B tokens');
-    expect(buildTestnetRemote(props).state.accounts[0].z).toBe(4);
   });
   it('rejects unsupported phases instead of inventing a CREATE demo',()=>{
     const props=fixture();props.market.phase=99;expect(()=>buildTestnetRemote(props)).toThrow('Unsupported');

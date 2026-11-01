@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
@@ -38,15 +37,14 @@ contract TopicMarketIntegrationV20Test is TopicMarketBase {
     }
 
     function _assertAccountClaim(address who, uint8 result) internal {
-        (uint256 o, uint256 l, uint256 b, uint256 f) = market.previewAccount(who, result);
+        (uint256 o, uint256 l, uint256 f) = market.previewAccount(who, result);
         uint256 before = usd.balanceOf(who);
         vm.prank(who);
         uint256 paid = market.claimAll();
-        assertEq(paid, o + l + b + f);
+        assertEq(paid, o + l + f);
         assertEq(usd.balanceOf(who) - before, paid);
         assertEq(market.shares(who), 0);
         assertEq(market.lpToken().balanceOf(who), 0);
-        assertEq(removedBBalance(market,who), 0);
         assertEq(market.yes(who) + market.no(who), 0);
         vm.prank(who);
         vm.expectRevert();
@@ -57,17 +55,17 @@ contract TopicMarketIntegrationV20Test is TopicMarketBase {
         _scenario(result);
         assertGt(market.shares(alice), 0);
         assertEq(market.lpToken().balanceOf(alice), 0);
-        (uint256 lp, uint256 b, uint256 cover) = market.previewSettlement(result);
-        (, uint256 aliceLP,,) = market.previewAccount(alice, result);
+        uint256 lp = market.previewSettlement(result);
+        (, uint256 aliceLP,) = market.previewAccount(alice, result);
         assertGt(aliceLP, 0);
         vm.warp(market.coreCutoff());
         vm.prank(dave);
         adapter.finalizeMarket();
         assertEq(market.outcome(), result);
         assertEq(market.lpBudgetInitial(), lp);
-        assertEq(market.bBudgetInitial(), b);
-        assertEq(market.coverPaid(), cover);
-        // Include unmaterialized LP, B-only rights, and both outcome positions.
+
+
+        // Include unmaterialized LP, and both outcome positions.
         _assertAccountClaim(carol, result);
         _assertAccountClaim(dave, result);
         _assertAccountClaim(alice, result);
@@ -85,14 +83,13 @@ contract TopicMarketIntegrationV20Test is TopicMarketBase {
         vm.warp(market.genesisCutoff());
         market.closeExpired();
         uint256 frozenR = market.failedRInitial();
-        uint256 frozenB = market.bBudgetInitial();
+
         uint256 before = usd.balanceOf(alice) + usd.balanceOf(bob);
         _assertAccountClaim(bob, 3);
         _assertAccountClaim(alice, 3);
         uint256 paid = usd.balanceOf(alice) + usd.balanceOf(bob) - before;
-        assertLe(paid, frozenR + frozenB);
-        assertLe(frozenR + frozenB - paid, 3);
-        assertEq(removedBSupply(market), 0);
+        assertLe(paid, frozenR);
+        assertLe(frozenR - paid, 3);
         _accounting();
     }
 

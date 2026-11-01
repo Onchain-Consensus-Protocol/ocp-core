@@ -6,7 +6,7 @@ import {ITopicMarketPriceSnapshot,IUsdCollateralSnapshot} from "./interfaces/ITo
 
 /// @notice Fixed TEST price of 400 USD per canonical Robinhood testnet TSLA token.
 /// @dev Not a market oracle or an ETH price. No owner, updates, rounds or freshness promises.
-/// Graduation R/B targets belong to the separate testnet Factory profile, not to this reader.
+/// The graduation R target belong to the separate testnet Factory profile, not to this reader.
 contract TopicMarketTestnetStockPriceSnapshot is ITopicMarketPriceSnapshot,IUsdCollateralSnapshot {
     address public constant TESTNET_TSLA=0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E;
     uint256 public constant TESTNET_CHAIN_ID=46630;

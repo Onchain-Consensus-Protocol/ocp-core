@@ -17,7 +17,7 @@ export type PaperCreateInput = {
  title:string;yesRule:string;noRule:string;invalidRule:string;assetSymbol:string;
 } & ({coreHours:number;coreDeadline?:never}|{coreDeadline:number;coreHours?:never});
 /** Server persistence only: never serialize users or full model accounts to public clients. */
-export interface StoredPaperMarket {
+export interface StoredPaperMarket { schemaVersion:2;
  id:string;creatorId:string;title:string;yesRule:string;noRule:string;invalidRule:string;
  assetSymbol:string;assetPriceUSD:number;createdAt:number;revision:number;
  users:string[];state:TopicMarketState;
@@ -27,18 +27,18 @@ export interface PaperSession {
  configured:boolean;user:null|{id:string;name:string;email:string};balanceUSD:string;initialGrantUSD:string;
 }
 export interface PaperPosition {
- gToken:string;yes:string;no:string;lp:string;B:string;coreSide:Outcome|null;coreStake:string;
+ gToken:string;yes:string;no:string;lp:string;coreSide:Outcome|null;coreStake:string;
  claimMarketUSD:string;claimCoreUSD:string;creatorFeesUSD:string;
 }
-export type PaperPresentation = Pick<TopicMarketState,'singlePool'|'config'|'TG'|'TF'|'TC'|'TT'|'Q'|'k'|'S'|'M0'|'cash'|'lpFees'|'basis'|'b'|'lpSupply'|'inventory'|'liquidityClosed'|'lpBudget'|'bBudget'|'failedSupply'> & {
+export type PaperPresentation = Pick<TopicMarketState,'config'|'TG'|'TF'|'TC'|'TT'|'Q'|'k'|'S'|'M0'|'cash'|'lpFees'|'basis'|'b'|'lpSupply'|'inventory'|'liquidityClosed'|'lpBudget'|'failedSupply'> & {
  own:TopicMarketAccount|null;claim:TopicMarketPayout|null;corePayout:number;coreFees:number;genesisPnl:number;
- outstanding:[number,number];lpBEstimates:{outcome:Outcome;lp:number;B:number}[];
+ outstanding:[number,number];lpEstimates:{outcome:Outcome;lp:number}[];
 };
-export interface PaperMarket {
+export interface PaperMarket { schemaVersion:2;
  id:string;title:string;yesRule:string;noRule:string;invalidRule:string;assetSymbol:string;
  assetPriceUSD:number;createdAt:number;serverNow:number;revision:number;phase:TopicMarketState['phase'];
  genesisDeadline:number;formalDeadline:number;coreDeadline:number;topicDeadline:number;
- R:string;B:string;rTarget:string;bTarget:string;genesisPriceUSD:string;
+ R:string;rTarget:string;genesisPriceUSD:string;
  yesPrice:number;noPrice:number;coreYes:string;coreNo:string;coreInvalid:string;
  coreOpenedAt:number|null;result:Outcome|null;volumeUSD:string;participants:number;
  presentation?:PaperPresentation;
@@ -48,7 +48,7 @@ export interface PaperMarket {
 export interface PaperQuote {
  detail?:TopicMarketTradeQuote;
  revision:number;expiresAt:number;payUSD:string;receiveUSD:string;quantity:string;feeUSD:string;
- BContributionUSD:string;wouldGraduate:boolean;
+ wouldGraduate:boolean;
 }
 export interface PaperTradeInput {
  marketId:string;requestId:string;expectedRevision:number;action:PaperAction;

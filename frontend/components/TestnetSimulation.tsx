@@ -39,7 +39,7 @@ export function buildTestnetRemote(
     g:graduated?0:wad(position?.genesisShares),
     // Pending Genesis shares become escrowed LP rights at graduation, not extra gTokens.
     lp:graduated?wad((position?.lp??0n)+(position?.genesisShares??0n)):wad(position?.lp),
-    z:wad(position?.b),yes:wad(position?.yes),no:wad(position?.no),coreSide,
+    yes:wad(position?.yes),no:wad(position?.no),coreSide,
     coreStake:money((position?.coreYes??0n)+(position?.coreNo??0n)+(position?.coreInvalid??0n)),
     coreRewards:[money(p?.feeYes),money(p?.feeNo),money(p?.feeInvalid)],
     // Unread bookkeeping flags/cost bases are not presented as wallet history.
@@ -50,7 +50,7 @@ export function buildTestnetRemote(
   const state:TopicMarketState={
     phase,now:Math.max(0,props.now-created),TG:relative(m.genesisCutoff),TF:relative(m.formalCutoff),
     TC:relative(m.early?.effectiveCutoff??m.coreCutoff),TT:relative(m.coreCutoff),Q:money(m.snapshot),k:wad(m.k),
-    singlePool:m.singlePool===true,rTarget:money(m.rTarget),bTarget:money(m.bTarget),R:money(m.R),B:money(m.B),S:wad(m.S),
+    rTarget:money(m.rTarget),R:money(m.R),S:wad(m.S),
     M0:wad(p?.basisWad),redeemedPairs:0,collateral:0,cash:money(m.cash),lpFees:money(m.lpFees),
     lpFeesEarned:0,formalVolume:money(p?.formalVolume),creatorFees:0,protocolFees:0,
     basis:wad(p?.basisWad),b:wad(p?.bWad),lpSupply:0,inventory:[wad(p?.inventoryYes),wad(p?.inventoryNo)],
@@ -60,8 +60,8 @@ export function buildTestnetRemote(
       openedAt:graduated?0:null,yes:yesStake,no:noStake,invalid:invalidStake,cash:yesStake+noStake+invalidStake,
       fees:money(p?.totalFees),feeTotal:money(p?.totalFees),officialRewards:[0,0,0],result:coreResult,
     },
-    result,cover:0,lpBudget:money(m.lpBudgetRemaining),bBudget:money(m.bBudgetRemaining),outcomeBudget:0,
-    lpClaimSupply:0,bClaimSupply:0,lpBudgetInitial:0,bBudgetInitial:0,failedSupply:0,failedBudgetInitial:0,
+    result,lpBudget:money(m.lpBudgetRemaining),outcomeBudget:0,
+    lpClaimSupply:0,lpBudgetInitial:0,failedSupply:0,failedBudgetInitial:0,
     failedBudget:0,coreBudget:0,coreOfficialBudget:0,payouts:null,corePayouts:p?.corePayout===undefined?[]:[money(p.corePayout)],
     events:[...(props.activity??[]),...(props.coreActivity??[])],config:{creatorAccount:-1,protocolAccount:-1,depthPolicy:'GRADUATION_CAPITAL'},
   };
@@ -73,8 +73,8 @@ export function buildTestnetRemote(
     input,state,assetSymbol:stock.symbol,balanceUSD:0,
     topic:{title:m.topic,YES:m.yesRule,NO:m.noRule,INVALID:m.invalidRule},pending:props.busy,
     prices:{genesis:genesisPrice,probability},
-    preview:{outcomes:0,lp:0,B:0,failed:0,total:money(p?.marketPayout)},
-    genesisPnl:0,lpBEstimates:[],
+    preview:{outcomes:0,lp:0,failed:0,total:money(p?.marketPayout)},
+    genesisPnl:0,lpEstimates:[],
     outstanding:[wad(p===undefined?undefined:p.totalYes-p.inventoryYes),wad(p===undefined?undefined:p.totalNo-p.inventoryNo)],
     chart:props.history??[],onInput,
     // Parent-supplied controls are the sole write surface; the display adapter has no transaction callbacks.

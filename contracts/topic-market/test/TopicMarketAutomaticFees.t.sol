@@ -166,6 +166,6 @@ contract TopicMarketAutomaticFeesTest is Test {
     function testFuzzGenesisRawRoundingConservesEveryUnit(uint32 raw) public {
         uint256 amount=bound(raw,100,1e6);vm.prank(alice);market.genesisBuy(amount,0,type(uint64).max,0);
         assertEq(market.creatorFees(),amount*7/1000);assertEq(market.protocolFees(),amount*3/1000);
-        assertEq(market.R()+market.B()+market.creatorFees()+market.protocolFees()+market.dust(),amount);
+        assertEq(market.R()+market.creatorFees()+market.protocolFees()+market.dust(),amount);
     }
 }

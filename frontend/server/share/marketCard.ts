@@ -7,7 +7,7 @@ const progress=(n:number|string,total:number|string)=>percent(Number(total)>0?Nu
 export function marketCardFacts(m:ShareMarket){
  if(m.phase==='SETTLED')return [{label:'FINAL RESULT',value:m.result??'Pending',color:'#ea580c'}];
  if(m.phase==='FAILED')return [{label:'GENESIS ENDED',value:'Not graduated · Refunds available',color:'#64748b'}];
- if(m.phase==='GENESIS')return [{label:'R TARGET',value:progress(m.R,m.rTarget),color:'#ea580c'},{label:'B TARGET',value:progress(m.B,m.bTarget),color:'#7c3aed'}];
+ if(m.phase==='GENESIS')return [{label:'R TARGET',value:progress(m.R,m.rTarget),color:'#ea580c'}];
  return [{label:'YES',value:percent(m.yesPrice*100),color:'#15803d'},{label:'NO',value:percent(m.noPrice*100),color:'#b91c1c'}];
 }
 export function marketDescription(m:ShareMarket){return `${m.assetSymbol} · ${phases[m.phase]??m.phase} · ${marketCardFacts(m).map(x=>`${x.label}: ${x.value}`).join(' · ')} · Virtual funds only`;}

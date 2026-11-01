@@ -9,7 +9,7 @@ import {MarketCard} from './marketCard';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {loadMarketBrand} from './marketBrand';
-const market:ShareMarket={id:'test-market',title:'Will Tesla reach a new high?',assetSymbol:'TSLA',phase:'GENESIS',result:null,R:'1800',B:'300',rTarget:'7200',bTarget:'1200',yesPrice:.6,noPrice:.4,volumeUSD:'12345',participants:8};
+const market:ShareMarket={id:'test-market',title:'Will Tesla reach a new high?',assetSymbol:'TSLA',phase:'GENESIS',result:null,R:'1800',rTarget:'7200',yesPrice:.6,noPrice:.4,volumeUSD:'12345',participants:8};
 async function request(url:string,method='GET',load=vi.fn(async()=>market as ShareMarket|null)){
  const req=Object.assign(Readable.from([]),{method,url,headers:{host:'untrusted.test'}}) as IncomingMessage;
  const headers:Record<string,unknown>={};let body:string|Buffer='';
@@ -19,7 +19,7 @@ async function request(url:string,method='GET',load=vi.fn(async()=>market as Sha
 describe('public market share cards',()=>{
  it('serves frozen snapshots independent of visitor identity, URL theme, or later market changes',async()=>{
   const id='00000000-0000-4000-8000-000000000001';
-  const snapshot:MarketShareSnapshot={id,market:{...market},at:1793088000,revision:1,theme:'dark',prices:[{label:'gTOKEN PRICE',value:'$0.0001',change:'+25.00%',positive:true}],priceSince:1793087000,priceNote:'Retained record comparison.',pnl:{label:'MY EXIT P&L',low:123,high:123,note:'Locked B excluded.'}};
+  const snapshot:MarketShareSnapshot={schemaVersion:2,id,market:{...market},at:1793088000,revision:1,theme:'dark',prices:[{label:'gTOKEN PRICE',value:'$0.0001',change:'+25.00%',positive:true}],priceSince:1793087000,priceNote:'Retained record comparison.',pnl:{label:'MY EXIT P&L',low:123,high:123,note:'Current positions only.'}};
   const frozen=vi.fn(async()=>snapshot),live=vi.fn(async()=>({...market,title:'Later changed title'}));
   const req=Object.assign(Readable.from([]),{method:'GET',url:`/api/market-share?snapshot=${id}&theme=light`,headers:{authorization:'Bearer ignored'}}) as IncomingMessage;
   const headers:Record<string,string>={};let html='';
@@ -36,7 +36,7 @@ describe('public market share cards',()=>{
   expect(url.origin+url.pathname).toBe('https://x.com/intent/tweet');expect(url.searchParams.get('text')).toContain('Test & 中文?');expect(url.searchParams.get('url')).toBe(marketShareUrl('id'));
  });
  it('shows phase-specific facts without invented odds',()=>{
-  expect(marketCardFacts(market).map(x=>x.value)).toEqual(['25.0%','25.0%']);
+  expect(marketCardFacts(market).map(x=>x.value)).toEqual(['25.0%']);
   for(const result of ['YES','NO','INVALID'] as const)expect(marketCardFacts({...market,phase:'SETTLED',result})).toEqual([{label:'FINAL RESULT',value:result,color:'#ea580c'}]);
   expect(marketCardFacts({...market,phase:'FAILED'}).map(x=>x.value).join()).toContain('Refunds available');expect(marketCardFacts({...market,phase:'WAIT_CORE'}).map(x=>x.value)).toEqual(['60.0%','40.0%']);
  });

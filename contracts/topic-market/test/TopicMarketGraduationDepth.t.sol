@@ -59,10 +59,9 @@ contract TopicMarketDepthDecimalsTest is TopicMarketStockCollateralTest {
             uint256 paid=m.quoteFormalBuy(true,1e18);m.formalBuy(true,1e18,paid,type(uint64).max);
             assertEq(m.bWad(),1386e16);assertTrue(checkMarketInvariants(m));
             vm.warp(m.coreCutoff());c.resolve(outcome);m.finalize();
-            uint256 before=t.balanceOf(address(this));(uint256 y,uint256 lp,uint256 reserve,)=m.previewAccount(address(this),outcome);
+            uint256 before=t.balanceOf(address(this));(uint256 y,uint256 lp,uint256 reserve)=m.previewAccount(address(this),outcome);
             m.claimAll();assertEq(t.balanceOf(address(this))-before,y+lp+reserve);
             assertEq(t.balanceOf(address(m)),m.accountedBalance());assertTrue(checkMarketInvariants(m));
-            assertEq(m.lpBudgetRemaining(),0);assertEq(m.bBudgetRemaining(),0);
-        }
+            assertEq(m.lpBudgetRemaining(),0);}
     }
 }

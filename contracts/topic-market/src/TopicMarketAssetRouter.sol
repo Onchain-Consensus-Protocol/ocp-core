@@ -26,7 +26,7 @@ interface ITopicMarketRouterForwarded { function isTrustedForwarder(address forw
 contract TopicMarketAssetRouter {
     using SafeERC20 for IERC20;
     enum Action { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket,
-        ClaimOutcome, ClaimLP, ClaimB, ClaimFailed, ClaimCore, RedeemPairs }
+        ClaimOutcome, ClaimLP, ClaimFailed, ClaimCore, RedeemPairs }
     /// @dev quantity is exact Formal outcome shares, Genesis sell shares, or pair-redemption money.
     /// businessLimit is Genesis buy minShares / Formal buy maxCollateral / sell minCollateral.
     /// minCollateral protects entry conversion; minOutput protects exit conversion.
@@ -126,7 +126,6 @@ contract TopicMarketAssetRouter {
         if (r.action == Action.ClaimMarket) return abi.encodeWithSignature("claimAll()");
         if (r.action == Action.ClaimOutcome) return abi.encodeWithSignature("claimOutcome()");
         if (r.action == Action.ClaimLP) return abi.encodeWithSignature("claimLP()");
-        if (r.action == Action.ClaimB) return abi.encodeWithSignature("claimB()");
         if (r.action == Action.ClaimFailed) return abi.encodeWithSignature("claimFailed()");
         if (r.action == Action.ClaimCore) return abi.encodeWithSignature("withdraw()");
         require(r.action == Action.RedeemPairs, "ACTION");

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
+import {assertSelectorRemoved} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase} from "./TopicMarketBase.sol";
 import {TopicMarketRightsToken} from "../src/TopicMarketRightsToken.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -67,14 +67,12 @@ contract TopicMarketMergeTest is TopicMarketBase {
         for(uint8 result=1;result<=3;result++){
             uint256 iv=result==1?market.inventoryY()/market.SCALE():result==2?market.inventoryN()/market.SCALE()
                 :(market.inventoryY()+market.inventoryN())/(2*market.SCALE());
-            uint256 nav=market.cash()+market.lpFees()+iv; uint256 basis=market.poolBasisWad()/market.SCALE();
-            uint256 reserve=market.B(); uint256 cover=Math.min(reserve,basis>nav?basis-nav:0);
+            uint256 nav=market.cash()+market.lpFees()+iv;
+
             _finish(result);
-            assertEq(market.coverPaid(),cover); assertEq(market.lpBudgetInitial(),nav+cover);
-            assertEq(market.bBudgetInitial(),reserve-cover);
+            assertEq(market.lpBudgetInitial(),nav);
             _claimAll(alice); _claimAll(bob); _claimAll(carol); _claimAll(dave); _accounting();
-            assertEq(market.lpToken().totalSupply(),0); assertEq(removedBSupply(market),0);
-            assertLe(market.collateralCash(),4); assertLe(market.lpBudgetRemaining(),3); assertLe(market.bBudgetRemaining(),3);
+            assertEq(market.lpToken().totalSupply(),0); assertLe(market.collateralCash(),4); assertLe(market.lpBudgetRemaining(),3);
             assertTrue(vm.revertToState(snap)); snap=vm.snapshotState();
         }
     }
@@ -101,19 +99,17 @@ contract TopicMarketMergeTest is TopicMarketBase {
             if(op==0){_formalBuy(a,side,W/(1000+seed%100));}
             else if(op==1){uint256 held=side?market.yes(a):market.no(a); if(held>1e13) _sell(a,side,held/2);}
             else if(op==2){uint256 held=market.lpToken().balanceOf(a); if(held>0){vm.prank(a);lpRights.transfer(to,held/2);}}
-            else if(op==3){vm.prank(a);vm.expectRevert("B_REMOVED");market.claimB();}
+            else if(op==3){vm.prank(a);assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));}
             else {uint256 pairs=Math.min(market.yes(a),market.no(a))/(2*market.SCALE());if(pairs>0){vm.prank(a);market.redeemPairs(pairs);}}
             _capacityInvariant();
         }
-        _finish(result); uint256 lpDen=market.lpSnapshot(); uint256 bDen=market.bSnapshotWad();
+        _finish(result); uint256 lpDen=market.lpSnapshot();
         for(uint256 i;i<4;i++){
             address a=actors[i]; uint256 held=market.lpToken().balanceOf(a);
             if(held>1){uint256 qty=held/3; uint256 expected=Math.mulDiv(market.lpBudgetInitial(),qty,lpDen);
                 vm.prank(a); assertEq(market.claimLP(qty),expected);}
             _claimAll(a); _accounting();
         }
-        assertEq(market.lpSnapshot(),lpDen); assertEq(market.bSnapshotWad(),bDen);
-        assertEq(market.lpToken().totalSupply(),0); assertEq(removedBSupply(market),0);
-        assertLe(market.collateralCash(),4); assertLe(market.lpBudgetRemaining(),8); assertLe(market.bBudgetRemaining(),8);
+        assertEq(market.lpSnapshot(),lpDen); assertEq(market.lpToken().totalSupply(),0); assertLe(market.collateralCash(),4); assertLe(market.lpBudgetRemaining(),8);
     }
 }

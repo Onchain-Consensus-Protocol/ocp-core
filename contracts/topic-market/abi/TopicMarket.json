@@ -42,19 +42,6 @@
   },
   {
     "type": "function",
-    "name": "B",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "LIMIT",
     "inputs": [],
     "outputs": [
@@ -133,71 +120,6 @@
   },
   {
     "type": "function",
-    "name": "bBudgetInitial",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "bBudgetRemaining",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "bSnapshotWad",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "bTarget",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "bToken",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract TopicMarketRightsToken"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "bWad",
     "inputs": [],
     "outputs": [
@@ -234,38 +156,6 @@
       }
     ],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "claimB",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
-    "name": "claimB",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -367,25 +257,6 @@
   },
   {
     "type": "function",
-    "name": "contribution",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "coordinates",
     "inputs": [],
     "outputs": [
@@ -431,19 +302,6 @@
   {
     "type": "function",
     "name": "coreFeesSent",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "coverPaid",
     "inputs": [],
     "outputs": [
       {
@@ -563,19 +421,6 @@
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "formalBAccrued",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1020,11 +865,6 @@
         "internalType": "uint256"
       },
       {
-        "name": "bPay",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "failedPay",
         "type": "uint256",
         "internalType": "uint256"
@@ -1045,16 +885,6 @@
     "outputs": [
       {
         "name": "lpBudget",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "bBudget",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "cover",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1333,19 +1163,6 @@
   },
   {
     "type": "function",
-    "name": "singlePool",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "token",
     "inputs": [],
     "outputs": [
@@ -1366,19 +1183,6 @@
         "name": "",
         "type": "uint64",
         "internalType": "uint64"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "totalContribution",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -1578,19 +1382,7 @@
         "internalType": "uint8"
       },
       {
-        "name": "cover",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
         "name": "lpBudget",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "bBudget",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1684,12 +1476,6 @@
       },
       {
         "name": "collateral",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "reserve",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

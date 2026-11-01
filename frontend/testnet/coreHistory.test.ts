@@ -11,7 +11,7 @@ const iface=new Interface(coreAbi),fi=new Interface(factoryAbi);
 const hash=(n:number)=>`0x${n.toString(16).padStart(64,'0')}`;
 function event(name:string,args:unknown[],block=4,index=0):Log{return {address:core,blockNumber:block,blockHash:hash(block),transactionHash:hash(1000+block),transactionIndex:0,index,removed:false,...iface.encodeEventLog(iface.getEvent(name)!,args)} as unknown as Log;}
 const stamped=(log:Log)=>({log,timestamp:log.blockNumber*10});
-function origin():HistoryCheckpoint{return {version:1,factory,market,createdAt:'30',k:'1',creation:{timestamp:30,log:{address:factory,blockNumber:3,blockHash:hash(3),transactionHash:hash(1003),transactionIndex:0,index:0,removed:false,...fi.encodeEventLog(fi.getEvent('MarketCreated')!,[market,user,user,user,30n,100n,200n,300n,300n,1n])} as unknown as Log},logs:[],latestBlock:6,latestHash:hash(6)};}
+function origin():HistoryCheckpoint{return {version:2,factory,market,createdAt:'30',k:'1',creation:{timestamp:30,log:{address:factory,blockNumber:3,blockHash:hash(3),transactionHash:hash(1003),transactionIndex:0,index:0,removed:false,...fi.encodeEventLog(fi.getEvent('MarketCreated')!,[market,user,user,user,30n,100n,200n,300n,300n,1n])} as unknown as Log},logs:[],latestBlock:6,latestHash:hash(6)};}
 beforeEach(()=>vi.stubGlobal('indexedDB',new IDBFactory()));afterEach(()=>vi.unstubAllGlobals());
 function provider(logs:Log[]){let head=6,reorg=false;const ranges:number[][]=[];const p={getNetwork:async()=>({chainId:46630n}),getBlock:async(n:number|string)=>{const number=n==='latest'?head:Number(n);return {number,timestamp:number*10,hash:hash(number+(reorg&&number===6?100:0))};},getLogs:async({address,fromBlock,toBlock}:{address:string;fromBlock:number;toBlock:number})=>{expect(address).toBe(core);ranges.push([fromBlock,toBlock]);return logs.filter(l=>l.blockNumber>=fromBlock&&l.blockNumber<=toBlock);}} as unknown as Provider;return {p,ranges,advance:()=>{head=8;},reorg:()=>{reorg=true;}};}
 describe('independent Core history',()=>{
@@ -50,6 +50,6 @@ describe('independent Core history',()=>{
   const o=origin();o.market=core;await expect(readCoreHistory(provider([]).p,core,o)).rejects.toThrow();
  });
  it('cache identity includes chain, factory, market and Core, separated from Market history',()=>{
-  const key=historyCacheKey(factory,market,core);expect(key).toContain('46630:core:1:');expect(key).not.toBe(historyCacheKey(factory,market,user));expect(key).not.toBe(historyCacheKey(factory,user,core));expect(key).not.toBe(historyCacheKey(user,market,core));
+  const key=historyCacheKey(factory,market,core);expect(key).toContain('46630:core:2:');expect(key).not.toBe(historyCacheKey(factory,market,user));expect(key).not.toBe(historyCacheKey(factory,user,core));expect(key).not.toBe(historyCacheKey(user,market,core));
  });
 });

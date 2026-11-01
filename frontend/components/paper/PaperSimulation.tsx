@@ -39,7 +39,7 @@ export function PaperSimulation({market:m,balanceUSD,lang,signedIn,pending,now,g
  },[api,m.id,m.revision,m.phase,actions,signedIn,pending,refresh]);
  if(!p)return <p>{lang==='zh'?'正在加载市场…':'Loading market…'}</p>;
  const state=createStockDemo(m.assetPriceUSD);
- Object.assign(state,p,{singlePool:p.singlePool===true,phase:m.phase,now:Math.max(0,now-m.createdAt),R:Number(m.R),B:Number(m.B),rTarget:Number(m.rTarget),bTarget:Number(m.bTarget),result:m.result,formalVolume:Number(m.volumeUSD)/m.assetPriceUSD});
+ Object.assign(state,p,{phase:m.phase,now:Math.max(0,now-m.createdAt),R:Number(m.R),rTarget:Number(m.rTarget),result:m.result,formalVolume:Number(m.volumeUSD)/m.assetPriceUSD});
  state.accounts=[{...state.accounts[0],...(p.own??{}),wallet:Number(balanceUSD)/m.assetPriceUSD}];
  state.core={...state.core,openedAt:m.coreOpenedAt===null?null:m.coreOpenedAt-m.createdAt,yes:Number(m.coreYes),no:Number(m.coreNo),invalid:Number(m.coreInvalid),feeTotal:p.coreFees};
  state.corePayouts=[p.corePayout];
@@ -54,7 +54,7 @@ export function PaperSimulation({market:m,balanceUSD,lang,signedIn,pending,now,g
  const claim=(type:'CLAIM_MARKET'|'CLAIM_CORE')=>onOrder({marketId:m.id,requestId:crypto.randomUUID(),expectedRevision:m.revision,action:{type}});
  const remote:RemoteSimulation={input,state,assetSymbol:m.assetSymbol,balanceUSD:Number(balanceUSD),topic:{title:m.title,YES:m.yesRule,NO:m.noRule,INVALID:m.invalidRule},pending,
   prices:{genesis:Number(m.genesisPriceUSD)*PAPER_GTOKEN_SCALE/m.assetPriceUSD,probability:gen||m.phase==='FAILED'?null:[m.yesPrice,m.noPrice]},
-  preview:p.claim??{outcomes:0,lp:0,B:0,failed:0,total:0},genesisPnl:p.genesisPnl,lpBEstimates:p.lpBEstimates,outstanding:p.outstanding,
+  preview:p.claim??{outcomes:0,lp:0,failed:0,total:0},genesisPnl:p.genesisPnl,lpEstimates:p.lpEstimates,outstanding:p.outstanding,
   chart:m.history.map(v=>({price:v.genesisPriceUSD*PAPER_GTOKEN_SCALE/m.assetPriceUSD,at:v.at-m.createdAt,kind:'TRADE'})),onInput,
   quote:side=>{const key=gen&&input.tab==='MARKET'?'G':side,entry=quotes[key],q=entry?.quote;return q&&JSON.stringify(entry.action)===JSON.stringify(actions[key])&&q.revision===m.revision&&q.expiresAt>now?q.detail??null:null;},
   trade:side=>send(gen?'G':side),stake:side=>send(side),canStake:side=>!!quotes[side]&&JSON.stringify(quotes[side].action)===JSON.stringify(actions[side])&&quotes[side].quote.expiresAt>now&&Number(quotes[side].quote.payUSD)<=Number(balanceUSD),claimMarket:()=>claim('CLAIM_MARKET'),claimCore:()=>claim('CLAIM_CORE'),

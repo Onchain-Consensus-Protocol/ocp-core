@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {assertSelectorRemoved} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase, MockCore, MockUSDC} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -19,10 +20,8 @@ contract TopicMarketTest is TopicMarketBase {
     function testBuySplitAndSquareQuote() public {
         _buy(alice, 100e3);
         assertEq(market.R(), 99000);
-        assertEq(market.B(), 0);
         assertEq(market.protocolFees(), 300);
         assertEq(market.creatorFees(), 700);
-        assertEq(market.contribution(alice), 0);
         assertEq(market.S(), Math.sqrt(99000 * 1e30));
         _accounting();
     }
@@ -35,8 +34,6 @@ contract TopicMarketTest is TopicMarketBase {
         // Integer curve reverse may leave at most one microUSDC, isolated from R.
         assertEq(market.S(), 0);
         assertEq(market.R(), 0);
-        assertEq(market.B(), 0);
-        assertEq(market.B(), market.contribution(alice));
         _accounting();
     }
 
@@ -52,8 +49,7 @@ contract TopicMarketTest is TopicMarketBase {
     function testBuyGraduationDoesNotCapActualFunds() public {
         _graduate();
         assertEq(market.initialCollateral(), 13860000);
-        assertEq(market.B(), 0);
-        assertGt(market.initialCollateral() + market.B(), 4200000);
+        assertGt(market.initialCollateral() + 0, 4200000);
         _accounting();
     }
 
@@ -99,14 +95,12 @@ contract TopicMarketTest is TopicMarketBase {
 
     function testFormalBuyThenSellFees() public {
         _graduate();
-        uint256 beforeB = market.B();
-        uint256 beforeZ = market.totalContribution();
+
+
         uint256 fee0 = market.lpFees();
         uint256 gross = market.quoteFormalBuy(true, 1e18);
         _formalBuy(bob, true, 1e18);
         assertEq(market.lpFees() - fee0, gross / 100);
-        assertEq(market.B(), beforeB);
-        assertEq(market.totalContribution(), beforeZ);
         (uint256 sellGross, uint256 net) = market.quoteFormalSell(true, 1e18);
         uint256 cashBefore = market.cash();
         uint256 wallet = usd.balanceOf(bob);
@@ -159,14 +153,12 @@ contract TopicMarketTest is TopicMarketBase {
 
     function testLPTransferPausedDoesNotTransferContribution() public {
         _graduate();
-        uint256 z = market.contribution(alice);
+
         uint256 part = market.shares(alice) / 3;
         vm.prank(alice);
         vm.expectRevert();
         IRemovedMarketAPI(address(market)).transferShares(bob, part);
         assertEq(market.shares(bob), 0);
-        assertEq(market.contribution(alice), z);
-        assertEq(market.contribution(bob), 0);
         _finish(2);
         _claimAll(alice);
         _claimAll(bob);
@@ -199,8 +191,7 @@ contract TopicMarketTest is TopicMarketBase {
         vm.expectRevert("CLAIMED");
         market.claimLP();
         vm.prank(alice);
-        vm.expectRevert("B_REMOVED");
-        market.claimB();
+        assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));
         vm.expectRevert("CORE_PENDING");
         market.finalize();
         _accounting();
@@ -230,19 +221,17 @@ contract TopicMarketTest is TopicMarketBase {
         _accounting();
         assertLe(market.collateralCash(), 3);
         assertEq(market.lpBudgetRemaining(), 0);
-        assertEq(market.bBudgetRemaining(), 0);
-    }
+        }
 
     function testFeesWithdrawOnlyAccruedNotReserve() public {
         _graduate();
         _formalBuy(bob, true, 1e18);
-        uint256 b = market.B();
+
         uint256 c = market.collateralCash();
         uint256 due = market.creatorFees();
         vm.prank(creator);
         market.claimFees();
         assertEq(usd.balanceOf(creator), due);
-        assertEq(market.B(), b);
         assertEq(market.collateralCash(), c);
         vm.prank(dave);
         market.claimFees();
@@ -253,8 +242,8 @@ contract TopicMarketTest is TopicMarketBase {
         _buy(alice,100e3);uint256 sold=market.shares(alice);vm.prank(alice);market.genesisSell(sold,0,type(uint64).max,0);
         _buy(bob,10e3); uint256 rf=market.R(); vm.warp(market.genesisCutoff()); market.closeExpired();
         vm.prank(bob); assertEq(market.claimFailed(),rf);
-        vm.prank(alice); vm.expectRevert("B_REMOVED"); market.claimB();
-        assertEq(market.failedRRemaining(),0); assertEq(market.bBudgetRemaining(),0); _accounting();
+        vm.prank(alice); assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));
+        assertEq(market.failedRRemaining(),0); _accounting();
     }
 
     function testZeroSupplyFailureNoDivisionByZero() public {
@@ -265,7 +254,7 @@ contract TopicMarketTest is TopicMarketBase {
         vm.warp(market.genesisCutoff());
         market.closeExpired();
         uint256 walletBefore=usd.balanceOf(alice);
-        vm.prank(alice);vm.expectRevert("B_REMOVED");market.claimB();
+        vm.prank(alice);assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));
         vm.prank(alice);vm.expectRevert("CLAIMED");market.claimFailed();
         assertEq(usd.balanceOf(alice),walletBefore);
         _accounting();

@@ -36,8 +36,7 @@ contract TopicMarketFullFlowTest is TopicMarketBase {
         }
     }
     function _run(uint8 expected) internal {
-        assertEq(market.rTarget(),8400e6);assertEq(market.bTarget(),0);
-        vm.prank(alice);vm.expectRevert();vault.stake(IOCPCore.Side.YES,1e6);
+        assertEq(market.rTarget(),8400e6);vm.prank(alice);vm.expectRevert();vault.stake(IOCPCore.Side.YES,1e6);
         _buy(alice,8000e6);assertEq(adapter.openedAt(),0);
         _buy(bob,1000e6);assertEq(adapter.openedAt(),block.timestamp);
         assertLe(address(market).code.length,24576);
@@ -52,10 +51,10 @@ contract TopicMarketFullFlowTest is TopicMarketBase {
         assertEq(market.outcome(),expected);assertEq(uint8(vault.outcome()),expected);
         address[4] memory users=[alice,bob,carol,dave];
         for(uint256 i;i<4;++i){
-            (uint256 o,uint256 lp,uint256 b,uint256 f)=market.previewAccount(users[i],expected);
+            (uint256 o,uint256 lp,uint256 f)=market.previewAccount(users[i],expected);
             uint256 before=usd.balanceOf(users[i]);
             vm.prank(users[i]);uint256 paid=market.claimAll();
-            assertEq(paid,o+lp+b+f);assertEq(usd.balanceOf(users[i])-before,paid);
+            assertEq(paid,o+lp+f);assertEq(usd.balanceOf(users[i])-before,paid);
             vm.prank(users[i]);vm.expectRevert();market.claimAll();
         }
         vm.prank(alice);vault.withdraw();vm.prank(bob);vault.withdraw();vm.prank(carol);vault.withdraw();

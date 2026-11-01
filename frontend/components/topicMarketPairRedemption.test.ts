@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { createTopicMarketDemo, topicMarketCreate, topicMarketBuy, topicMarketFormalBuy, topicMarketFormalSell, topicMarketRedeemPairs,
   topicMarketMaxFormalSellTokens, topicMarketCoordinates, topicMarketCoreStake, topicMarketAdvanceTime, topicMarketFinalize,
-  topicMarketTransferLP, topicMarketTransferB, topicMarketClaimLP, topicMarketClaimB, topicMarketClaim, topicMarketClaimCore,
+  topicMarketTransferLP,  topicMarketClaimLP,  topicMarketClaim, topicMarketClaimCore,
   topicMarketClaimFees, topicMarketClaimCoreOfficial, topicMarketAccounting, topicMarketAssertLedger } from "./topicMarketDemoModel";
 type State=ReturnType<typeof createTopicMarketDemo>;
-const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo({singlePool:false}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
+const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo({Q:6000}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
 const bought=()=>topicMarketFormalBuy(topicMarketFormalBuy(formal(),0,"YES",100),0,"NO",80);
+const frozen=(s:State)=>({cash:s.cash,lpFees:s.lpFees,lpSupply:s.lpSupply,inventory:s.inventory,b:s.b});
 const ledger=(s:State)=>{topicMarketAssertLedger(s);expect(topicMarketAccounting(s).error).toBeCloseTo(0,7);};
-const frozen=(s:State)=>({basis:s.basis,b:s.b,inventory:s.inventory,cash:s.cash,B:s.B,lpFees:s.lpFees,creatorFees:s.creatorFees,protocolFees:s.protocolFees,core:s.core,lp:s.accounts.map(a=>a.lp),z:s.accounts.map(a=>a.z)});
 describe("TopicMarket locked LP: directly purchased outcome pair redemption",()=>{
- it("redeems only real purchased YES+NO and leaves locked LP/B assets untouched",()=>{
+ it("redeems only real purchased YES+NO and leaves locked LP assets untouched",()=>{
   let s=bought();const before=s,other=frozen(s);s=topicMarketRedeemPairs(s,0,20);
   expect(s.accounts[0].yes).toBe(80);expect(s.accounts[0].no).toBe(60);
   expect(s.accounts[0].wallet-before.accounts[0].wallet).toBeCloseTo(20,8);
@@ -38,14 +38,11 @@ describe("TopicMarket locked LP: directly purchased outcome pair redemption",()=
   for(const n of [0,-1,NaN,Infinity,81]){expect(()=>topicMarketRedeemPairs(s,0,n)).toThrow();expect(JSON.stringify(s)).toBe(before);}
   expect(()=>topicMarketRedeemPairs(s,1,1)).toThrow();ledger(s);
  });
- for(const outcome of ["YES","NO","INVALID"] as const)it(`preserves B cover and all final burn claims after pair redemption: ${outcome}`,()=>{
-  let s=topicMarketRedeemPairs(bought(),0,20);s=topicMarketTransferLP(s,0,1,s.accounts[0].lp/3);s=topicMarketTransferB(s,1,2,s.accounts[1].z/4);
+ for(const outcome of ["YES","NO","INVALID"] as const)it(`preserves all final burn claims after pair redemption: ${outcome}`,()=>{
+  let s=topicMarketRedeemPairs(bought(),0,20);
   if(outcome!=="INVALID")s=topicMarketCoreStake(s,2,outcome,100);
   const v=outcome==="YES"?s.inventory[0]:outcome==="NO"?s.inventory[1]:(s.inventory[0]+s.inventory[1])/2;
-  const cover=Math.min(s.B,Math.max(s.basis-s.cash-s.lpFees-v,0));
-  s=topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));expect(s.cover).toBeCloseTo(cover,7);
-  s=topicMarketClaimLP(s,1,s.accounts[1].lp/4);s=topicMarketClaimB(s,2,s.accounts[2].z/5);
-  s=topicMarketTransferLP(s,2,0,s.accounts[2].lp/2);s=topicMarketTransferB(s,0,1,s.accounts[0].z/2);
+  s=topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));
   for(let id=0;id<3;id++){s=topicMarketClaim(s,id);s=topicMarketClaimCore(s,id);expect(()=>topicMarketClaim(s,id)).toThrow();ledger(s);}
   if(s.creatorFees>0)s=topicMarketClaimFees(s,"CREATOR",1);if(s.protocolFees>0)s=topicMarketClaimFees(s,"PROTOCOL",2);if(s.coreOfficialBudget>0)s=topicMarketClaimCoreOfficial(s,2);
   expect(topicMarketAccounting(s).wallets).toBeCloseTo(30000,7);expect(topicMarketAccounting(s).reserves).toBeCloseTo(0,7);ledger(s);

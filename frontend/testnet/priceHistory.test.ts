@@ -35,10 +35,10 @@ describe('current TopicMarket price history',()=>{
   it('retains the real Genesis curve after graduation/claims and counts only actual formal turnover',()=>{
     const logs=[
       event(iface,'GenesisTrade',[USER,true,10n*WAD,3n*WAD],4,0),
-      event(iface,'Graduated',[USER,true,10n*WAD,WAD],4,1),
+      event(iface,'Graduated',[USER,true,10n*WAD],4,1),
       event(iface,'FormalTrade',[USER,true,true,WAD,2n*WAD],5,0),
       event(iface,'FormalTrade',[USER,false,false,WAD/2n,WAD],5,1),
-      event(iface,'Finalized',[1,0n,10n*WAD,WAD],6,0),
+      event(iface,'Finalized',[1,10n*WAD],6,0),
       event(iface,'Claimed',[USER,hash(99),WAD],6,1),
     ];
     const result=replayMarketPriceHistory(stamped(creation()),logs.map(stamped),WAD,6);

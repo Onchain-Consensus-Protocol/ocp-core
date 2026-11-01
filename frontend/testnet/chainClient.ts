@@ -11,9 +11,9 @@ import {readChainPriceHistory, replayCheckpoint, type ChainPriceHistory} from '.
 
 export const TESTNET_CHAIN_ID = 46630n;
 const tokenAbi = ['function symbol() view returns(string)', 'function decimals() view returns(uint8)', 'function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'];
-export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; fixedRTarget?:bigint; fixedBTarget?:bigint }
-export interface MarketSummary { singlePool?:boolean; address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;priceYes?:bigint;R?:bigint;B?:bigint;rTarget?:bigint;bTarget?:bigint }
-export interface AccountPosition { balance:bigint; genesisShares:bigint; yes:bigint; no:bigint; lp:bigint; b:bigint; coreYes:bigint; coreNo:bigint; coreInvalid:bigint; marketAllowance:bigint; vaultAllowance:bigint; routerAllowance:bigint }
+export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; fixedRTarget?:bigint; }
+export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;priceYes?:bigint;R?:bigint;rTarget?:bigint; }
+export interface AccountPosition { balance:bigint; genesisShares:bigint; yes:bigint; no:bigint; lp:bigint; coreYes:bigint; coreNo:bigint; coreInvalid:bigint; marketAllowance:bigint; vaultAllowance:bigint; routerAllowance:bigint }
 export interface CoreLifecycle {bond:bigint; requestId:bigint; requestedOutcome:number; processAfter:bigint; effectiveCutoff:bigint; due:boolean; refund?:bigint; penalty?:bigint; bondRefund?:bigint}
 /** Prices/quantities are WAD; money and payouts use collateral native units. Unknown metrics stay absent. */
 export interface MarketPresentation {
@@ -22,11 +22,11 @@ export interface MarketPresentation {
   formalVolume?:bigint;totalFees:bigint;feeYes?:bigint;feeNo?:bigint;feeInvalid?:bigint;
   corePayout?:bigint;marketPayout?:bigint;genesisPrice:bigint;
 }
-export interface MarketState extends MarketSummary { feeClaims?:{automatic?:boolean;creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string}; poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; R:bigint; B:bigint; S:bigint; rTarget:bigint; bTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; bBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
+export interface MarketState extends MarketSummary { feeClaims?:{creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string}; poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; R:bigint; S:bigint; rTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
 export interface DirectoryState { factory:string; owner:string; fixedTestTargets?:boolean; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
 export interface PaymentRoute {router:string;exchange:string;stock:string;stable:string;stableSymbol:string;stableDecimals:number;stableBalance?:bigint;stableAllowance?:bigint}
 export interface CreateMarketInput { stock:string; topic:string; yesRule:string; noRule:string; invalidRule:string; coreEnd:bigint }
-export enum RouterAction { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket, ClaimOutcome, ClaimLP, ClaimB, ClaimFailed, ClaimCore, RedeemPairs }
+export enum RouterAction { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket, ClaimOutcome, ClaimLP, ClaimFailed, ClaimCore, RedeemPairs }
 export interface RouterRequest { market:string; action:RouterAction; paymentAsset:string; inputAmount:bigint; quantity:bigint; minCollateral:bigint; businessLimit:bigint; minOutput:bigint; deadline:bigint; side:0|1|2; graduationIntent:0|1|2 }
 
 export function nonzeroAddress(value:string):string {
@@ -38,13 +38,15 @@ export async function assertTestnet(provider:Provider):Promise<void> {
   if((await provider.getNetwork()).chainId!==TESTNET_CHAIN_ID) throw new Error('请切换到 Robinhood Chain Testnet（46630）');
 }
 
-/** Raw amounts use collateral decimals; outcome/LP/B quantities use 18 decimals. No write runs on construction/read. */
+/** Raw amounts use collateral decimals; outcome/LP quantities use 18 decimals. No write runs on construction/read. */
 export function createChainClient(provider:Provider, factoryAddress:string) {
   const address=nonzeroAddress(factoryAddress);
   const factory=new Contract(address,factoryAbi,provider);
   async function ready() {
     await assertTestnet(provider);
     if(await provider.getCode(address)==='0x') throw new Error('测试网工厂地址没有合约代码');
+    const version=await new Contract(address,['function interfaceVersion() view returns(uint256)'],provider).interfaceVersion().catch(()=>0n);
+    if(version!==2n)throw new Error('测试网合约版本不支持：需要 interfaceVersion 2，请更新部署配置');
   }
   async function summary(marketAddress:string,includePresentation=false):Promise<MarketSummary> {
     const market=nonzeroAddress(marketAddress);
@@ -53,12 +55,11 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const result:MarketSummary={address:market,stock,creator:r.creator,adapter:r.adapter,vault:r.vault,topic:r.topic,yesRule:r.yesRule,noRule:r.noRule,invalidRule:r.invalidRule,createdAt:r.createdAt,genesisCutoff:r.coreCutoff-7200n,formalCutoff:r.formalCutoff,coreCutoff:r.coreCutoff,snapshot:r.snapshot};
     if(includePresentation){
       const m=new Contract(market,marketAbi,provider);
-      result.singlePool=await new Contract(market,['function singlePool() view returns(bool)'],provider).singlePool().catch(()=>false);
-      const metrics=await Promise.allSettled([m.phase(),m.R(),m.B(),m.rTarget(),m.bTarget()]);
-      const names=['phase','R','B','rTarget','bTarget'] as const;
+      const metrics=await Promise.allSettled([m.phase(),m.R(),m.rTarget()]);
+      const names=['phase','R','rTarget'] as const;
       metrics.forEach((value,i)=>{if(value.status==='fulfilled'){
         if(names[i]==='phase')result.phase=Number(value.value);
-        else result[names[i] as 'R'|'B'|'rTarget'|'bTarget']=value.value;
+        else result[names[i] as 'R'|'rTarget']=value.value;
       }});
       if(result.phase===1||result.phase===2){
         const v=new Contract(result.vault,vaultAbi,provider);
@@ -88,8 +89,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
         if(fixedTestTargets){
           if(getAddress(stock)!==getAddress('0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E') || result.decimals!==18) throw new Error('TESTNET_TSLA_ONLY');
           await oracle.collateralForUsd(500n*10n**18n); // Bond still needs a valid USD conversion.
-          const singlePool=await new Contract(address,['function singlePool() view returns(bool)'],provider).singlePool().catch(()=>false);
-          result.fixedRTarget=singlePool?4200000000000000n:3600000000000000n;result.fixedBTarget=singlePool?0n:600000000000000n;
+          result.fixedRTarget=4200000000000000n;
         } else result.snapshot=await oracle.ethPrice6();
       }
       catch {result.snapshotError='价格快照不可用：请检查喂价时效、状态和配置';}
@@ -101,26 +101,25 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
   async function readMarket(marketAddress:string,account?:string):Promise<MarketState> {
     await ready();const base=await summary(marketAddress);
     const m=new Contract(base.address,marketAbi,provider);const v=new Contract(base.vault,vaultAbi,provider);
-    const keys=['phase','outcome','R','B','S','rTarget','bTarget','k','cash','lpFees','lpBudgetRemaining','bBudgetRemaining'] as const;
+    const keys=['phase','outcome','R','S','rTarget','k','cash','lpFees','lpBudgetRemaining'] as const;
     const values=await Promise.all(keys.map(key=>m[key]()));
     const state={...base,...Object.fromEntries(keys.map((key,i)=>[key,values[i]]))} as MarketState;
-    state.singlePool=await new Contract(base.address,['function singlePool() view returns(bool)'],provider).singlePool().catch(()=>false);
     state.phase=Number(state.phase);state.outcome=Number(state.outcome);
-    try{const [creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient]=await Promise.all([m.creator(),m.protocol(),m.creatorFees(),m.protocolFees(),v.officialMarketFeesClaimable(),v.emptySettlementRecipient()]);state.feeClaims={creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient};try{state.feeClaims.automatic=await new Contract(base.address,['function automaticFeePayout() view returns(bool)'],provider).automaticFeePayout();}catch{state.feeClaims.automatic=false;}}catch{/* 无法读取时不假定手续费为零。 */}
+    try{const [creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient]=await Promise.all([m.creator(),m.protocol(),m.creatorFees(),m.protocolFees(),v.officialMarketFeesClaimable(),v.emptySettlementRecipient()]);state.feeClaims={creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient};}catch{/* 无法读取时不假定手续费为零。 */}
     try{state.poolStockBalance=await new Contract(base.stock,tokenAbi,provider).balanceOf(base.address);}catch{/* 未读到真实余额时保持未知，不用cash或0代替。 */}
     [state.vaultResolved,state.vaultOutcome,state.vaultSettlementReady,state.totalStakeYes,state.totalStakeNo,state.totalStakeInvalid]=await Promise.all([v.resolved(),v.outcome(),v.settlementReady(),v.totalStakeYes(),v.totalStakeNo(),v.totalStakeInvalid()]);
     state.vaultOutcome=Number(state.vaultOutcome);
     if(account){
       account=nonzeroAddress(account);const token=new Contract(base.stock,tokenAbi,provider);
-      const [lp,b,router]=await Promise.all([m.lpToken(),m.bToken(),m.trustedForwarder()]);
-      const [balance,genesisShares,yes,no,lpBalance,bBalance,stake,marketAllowance,vaultAllowance,routerAllowance]=await Promise.all([token.balanceOf(account),m.shares(account),m.yes(account),m.no(account),new Contract(lp,tokenAbi,provider).balanceOf(account),getAddress(b)===ZeroAddress?Promise.resolve(0n):new Contract(b,tokenAbi,provider).balanceOf(account),v.stakeOf(account),token.allowance(account,base.address),token.allowance(account,base.vault),token.allowance(account,router)]);
-      state.position={balance,genesisShares,yes,no,lp:lpBalance,b:bBalance,coreYes:stake[0],coreNo:stake[1],coreInvalid:stake[2],marketAllowance,vaultAllowance,routerAllowance};
+      const [lp,router]=await Promise.all([m.lpToken(),m.trustedForwarder()]);
+      const [balance,genesisShares,yes,no,lpBalance,stake,marketAllowance,vaultAllowance,routerAllowance]=await Promise.all([token.balanceOf(account),m.shares(account),m.yes(account),m.no(account),new Contract(lp,tokenAbi,provider).balanceOf(account),v.stakeOf(account),token.allowance(account,base.address),token.allowance(account,base.vault),token.allowance(account,router)]);
+      state.position={balance,genesisShares,yes,no,lp:lpBalance,coreYes:stake[0],coreNo:stake[1],coreInvalid:stake[2],marketAllowance,vaultAllowance,routerAllowance};
     }
     try {
       const [bond, request, due, effectiveCutoff] = await Promise.all([v.earlyTerminationBondRequired(),v.pendingEarlyTermination(),v.earlyTerminationProcessingDue(),v.effectiveResolutionTime()]);
       state.early={bond,requestId:request.id,requestedOutcome:Number(request.requestedOutcome),processAfter:request.processAfter,effectiveCutoff,due};
       if(account){const [exit,bondRefund]=await Promise.all([v.previewExitStake(account),v.claimableEarlyBond(account)]);state.early.refund=exit[0];state.early.penalty=exit[1];state.early.bondRefund=bondRefund;}
-    } catch { /* Existing immutable deployments do not expose these new lifecycle methods. */ }
+    } catch { /* Leave unavailable RPC metrics absent; never synthesize lifecycle values. */ }
     try {
       const [basisWad,bWad,inventoryYes,inventoryNo,totalYes,totalNo,totalFees]=await Promise.all([
         m.poolBasisWad(),m.bWad(),m.inventoryY(),m.inventoryN(),m.yesSupply(),m.noSupply(),v.totalMarketFeesAccrued(),
@@ -137,7 +136,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
         }catch{/* Optional account view unavailable. */}
         if(state.phase===3 || state.phase===4){
           try {const payout=await m.previewAccount(account,state.phase===4?1:state.outcome);
-            state.presentation.marketPayout=payout[0]+payout[1]+payout[2]+payout[3];
+            state.presentation.marketPayout=payout[0]+payout[1]+payout[2];
           }catch{/* Do not fabricate a zero claim when a view fails. */}
         }
       }
@@ -188,7 +187,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     return new Contract(base.address,marketAbi,provider)[method](...args);
   }
   function withSigner(signer:Signer,validateSession?:()=>void) {
-    async function writeReady(){await ready();if(!signer.provider) throw new Error('钱包未连接');await assertTestnet(signer.provider);}
+    async function writeReady(){if(!signer.provider) throw new Error('钱包未连接');await assertTestnet(signer.provider);await ready();}
     async function submit(contract:Contract,method:string,args:unknown[],paymentGas=0n):Promise<ContractTransactionResponse>{
       if(!signer.provider) throw new Error('钱包未连接');
       // 在估算值上另加发费预算；避免估算绕过发费后钱包只提供冻结结算的gas。

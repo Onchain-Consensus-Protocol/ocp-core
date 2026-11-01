@@ -99,7 +99,7 @@ contract RHEarlyTerminationForkTest is Test {
             c.pendingBondEscrow(),c.totalEarlyBondRefunds(),c.claimableEarlyBond(ALICE),c.claimableEarlyBond(BOB),c.effectiveResolutionTime()));
         bytes32 money=keccak256(abi.encode(IERC20(stocks[i]).balanceOf(address(c)),IERC20(stocks[i]).balanceOf(address(m)),c.totalPrincipal(),c.totalMarketFeesAccrued(),
             c.exitPenaltyPool(),c.failedProposalBondPool(),c.marketFeeUserPoolRemaining(),c.remainingSettlementPool(),c.officialMarketFeesClaimable()));
-        return keccak256(abi.encode(governance,money,_positions(c),c.resolved(),c.settlementReady(),m.phase(),m.R(),m.B(),m.accountedBalance(),m.yes(ALICE),m.lpBudgetRemaining(),m.bBudgetRemaining()));
+        return keccak256(abi.encode(governance,money,_positions(c),c.resolved(),c.settlementReady(),m.phase(),m.R(),0,m.accountedBalance(),m.yes(ALICE),m.lpBudgetRemaining(),0));
     }
     function _stake(uint256 i,address user,uint256 dollars,uint8 side) private {
         TopicMarketAssetRouter.Request memory r=_request(i,TopicMarketAssetRouter.Action.CoreStake);r.inputAmount=dollars;r.side=side;_route(i,user,r);_accounting(i);
@@ -158,7 +158,7 @@ contract RHEarlyTerminationForkTest is Test {
         vm.prank(ALICE);vm.expectRevert();cores[0].claimEarlyTerminationBond();
         TopicMarketAssetRouter.Request memory claim=_request(0,TopicMarketAssetRouter.Action.ClaimMarket);claim.minOutput=1;
         uint256 usd=IERC20(USDG).balanceOf(ALICE);_route(0,ALICE,claim);assertGt(IERC20(USDG).balanceOf(ALICE),usd);
-        assertEq(markets[0].shares(ALICE)+markets[0].yes(ALICE)+0+markets[0].lpToken().balanceOf(ALICE),0);
+        assertEq(markets[0].shares(ALICE)+markets[0].yes(ALICE)+markets[0].lpToken().balanceOf(ALICE),0);
         _claimCore(ALICE);_claimCore(BOB);assertEq(IERC20(stocks[0]).balanceOf(address(cores[0])),0);
         assertTrue(checkMarketInvariants(markets[0]));assertEq(_state(1),isolated);assertTrue(adapters[1].tradingAllowed());
         assertEq(IERC20(stocks[0]).balanceOf(address(routers[0])),0);assertEq(IERC20(USDG).balanceOf(address(routers[0])),0);

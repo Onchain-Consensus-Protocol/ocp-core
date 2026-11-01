@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {TopicMarket, IToken6} from "../src/TopicMarket.sol";
@@ -37,7 +36,6 @@ contract TopicMarketStockCollateralTest is Test {
             assertEq(m.quoteGenesisBuy(unit),referenceSupply);
             m.genesisBuy(unit,referenceSupply,type(uint64).max,0);
             assertEq(m.R(),99*unit/100);
-            assertEq(removedBSupply(m),0);
             assertTrue(checkMarketInvariants(m));
             m.genesisSell(m.S(),0,type(uint64).max,0);
             assertEq(m.S(),0); assertEq(m.R(),0); assertTrue(checkMarketInvariants(m));
@@ -54,7 +52,7 @@ contract TopicMarketStockCollateralTest is Test {
         m.formalSell(true,5e17,0,type(uint64).max);
         assertTrue(checkMarketInvariants(m));
         vm.warp(m.coreCutoff()); c.resolve(1); m.finalize();
-        (uint256 a,uint256 b,uint256 cc,)=m.previewAccount(address(this),1);
+        (uint256 a,uint256 b,uint256 cc)=m.previewAccount(address(this),1);
         uint256 before=t.balanceOf(address(this)); m.claimAll();
         assertEq(t.balanceOf(address(this))-before,a+b+cc);
         assertTrue(checkMarketInvariants(m));
@@ -75,7 +73,6 @@ contract TopicMarketStockCollateralTest is Test {
         address user=address(0xa11ce);
         (bool ok,)=address(m).call(abi.encodePacked(abi.encodeCall(m.genesisBuy,(1e18,0,type(uint64).max,0)),user));
         assertTrue(ok); assertGt(m.shares(user),0); assertEq(m.shares(address(this)),0);
-        assertEq(removedBBalance(m,user),0);
         vm.warp(m.genesisCutoff());m.closeExpired();
         uint256 before=t.balanceOf(address(this));
         (ok,)=address(m).call(abi.encodePacked(abi.encodeCall(m.claimAll,()),user));

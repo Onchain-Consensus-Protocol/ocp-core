@@ -9,7 +9,6 @@ contract TopicMarketTestnetStockFactory is TopicMarketStockFactory {
     address public constant TESTNET_TSLA = 0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E;
     bool public constant fixedTestnetGraduation = true;
     uint256 public constant testRTarget = 42e14; // 0.0042 TSLA
-    uint256 public constant testBTarget = 0; // Legacy getter; no B pool
     constructor(address owner_,address protocol_,TopicMarketCoreDeployer cd_,TopicMarketDeployer md_)
         TopicMarketStockFactory(owner_,protocol_,cd_,md_)
     {
@@ -18,7 +17,7 @@ contract TopicMarketTestnetStockFactory is TopicMarketStockFactory {
     function _graduationBasis(address stock, StockConfig memory config) internal view override returns(uint256) {
         require(block.chainid == 46630 && stock == TESTNET_TSLA && config.decimals == 18, "TESTNET_TSLA_ONLY");
         // 零仅是“固定测试门槛、不使用ETH价格快照”的显式标记，不是ETH行情。
-        // Market构造时独立再次检查chainId及真实TSLA地址，然后直接写固定R/B。
+        // Market构造时独立再次检查chainId及真实TSLA地址，然后直接写固定R门槛。
         return 0;
     }
 }

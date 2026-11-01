@@ -13,7 +13,7 @@ const ledger = (s: State) => {
   expect(topicMarketAccounting(s).total).toBeCloseTo(30000, 7);
 };
 const formal = () => {
-  let s = topicMarketCreate(createTopicMarketDemo({singlePool:false}));
+  let s = topicMarketCreate(createTopicMarketDemo({Q:6000}));
   for (let id = 0; id < 3; id++) s = topicMarketBuy(s, id, 9000);
   expect(s.phase).toBe("FORMAL");
   return s;
@@ -22,7 +22,7 @@ const finalize = (s: State) => topicMarketFinalize(topicMarketAdvanceTime(s, s.T
 const trade = (s: State, budget = 100) => topicMarketFormalBuyBudget(s, 2, "YES", budget);
 
 describe("TopicMarket Formal Core fee: historical conditional reward escrow", () => {
-  it("preserves Genesis creator/project fees and routes Formal fees to LP/Core/B", () => {
+  it("preserves Genesis creator/project fees and routes Formal fees to LP/Core", () => {
     let s = formal();
     const before = s;
     expect(before.protocolFees).toBeCloseTo(81,8);
@@ -34,18 +34,13 @@ describe("TopicMarket Formal Core fee: historical conditional reward escrow", ()
     expect(q.fees.protocol).toBeCloseTo(q.gross*.003,8);
     s = trade(s);
     expect(s.cash - before.cash).toBeCloseTo(98, 8);
-    expect(s.lpFees - before.lpFees).toBeCloseTo(.5, 8);
+    expect(s.lpFees - before.lpFees).toBeCloseTo(1, 8);
     expect(s.creatorFees).toBe(before.creatorFees);
-    expect(q.B).toBeCloseTo(.5, 8);
-    expect(q.fees.B).toBeCloseTo(.5, 8);
-    expect(q.contribution).toBe(0);
     expect(s.protocolFees).toBeCloseTo(before.protocolFees+q.protocolFee,8);
     expect(s.core.fees).toBeCloseTo(.7, 8);
     expect(s.core.feeTotal).toBeCloseTo(.7, 8);
     expect(s.core.cash).toBe(0);
     expect(s.core.yes + s.core.no + s.core.invalid).toBe(0);
-    expect(s.B - before.B).toBeCloseTo(.5, 8);
-    expect(s.accounts.map(a => a.z)).toEqual(before.accounts.map(a => a.z));
     expect(s.collateral).toBe(before.collateral);
     ledger(s);
   });

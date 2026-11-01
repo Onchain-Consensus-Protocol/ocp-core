@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -89,15 +88,13 @@ contract TopicMarketStockIntegrationTest is Test {
         assertEq(vault.earlyTerminationBondRequired(),2e18); // Existing market never reprices.
     }
     function testRealFactoryRegistrationForwarderAndUnits() public view {
-        assertTrue(factory.isMarket(address(m)));assertEq(m.rTarget(),336e17);assertEq(m.bTarget(),0);
-        assertTrue(m.isTrustedForwarder(address(router)));assertTrue(vault.isTrustedForwarder(address(router)));
+        assertEq(factory.interfaceVersion(),2);assertTrue(factory.isMarket(address(m)));assertEq(m.rTarget(),336e17);assertTrue(m.isTrustedForwarder(address(router)));assertTrue(vault.isTrustedForwarder(address(router)));
         assertEq(address(m.token()),address(c));assertEq(address(vault.stakeToken()),address(c));
         assertLe(address(m).code.length,24576);
     }
     function testStableBuysAndSalesKeepRightsOnUserAndPreserveDust() public {
         c.mint(address(router),7);u.mint(address(router),9);
-        buy(1000e6);assertGt(m.shares(alice),0);assertEq(m.shares(address(router)),0);assertEq(removedBBalance(m,alice),0);
-        assertEq(c.balanceOf(address(router)),7);assertEq(u.balanceOf(address(router)),9);
+        buy(1000e6);assertGt(m.shares(alice),0);assertEq(m.shares(address(router)),0);assertEq(c.balanceOf(address(router)),7);assertEq(u.balanceOf(address(router)),9);
         TopicMarketAssetRouter.Request memory r=req(TopicMarketAssetRouter.Action.GenesisSell);r.quantity=m.shares(alice)/2;
         uint256 before=u.balanceOf(alice);vm.prank(alice);router.execute(r);assertGt(u.balanceOf(alice),before);
         assertEq(c.allowance(address(router),address(m)),0);assertEq(c.allowance(address(router),address(ex)),0);
@@ -111,19 +108,24 @@ contract TopicMarketStockIntegrationTest is Test {
         r=req(TopicMarketAssetRouter.Action.FormalBuy);r.quantity=1e18;r.inputAmount=500e6;r.businessLimit=2e18;
         vm.prank(alice);router.execute(r);assertEq(m.yes(alice),1e18);assertEq(m.yes(address(router)),0);
         r=req(TopicMarketAssetRouter.Action.FormalSell);r.quantity=5e17;vm.prank(alice);router.execute(r);assertEq(m.yes(alice),5e17);
+        r=req(TopicMarketAssetRouter.Action.FormalBuy);r.side=1;r.quantity=5e17;r.inputAmount=500e6;r.businessLimit=2e18;
+        vm.prank(alice);router.execute(r);assertEq(m.no(alice),5e17);
+        r=req(TopicMarketAssetRouter.Action.RedeemPairs);r.quantity=1e17;
+        uint256 pairWallet=u.balanceOf(alice);vm.prank(alice);router.execute(r);
+        assertEq(m.yes(alice),4e17);assertEq(m.no(alice),4e17);assertGt(u.balanceOf(alice),pairWallet);
+        assertEq(m.yes(address(router))+m.no(address(router)),0);assertTrue(checkMarketInvariants(m));
         vm.warp(m.coreCutoff());adapter.finalizeMarket();
         r=req(TopicMarketAssetRouter.Action.ClaimMarket);uint256 before=u.balanceOf(alice);vm.prank(alice);router.execute(r);assertGt(u.balanceOf(alice),before);
-        assertEq(removedBBalance(m,alice),0);assertEq(m.lpToken().balanceOf(alice),0);
+        assertEq(m.lpToken().balanceOf(alice),0);
         r=req(TopicMarketAssetRouter.Action.ClaimCore);vm.prank(alice);router.execute(r);assertTrue(checkMarketInvariants(m));
         vm.prank(alice);vm.expectRevert();router.execute(r);
     }
     function testOutputSwapFailureRollsBackBurnAndAllowsNativeClaim() public {
         factory.setStockEnabled(address(c),false);
         buy(1000e6);vm.warp(m.genesisCutoff());m.closeExpired();
-        uint256 g=m.shares(alice);uint256 b=removedBBalance(m,alice);ex.setFail(true);
-        TopicMarketAssetRouter.Request memory r=req(TopicMarketAssetRouter.Action.ClaimMarket);vm.prank(alice);vm.expectRevert();router.execute(r);
-        assertEq(m.shares(alice),g);assertEq(removedBBalance(m,alice),b);
-        uint256 before=c.balanceOf(alice);vm.prank(alice);m.claimAll();assertGt(c.balanceOf(alice),before);
+        uint256 g=m.shares(alice);ex.setFail(true);
+        TopicMarketAssetRouter.Request memory r=req(TopicMarketAssetRouter.Action.ClaimFailed);vm.prank(alice);vm.expectRevert();router.execute(r);
+        assertEq(m.shares(alice),g);uint256 before=c.balanceOf(alice);vm.prank(alice);m.claimAll();assertGt(c.balanceOf(alice),before);
     }
     function testCannotBypassSideLockOrClaimOthersWithSuffix() public {
         graduate();vm.prank(alice);vault.stake(IOCPCore.Side.NO,1e18);
@@ -158,7 +160,7 @@ contract TopicMarketStockIntegrationTest is Test {
     function testStockDisableReenablePreservesMarketsAndConfig() public {
         (ITopicMarketPriceSnapshot price,address route,uint256 coefficient,,)=factory.stocks(address(c));
         factory.setStockEnabled(address(c),false);
-        assertTrue(factory.isMarket(address(m)));
+        assertEq(factory.interfaceVersion(),2);assertTrue(factory.isMarket(address(m)));
         assertEq(factory.marketCollateral(address(m)),address(c));
         vm.expectRevert(bytes("STOCK_DISABLED"));
         factory.createMarket(address(c),"disabled","yes","no","invalid",uint64(block.timestamp+6 hours));

@@ -2,31 +2,31 @@
 export type Side = "YES" | "NO";
 export type Outcome = Side | "INVALID";
 export type TopicMarketPhase = "CREATE" | "GENESIS" | "FORMAL" | "WAIT_CORE" | "FAILED" | "SETTLED";
-export type TopicMarketScenario = "GENESIS" | "BUY_GRADUATE" | "SELL_READY" | "SELL_GRADUATE" | "FAILURE";
-export interface TopicMarketConfig { singlePool?:boolean; depthPolicy?: "GRADUATION_CAPITAL"; Q?: number; k?: number; b?: number; TF?: number; TC?: number; TT?: number; creatorAccount?: number; protocolAccount?: number }
+export type TopicMarketScenario = "GENESIS" | "BUY_GRADUATE" | "FAILURE";
+export interface TopicMarketConfig {  depthPolicy?: "GRADUATION_CAPITAL"; Q?: number; k?: number; b?: number; TF?: number; TC?: number; TT?: number; creatorAccount?: number; protocolAccount?: number }
 export interface TopicMarketAccount {
-  name: string; wallet: number; g: number; lp: number; z: number; yes: number; no: number;
+  name: string; wallet: number; g: number; lp: number; yes: number; no: number;
   coreSide: Outcome | null; coreStake: number; coreRewards: [number, number, number]; claimed: boolean; coreClaimed: boolean; paid: number; received: number;
 }
-export interface TopicMarketPayout { outcomes: number; lp: number; B: number; failed: number; total: number }
+export interface TopicMarketPayout { outcomes: number; lp: number; failed: number; total: number }
 export interface TopicMarketEvent { id: number; at: number; kind: string; actor?: number; amount?: number; quantity?: number; detail?: string; wallet?: string; transactionHash?: string; source?: "MARKET" | "CORE"; timestamp?: number; side?: string }
 export interface TopicMarketLiquidityReference { lpSupply:number; basis:number; b:number; cash:number; lpFees:number; inventory:[number,number] }
 export interface TopicMarketAddQuote { lp:number; money:number; cash:number; lpFee:number; yes:number; no:number; basis:number; b:number; restart:boolean }
 export interface TopicMarketState {
-  singlePool?:boolean; initialCapital?:number; phase: TopicMarketPhase; now: number; TG: number; TF: number; TC: number; TT: number; Q: number; k: number;
-  rTarget: number; bTarget: number; R: number; B: number; S: number; M0: number; redeemedPairs: number;
+   initialCapital?:number; phase: TopicMarketPhase; now: number; TG: number; TF: number; TC: number; TT: number; Q: number; k: number;
+  rTarget: number; R: number; S: number; M0: number; redeemedPairs: number;
   collateral: number; cash: number; lpFees: number; lpFeesEarned:number; formalVolume:number; creatorFees: number; protocolFees: number;
   basis: number; b: number; lpSupply: number; inventory: [number, number]; liquidityClosed: boolean; restartLiquidity:TopicMarketLiquidityReference|null;
   accounts: TopicMarketAccount[]; core: { openedAt: number | null; yes: number; no: number; invalid: number; cash: number; fees: number; feeTotal: number; officialRewards: [number, number, number]; result: Outcome | null };
-  result: Outcome | null; cover: number; lpBudget: number; bBudget: number; outcomeBudget: number;
-  lpClaimSupply:number; bClaimSupply:number; lpBudgetInitial:number; bBudgetInitial:number; failedSupply:number; failedBudgetInitial:number;
+  result: Outcome | null; lpBudget: number; outcomeBudget: number;
+  lpClaimSupply:number;  lpBudgetInitial:number;  failedSupply:number; failedBudgetInitial:number;
   failedBudget: number; coreBudget: number; coreOfficialBudget: number; payouts: TopicMarketPayout[] | null; corePayouts: number[];
   events: TopicMarketEvent[]; config: { creatorAccount: number; protocolAccount: number; depthPolicy?: "GRADUATION_CAPITAL" };
 }
 export interface TopicMarketTradeQuote {
-  quantity: number; gross: number; net: number; R: number; B: number; lpFee: number;
+  quantity: number; gross: number; net: number; R: number; lpFee: number;
   creatorFee: number; protocolFee: number; coreFee: number; wouldGraduate: boolean; average: number; mergePairs?: number;
-  actual: number; contribution: number; fees: { creator: number; lp: number; protocol: number; core: number; B:number }; unused?: number;
+  actual: number; fees: { creator: number; lp: number; protocol: number; core: number }; unused?: number;
 }
 export interface TopicMarketExitQuote { money: number; cash: number; lpFee: number; yes: number; no: number; fraction: number }
 const EPS = 1e-7;
@@ -60,7 +60,6 @@ function receive(s: TopicMarketState, id: number, amount: number) {
   const a = account(s, id); a.wallet += amount; a.received += amount;
 }
 function accrueGenesis(s: TopicMarketState, id: number, gross: number) {
-  const reserve = s.singlePool ? 0 : .045 * gross; s.B += reserve; s.accounts[id].z += reserve;
   s.creatorFees += .007 * gross; s.protocolFees += .003 * gross;
 }
 /** 沿用OCPCore：三套条件奖励只在终局择一兑现；手续费不加入质押本金或多数分母。 */
@@ -77,9 +76,9 @@ function accrueCoreFee(s: TopicMarketState, amount: number) {
 }
 function graduate(s: TopicMarketState, id: number, kind: string) {
   // 不用epsilon补足门槛，也不截断本笔订单。
-  if (!(s.R >= s.rTarget && s.B >= s.bTarget)) return;
+  if (!(s.R >= s.rTarget)) return;
   // 多人模拟按毕业时真实入池资本确定曲线深度；不创造资金、不增加结果份额。
-  if(s.singlePool || s.config.depthPolicy === "GRADUATION_CAPITAL") s.b=s.R;
+  s.b=s.R;
   s.phase = "FORMAL"; s.M0 = s.R; s.collateral = s.R; s.basis = s.R; s.R = 0;
   s.inventory = [s.M0, s.M0]; s.lpSupply = s.S;
   s.accounts.forEach(a => { a.lp = a.g; a.g = 0; });
@@ -93,14 +92,14 @@ export function createTopicMarketDemo(config: TopicMarketConfig = {}): TopicMark
   // -1表示演示账户以外的独立费用收款桶；不向账户1/2/3赋予收款角色。
   const creatorAccount = config.creatorAccount ?? 1, protocolAccount = config.protocolAccount ?? 2;
   if (![creatorAccount, protocolAccount].every(x => Number.isInteger(x) && x >= -1 && x < 3)) throw new Error("ACCOUNT");
-  return { singlePool:config.singlePool ?? true, phase: "CREATE", now: 0, TG, TF, TC, TT, Q, k,
-    rTarget: (config.singlePool === false ? 3.6 : 4.2) * Q, bTarget: config.singlePool === false ? .6 * Q : 0, R: 0, B: 0, S: 0, M0: 0, redeemedPairs: 0, collateral: 0,
+  return { phase: "CREATE", now: 0, TG, TF, TC, TT, Q, k,
+    rTarget: 4.2 * Q, R: 0, S: 0, M0: 0, redeemedPairs: 0, collateral: 0,
     cash: 0, lpFees: 0, lpFeesEarned:0,formalVolume:0, creatorFees: 0, protocolFees: 0, basis: 0, b, lpSupply: 0,
     inventory: [0, 0], liquidityClosed: false, restartLiquidity:null,
-    accounts: ["You", "Trader A", "Trader B"].map(name => ({ name, wallet: 10000, g: 0, lp: 0, z: 0,
+    accounts: ["You", "Trader A", "Trader B"].map(name => ({ name, wallet: 10000, g: 0, lp: 0,
       yes: 0, no: 0, coreSide: null, coreStake: 0, coreRewards: [0, 0, 0], claimed: false, coreClaimed: false, paid: 0, received: 0 })),
-    core: { openedAt: null, yes: 0, no: 0, invalid: 0, cash: 0, fees: 0, feeTotal: 0, officialRewards: [0, 0, 0], result: null }, result: null, cover: 0,
-    lpBudget: 0, bBudget: 0, outcomeBudget: 0, lpClaimSupply:0,bClaimSupply:0,lpBudgetInitial:0,bBudgetInitial:0,failedSupply:0,failedBudgetInitial:0,
+    core: { openedAt: null, yes: 0, no: 0, invalid: 0, cash: 0, fees: 0, feeTotal: 0, officialRewards: [0, 0, 0], result: null }, result: null,
+    lpBudget: 0, outcomeBudget: 0, lpClaimSupply:0,lpBudgetInitial:0,failedSupply:0,failedBudgetInitial:0,
     failedBudget: 0, coreBudget: 0, coreOfficialBudget: 0,
     payouts: null, corePayouts: [], events: [], config: { creatorAccount, protocolAccount, ...(config.depthPolicy?{depthPolicy:config.depthPolicy}:{}) } };
 }
@@ -122,23 +121,23 @@ export function topicMarketPrices(s: TopicMarketState) {
 }
 export function topicMarketQuoteBuy(s: TopicMarketState, paid: number): TopicMarketTradeQuote {
   if (!positive(paid)) throw new Error("AMOUNT");
-  const rate=s.singlePool ? .99 : .945, reserve=s.singlePool ? 0 : .045;
+  const rate=.99;
   const quantity = Math.sqrt((s.R + rate * paid) / s.k) - s.S;
-  return { quantity, gross: paid, net: rate * paid, R: rate * paid, B: reserve * paid, lpFee: 0,
+  return { quantity, gross: paid, net: rate * paid, R: rate * paid, lpFee: 0,
     creatorFee: .007 * paid, protocolFee: .003 * paid, coreFee: 0,
-    wouldGraduate: s.R + rate * paid >= s.rTarget && s.B + reserve * paid >= s.bTarget,
-    average: paid / quantity, actual: paid, contribution: reserve * paid,
-    fees: { creator: .007 * paid, lp: 0, protocol: .003 * paid, core: 0, B:0 } };
+    wouldGraduate: s.R + rate * paid >= s.rTarget,
+    average: paid / quantity, actual: paid,
+    fees: { creator: .007 * paid, lp: 0, protocol: .003 * paid, core: 0 } };
 }
 export function topicMarketQuoteSell(s: TopicMarketState, tokens: number): TopicMarketTradeQuote {
   if (!positive(tokens) || tokens > s.S) throw new Error("HOLDINGS");
-  const rate=s.singlePool ? .99 : .945, reserve=s.singlePool ? 0 : .045;
+  const rate=.99;
   const gross = tokens === s.S ? s.R : s.k * tokens * (2 * s.S - tokens);
-  return { quantity: tokens, gross, net: rate * gross, R: -gross, B: reserve * gross, lpFee: 0,
+  return { quantity: tokens, gross, net: rate * gross, R: -gross, lpFee: 0,
     creatorFee: .007 * gross, protocolFee: .003 * gross, coreFee: 0,
-    wouldGraduate: s.R - gross >= s.rTarget && s.B + reserve * gross >= s.bTarget,
-    average: rate * gross / tokens, actual: rate * gross, contribution: reserve * gross,
-    fees: { creator: .007 * gross, lp: 0, protocol: .003 * gross, core: 0, B:0 } };
+    wouldGraduate: s.R - gross >= s.rTarget,
+    average: rate * gross / tokens, actual: rate * gross,
+    fees: { creator: .007 * gross, lp: 0, protocol: .003 * gross, core: 0 } };
 }
 export function topicMarketBuy(state: TopicMarketState, id: number, paid: number): TopicMarketState {
   requireGen(state); const q = topicMarketQuoteBuy(state, paid), s = copy(state); pay(s, id, paid);
@@ -156,9 +155,9 @@ export function topicMarketQuoteFormalBuy(s: TopicMarketState, side: Side, token
   const q = topicMarketCoordinates(s), end: [number, number] = [...q]; end[i] += tokens;
   const net = Math.max(0, topicMarketCost(...end, s.b) - topicMarketCost(...q, s.b));
   const gross = net / .98;
-  return { quantity: tokens, gross, net, R: 0, B: s.singlePool ? 0 : .005*gross, lpFee: (s.singlePool ? .01 : .005) * gross,
+  return { quantity: tokens, gross, net, R: 0, lpFee: .01 * gross,
     creatorFee: 0, protocolFee: .003 * gross, coreFee: .007 * gross, wouldGraduate: false, average: gross / tokens,
-    actual: gross, contribution: 0, fees: { creator: 0, lp: (s.singlePool ? .01 : .005) * gross, protocol: .003 * gross, core: .007 * gross, B:s.singlePool ? 0 : .005*gross } };
+    actual: gross, fees: { creator: 0, lp: .01 * gross, protocol: .003 * gross, core: .007 * gross } };
 }
 export function topicMarketQuoteFormalSell(s: TopicMarketState, side: Side, tokens: number): TopicMarketTradeQuote {
   const i = sideIndex(side), q = topicMarketCoordinates(s);
@@ -170,13 +169,13 @@ export function topicMarketQuoteFormalSell(s: TopicMarketState, side: Side, toke
   // C(q+m·1)=C(q)+m：坐标平移只改变抵押形态，不改变单边LMSR成交价。
   const gross = Math.max(0, topicMarketCost(...q, s.b) + mergePairs - topicMarketCost(...end, s.b));
   if (gross > s.cash + mergePairs + EPS) throw new Error("CASH");
-  return { quantity: tokens, gross, net: .98 * gross, mergePairs, R: 0, B: s.singlePool ? 0 : .005*gross, lpFee: (s.singlePool ? .01 : .005) * gross,
+  return { quantity: tokens, gross, net: .98 * gross, mergePairs, R: 0, lpFee: .01 * gross,
     creatorFee: 0, protocolFee: .003 * gross, coreFee: .007 * gross, wouldGraduate: false, average: .98 * gross / tokens,
-    actual: .98 * gross, contribution: 0, fees: { creator: 0, lp: (s.singlePool ? .01 : .005) * gross, protocol: .003 * gross, core: .007 * gross, B:s.singlePool ? 0 : .005*gross } };
+    actual: .98 * gross, fees: { creator: 0, lp: .01 * gross, protocol: .003 * gross, core: .007 * gross } };
 }
 export function topicMarketFormalBuy(state: TopicMarketState, id: number, side: Side, tokens: number): TopicMarketState {
   requireFormal(state); const q = topicMarketQuoteFormalBuy(state, side, tokens), s = copy(state), i = sideIndex(side);
-  pay(s, id, q.gross); s.cash += q.net; s.B+=q.B;s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
+  pay(s, id, q.gross); s.cash += q.net; s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
   s.inventory[i] -= tokens; if (i === 0) s.accounts[id].yes += tokens; else s.accounts[id].no += tokens;
   record(s, "FORMAL_BUY", id, q.gross, tokens, side); return result(s);
 }
@@ -208,7 +207,7 @@ export function topicMarketFormalSell(state: TopicMarketState, id: number, side:
   s.inventory[i] += tokens; if (i === 0) s.accounts[id].yes -= tokens; else s.accounts[id].no -= tokens;
   s.inventory[0] -= mergePairs; s.inventory[1] -= mergePairs;
   s.collateral -= mergePairs; s.redeemedPairs += mergePairs;
-  s.cash += mergePairs - q.gross; s.B+=q.B;s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
+  s.cash += mergePairs - q.gross; s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
   receive(s, id, q.net); record(s, "FORMAL_SELL", id, q.net, tokens, side); return result(s);
 }
 // 旧版本入口明确禁用，不能从LP权益转让绕回底层提款。
@@ -217,16 +216,15 @@ export function topicMarketExitLP(_s:TopicMarketState,_id:number,_lp:number):Top
 export function topicMarketQuoteAddLP(_s:TopicMarketState,_lp:number):TopicMarketAddQuote {throw new Error("LP_ADDITION_DISABLED");}
 export function topicMarketMaxAddLP(_s:TopicMarketState,_id:number):number{return 0;}
 export function topicMarketAddLP(_s:TopicMarketState,_id:number,_lp:number):TopicMarketState {throw new Error("LP_ADDITION_DISABLED");}
-function transferRight(state:TopicMarketState,from:number,to:number,amount:number,kind:"lp"|"z"):TopicMarketState {
+export function topicMarketTransferLP(state:TopicMarketState,from:number,to:number,amount:number):TopicMarketState {
   const a=account(state,from);account(state,to);
-  if(!positive(amount)||amount>a[kind]||from===to)throw new Error("HOLDINGS");
-  if(kind==="lp"?!["FORMAL","WAIT_CORE","SETTLED"].includes(state.phase):state.phase==="CREATE")throw new Error("PHASE");
-  const s=copy(state);s.accounts[from][kind]-=amount;s.accounts[to][kind]+=amount;
-  record(s,kind==="lp"?"TRANSFER_LP":"TRANSFER_B",from,undefined,amount,String(to));return result(s);
+  if(!positive(amount)||amount>a.lp||from===to)throw new Error("HOLDINGS");
+  if(!["FORMAL","WAIT_CORE","SETTLED"].includes(state.phase))throw new Error("PHASE");
+  const s=copy(state);s.accounts[from].lp-=amount;s.accounts[to].lp+=amount;
+  record(s,"TRANSFER_LP",from,undefined,amount,String(to));return result(s);
 }
-export const topicMarketTransferLP=(s:TopicMarketState,from:number,to:number,amount:number)=>transferRight(s,from,to,amount,"lp");
-export const topicMarketTransferB=(s:TopicMarketState,from:number,to:number,amount:number)=>transferRight(s,from,to,amount,"z");
-/** 完整组合的抵押赎回：每对YES+NO所有结果都值1，不能从做市现金或B重复提款。 */
+
+/** 完整组合的抵押赎回：每对YES+NO所有结果都值1，不能从做市现金重复提款。 */
 export function topicMarketRedeemPairs(state: TopicMarketState, id: number, pairs: number): TopicMarketState {
   if (state.phase !== "FORMAL" && state.phase !== "WAIT_CORE") throw new Error("PHASE");
   if (!positive(pairs)) throw new Error("AMOUNT");
@@ -274,31 +272,30 @@ function settle(s: TopicMarketState) {
   const inventoryValue = outcomeValue(...s.inventory, outcome);
   s.collateral -= inventoryValue; s.outcomeBudget = s.collateral; s.collateral = 0;
   const nav = s.cash + s.lpFees + inventoryValue;
-  s.cover = Math.min(s.B, Math.max(s.basis - nav, 0)); s.lpBudget = nav + s.cover; s.bBudget = s.B - s.cover;
-  s.lpClaimSupply=s.lpSupply;s.bClaimSupply=sum(s.accounts.map(a=>a.z));
-  s.lpBudgetInitial=s.lpBudget;s.bBudgetInitial=s.bBudget;
+  s.lpBudget = nav;
+  s.lpClaimSupply=s.lpSupply;
+  s.lpBudgetInitial=s.lpBudget;
   s.payouts=[];
   const rewardIndex = outcome === "YES" ? 0 : outcome === "NO" ? 1 : 2;
   s.corePayouts = s.accounts.map(a => (outcome === "INVALID" ? a.coreStake
     : a.coreSide === outcome ? s.core.cash * a.coreStake / (outcome === "YES" ? s.core.yes : s.core.no) : 0) + a.coreRewards[rewardIndex]);
   s.coreBudget = sum(s.corePayouts); s.coreOfficialBudget = s.core.officialRewards[rewardIndex];
-  s.core.fees = 0; s.core.cash = 0; s.cash = 0; s.lpFees = 0; s.B = 0; s.inventory = [0, 0];
-  record(s, "SETTLE", undefined, s.cover, undefined, outcome);
+  s.core.fees = 0; s.core.cash = 0; s.cash = 0; s.lpFees = 0; s.inventory = [0, 0];
+  record(s, "SETTLE", undefined, undefined, undefined, outcome);
   distributeOfficialFees(s);
 }
 function fail(s:TopicMarketState){
   s.phase="FAILED";s.failedBudget=s.R;s.failedBudgetInitial=s.R;s.failedSupply=s.S;
-  s.bBudget=s.B;s.bBudgetInitial=s.B;s.bClaimSupply=sum(s.accounts.map(a=>a.z));s.payouts=[];
-  s.R=0;s.B=0;record(s,"FAIL");distributeOfficialFees(s);
+  s.payouts=[];
+  s.R=0;record(s,"FAIL");distributeOfficialFees(s);
 }
 /** 按当前token余额预览；结算分母/初始预算固定，转让和burn不改变每份兑付率。 */
 export function topicMarketClaimPreview(s:TopicMarketState,id:number):TopicMarketPayout {
  const a=account(s,id);const settled=s.phase==="SETTLED",failedState=s.phase==="FAILED";
  const outcomes=settled?outcomeValue(a.yes,a.no,s.result!):0;
  const lp=settled&&s.lpClaimSupply>0?s.lpBudgetInitial*a.lp/s.lpClaimSupply:0;
- const B=(settled||failedState)&&s.bClaimSupply>0?s.bBudgetInitial*a.z/s.bClaimSupply:0;
  const failed=failedState&&s.failedSupply>0?s.failedBudgetInitial*a.g/s.failedSupply:0;
- return {outcomes,lp,B,failed,total:outcomes+lp+B+failed};
+ return {outcomes,lp,failed,total:outcomes+lp+failed};
 }
 /** to是绝对模拟秒数；一次跨过多个时点也依正确顺序处理。 */
 export function topicMarketAdvanceTime(state: TopicMarketState, to: number): TopicMarketState {
@@ -319,17 +316,10 @@ export function topicMarketClaimLP(state:TopicMarketState,id:number,amount:numbe
  s.accounts[id].lp-=amount;s.lpSupply-=amount;s.lpBudget-=money;
  receive(s,id,money);record(s,"BURN_LP",id,money,amount);return result(s);
 }
-export function topicMarketClaimB(state:TopicMarketState,id:number,amount:number):TopicMarketState {
- const a=account(state,id);if(!["SETTLED","FAILED"].includes(state.phase)||!positive(amount)||amount>a.z||!positive(state.bClaimSupply))throw new Error("CLAIM");
- const s=copy(state),money=s.bBudgetInitial*amount/s.bClaimSupply;
- s.accounts[id].z-=amount;s.bBudget-=money;
- receive(s,id,money);record(s,"BURN_B",id,money,amount);return result(s);
-}
 export function topicMarketClaim(state:TopicMarketState,id:number):TopicMarketState {
- const a=account(state,id);if(!["SETTLED","FAILED"].includes(state.phase)||!(a.lp+a.z+a.g+a.yes+a.no>0))throw new Error("CLAIM");
+ const a=account(state,id);if(!["SETTLED","FAILED"].includes(state.phase)||!(a.lp+a.g+a.yes+a.no>0))throw new Error("CLAIM");
  let s=copy(state);const p=topicMarketClaimPreview(s,id);
  if(a.lp>0&&s.phase==="SETTLED")s=topicMarketClaimLP(s,id,a.lp);
- if(a.z>0)s=topicMarketClaimB(s,id,a.z);
  s.outcomeBudget-=p.outcomes;s.failedBudget-=p.failed;
  if(s.phase==="FAILED")s.S-=s.accounts[id].g;
  s.accounts[id].g=0;s.accounts[id].yes=0;s.accounts[id].no=0;s.accounts[id].claimed=true;
@@ -356,7 +346,7 @@ export function topicMarketClaimFees(state: TopicMarketState, kind: "CREATOR" | 
   receive(s, id, amount); record(s, "CLAIM_FEES", id, amount, undefined, kind); return result(s);
 }
 export function topicMarketMaxBuy(s: TopicMarketState, id: number): number { return account(s, id).wallet; }
-export function topicMarketHoldings(s: TopicMarketState, id: number) { const a = account(s, id); return { g: a.g, lp: a.lp, z: a.z, yes: a.yes, no: a.no, wallet: a.wallet, core: a.coreStake }; }
+export function topicMarketHoldings(s: TopicMarketState, id: number) { const a = account(s, id); return { g: a.g, lp: a.lp, yes: a.yes, no: a.no, wallet: a.wallet, core: a.coreStake }; }
 export function topicMarketMaxFormalBuyTokens(s: TopicMarketState, id: number, side: Side): number {
   const i = sideIndex(side), wallet = account(s, id).wallet; let lo = 0, hi = s.inventory[i];
   if (!hi || s.liquidityClosed) return 0;
@@ -366,15 +356,15 @@ export function topicMarketMaxFormalBuyTokens(s: TopicMarketState, id: number, s
 }
 export function topicMarketAccounting(s: TopicMarketState) {
   const wallets = sum(s.accounts.map(a => a.wallet));
-  const reserves = s.R + s.B + s.collateral + s.cash + s.lpFees + s.creatorFees + s.protocolFees
-    + s.core.cash + s.core.fees + s.coreOfficialBudget + s.lpBudget + s.bBudget + s.outcomeBudget + s.failedBudget + s.coreBudget;
+  const reserves = s.R + s.collateral + s.cash + s.lpFees + s.creatorFees + s.protocolFees
+    + s.core.cash + s.core.fees + s.coreOfficialBudget + s.lpBudget + s.outcomeBudget + s.failedBudget + s.coreBudget;
   return { wallets, reserves, total: wallets + reserves, initialTotal: s.initialCapital ?? 30000, error: wallets + reserves - (s.initialCapital ?? 30000) };
 }
 export function topicMarketAssertLedger(s: TopicMarketState) {
   const a = topicMarketAccounting(s);
-  const balances = [s.R, s.B, s.collateral, s.cash, s.lpFees, s.creatorFees, s.protocolFees, s.basis, s.b,
-    s.lpSupply, s.redeemedPairs, ...s.inventory, s.core.cash, s.core.fees, s.coreOfficialBudget, s.lpBudget, s.bBudget, s.outcomeBudget, s.failedBudget, s.coreBudget,
-    ...s.accounts.flatMap(x => [x.wallet, x.g, x.lp, x.z, x.yes, x.no, x.coreStake])];
+  const balances = [s.R, s.collateral, s.cash, s.lpFees, s.creatorFees, s.protocolFees, s.basis, s.b,
+    s.lpSupply, s.redeemedPairs, ...s.inventory, s.core.cash, s.core.fees, s.coreOfficialBudget, s.lpBudget, s.outcomeBudget, s.failedBudget, s.coreBudget,
+    ...s.accounts.flatMap(x => [x.wallet, x.g, x.lp, x.yes, x.no, x.coreStake])];
   if (balances.some(x => !Number.isFinite(x) || x < -EPS) || Math.abs(a.error) > EPS) throw new Error("LEDGER");
   if (s.phase === "GENESIS" && (Math.abs(sum(s.accounts.map(x => x.g)) - s.S) > EPS || Math.abs(s.R - s.k * s.S * s.S) > EPS)) throw new Error("CURVE");
   if (s.phase === "FORMAL" || s.phase === "WAIT_CORE") {
@@ -393,15 +383,6 @@ export function topicMarketScenario(kind: TopicMarketScenario, config: TopicMark
     for (let id = 0; id < 3 && left > 1e-9; id++) { const paid = Math.min(left, s.accounts[id].wallet * .95); s = topicMarketBuy(s, id, paid); left -= paid; }
     if (left > 1e-7) throw new Error("SCENARIO_BUDGET");
   };
-  if(s.singlePool && ["SELL_READY","SELL_GRADUATE"].includes(kind)) throw new Error("LEGACY_SCENARIO");
-  if (kind === "BUY_GRADUATE") { fund((s.singlePool ? s.rTarget / .99 : s.bTarget / .045) * (1 + 1e-12)); return s; }
-  if (!["SELL_READY", "SELL_GRADUATE"].includes(kind)) throw new Error("SCENARIO");
-  fund(8.5 * s.Q / .945);
-  if (kind === "SELL_READY") return s;
-  const gross = (s.bTarget - s.B) / .045 * (1 + 1e-12);
-  const quantity = s.S - Math.sqrt((s.R - gross) / s.k);
-  const holder = s.accounts.findIndex(a => a.g >= quantity); if (holder < 0) throw new Error("SCENARIO_HOLDINGS");
-  s = topicMarketSell(s, holder, quantity);
-  if (s.phase !== "FORMAL") throw new Error("SCENARIO_GRADUATION");
-  return s;
+  if (kind !== "BUY_GRADUATE") throw new Error("SCENARIO");
+  fund(s.rTarget / .99 * (1 + 1e-12)); return s;
 }

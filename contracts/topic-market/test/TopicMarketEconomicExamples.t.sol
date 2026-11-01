@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase, MockCore} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
@@ -28,7 +27,7 @@ contract TopicMarketEconomicExamplesTest is TopicMarketBase {
         assertEq(uint256(market.phase()),1); assertEq(market.graduationSupply(),oldS+minted);
         assertEq(market.initialCollateral(),oldR+990e6); assertEq(market.shares(dave),minted);
         uint256 lpValue=Math.mulDiv(market.initialCollateral(),minted,market.graduationSupply());
-        assertGt(lpValue,450e6); assertLt(lpValue,550e6); assertEq(market.contribution(dave),0); assertEq(address(market.bToken()),address(0)); _accounting();
+        assertGt(lpValue,450e6); assertLt(lpValue,550e6); _accounting();
     }
 
     function testCreatorSelfTradeStillPaysProtocolShareAfterRecoveringOwnFeesAndB() public {
@@ -40,8 +39,6 @@ contract TopicMarketEconomicExamplesTest is TopicMarketBase {
         market.genesisSell(supply, 0, type(uint64).max, 0);
         assertEq(market.S(), 0);
         assertEq(market.R(), 0);
-        assertEq(market.B(), 0);
-        assertEq(address(market.bToken()),address(0));
         vm.warp(market.genesisCutoff());
         market.closeExpired();
         vm.startPrank(creator);
@@ -50,7 +47,6 @@ contract TopicMarketEconomicExamplesTest is TopicMarketBase {
         assertLe(usd.balanceOf(creator), start);
         assertApproxEqAbs(start - usd.balanceOf(creator), usd.balanceOf(protocol), 10);
         assertGt(usd.balanceOf(protocol), 0);
-        assertEq(removedBSupply(market), 0);
         assertEq(usd.balanceOf(address(market)), market.accountedBalance());
         assertTrue(checkMarketInvariants(market));
     }
@@ -61,10 +57,10 @@ contract TopicMarketEconomicExamplesTest is TopicMarketBase {
         _finish(1);
         uint256 g = market.shares(alice);
         uint256 escrow = market.lpToken().balanceOf(address(market));
-        uint256 b = removedBBalance(market,alice);
+
         uint256 y = market.yes(alice);
         uint256 lpBudget = market.lpBudgetRemaining();
-        uint256 bBudget = market.bBudgetRemaining();
+
         uint256 collateral = market.collateralCash();
         usd.setFail(true);
         vm.prank(alice);
@@ -73,16 +69,14 @@ contract TopicMarketEconomicExamplesTest is TopicMarketBase {
         assertEq(market.shares(alice), g);
         assertEq(market.lpToken().balanceOf(address(market)), escrow);
         assertEq(market.lpToken().balanceOf(alice), 0);
-        assertEq(removedBBalance(market,alice), b);
         assertEq(market.yes(alice), y);
         assertEq(market.lpBudgetRemaining(), lpBudget);
-        assertEq(market.bBudgetRemaining(), bBudget);
         assertEq(market.collateralCash(), collateral);
         usd.setFail(false);
         vm.prank(alice);
         market.claimAll();
         assertEq(market.shares(alice) + market.yes(alice), 0);
-        assertEq(market.lpToken().balanceOf(alice) + removedBBalance(market,alice), 0);
+        assertEq(market.lpToken().balanceOf(alice) + 0, 0);
         _accounting();
     }
 }

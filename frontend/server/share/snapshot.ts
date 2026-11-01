@@ -9,7 +9,7 @@ const signed=(n:number,suffix:string)=>`${n>=0?'+':''}${n.toFixed(2)}${suffix}`;
 export function createShareSnapshot(stored:StoredPaperMarket,userId:string,theme:ShareTheme,nowMs:number,snapshotId:string):MarketShareSnapshot {
  const m=advancePaperMarket(stored,nowMs),view=projectPaperMarket(m,userId,nowMs),s=m.state;
  const id=m.users.indexOf(userId),a=id>=0?s.accounts[id]:null;
- const market:ShareMarket={id:m.id,title:m.title,assetSymbol:m.assetSymbol,phase:s.phase,result:s.result,R:view.R,B:view.B,rTarget:view.rTarget,bTarget:view.bTarget,yesPrice:view.yesPrice,noPrice:view.noPrice,volumeUSD:view.volumeUSD,participants:view.participants};
+ const market:ShareMarket={id:m.id,title:m.title,assetSymbol:m.assetSymbol,phase:s.phase,result:s.result,R:view.R,rTarget:view.rTarget,yesPrice:view.yesPrice,noPrice:view.noPrice,volumeUSD:view.volumeUSD,participants:view.participants};
  const formal=s.core.openedAt!==null;
  const history=m.history.filter(p=>formal?p.yesPrice!==null&&p.at<=view.formalDeadline:p.yesPrice===null&&p.genesisPriceUSD>0);
  const first=history[0],last=history.at(-1);let prices:SharePrice[];
@@ -29,18 +29,18 @@ export function createShareSnapshot(stored:StoredPaperMarket,userId:string,theme
    const value=(net+topicMarketClaimPreview(s,id).total+(s.phase==='SETTLED'&&!a.coreClaimed?(s.corePayouts[id]??0):0)+creator)*P;
    pnl={label:'MY TOTAL P&L',low:value,high:value,note:'Received + unclaimed payouts - all invested. Virtual USD.'};
   }else if(s.phase==='GENESIS'){
-   // This is cash-out P&L, not total account NAV: locked B is explicitly excluded.
+   // This is cash-out P&L, not the total account NAV.
    const sale=a.g>0?topicMarketQuoteSell(s,a.g):null;
    const value=(net+(sale?.net??0)+creator+(m.creatorId===userId?(sale?.creatorFee??0):0))*P;
-   pnl={label:'MY EXIT P&L (EST.)',low:value,high:value,note:'Net gToken sale + receipts/claimable creator fees - all invested.'+(s.singlePool?'':' Locked B excluded.')};
+   pnl={label:'MY EXIT P&L (EST.)',low:value,high:value,note:'Net gToken sale + receipts/claimable creator fees - all invested.'};
   }else{
-   const scenarios=view.presentation!.lpBEstimates.map((r,i)=>{
+   const scenarios=view.presentation!.lpEstimates.map((r,i)=>{
     const shares=r.outcome==='YES'?a.yes:r.outcome==='NO'?a.no:(a.yes+a.no)/2;
     const stake=r.outcome==='INVALID'?a.coreStake:a.coreSide===r.outcome?s.core.cash*a.coreStake/(r.outcome==='YES'?s.core.yes:s.core.no):0;
-    return (net+shares+r.lp+r.B+stake+a.coreRewards[i]+creator)*P;
+    return (net+shares+r.lp+stake+a.coreRewards[i]+creator)*P;
    });
    pnl={label:'MY SETTLEMENT P&L (EST.)',low:Math.min(...scenarios),high:Math.max(...scenarios),note:'YES / NO / INVALID at current positions. Future trades/stakes excluded; not withdrawable.'};
   }
  }
- return {id:snapshotId,market,theme,at:Math.floor(nowMs/1000),revision:m.revision,prices,priceSince:first?.at??null,priceNote:s.phase==='FAILED'?'Trading stopped: not graduated.':s.phase==='SETTLED'?`Settled: ${s.result}. Prices are last retained trading quotes.`:'Change from earliest retained price record, not necessarily 24h.',pnl};
+ return {schemaVersion:2,id:snapshotId,market,theme,at:Math.floor(nowMs/1000),revision:m.revision,prices,priceSince:first?.at??null,priceNote:s.phase==='FAILED'?'Trading stopped: not graduated.':s.phase==='SETTLED'?`Settled: ${s.result}. Prices are last retained trading quotes.`:'Change from earliest retained price record, not necessarily 24h.',pnl};
 }

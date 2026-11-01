@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import {assertSelectorRemoved} from "./MarketInvariantCheck.sol";
 import {TopicMarketBase, MockCore} from "./TopicMarketBase.sol";
 import {TopicMarket} from "../src/TopicMarket.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -15,11 +16,9 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
         usd.approve(address(market), type(uint256).max);
         _graduate();
         _formalBuy(bob, true, market.inventoryY());
-        uint256 originalB = market.B();
+
         uint256 initial = market.initialCollateral();
         _finish(1);
-        assertEq(market.coverPaid(), originalB);
-        assertEq(market.bBudgetInitial(), 0);
         assertLt(market.lpBudgetInitial(), initial);
         _claimAll(alice);
         _claimAll(bob);
@@ -29,16 +28,14 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
     function testLPReceivesNetAssetsWithoutSyntheticBCompensation() public {
         _graduate(); _formalBuy(bob,true,market.inventoryY()/20);
         uint256 nav=market.cash()+market.lpFees()+market.inventoryY()/market.SCALE();
-        _finish(1); assertEq(market.coverPaid(),0); assertEq(market.lpBudgetInitial(),nav); assertEq(market.bBudgetInitial(),0); _accounting();
+        _finish(1); assertEq(market.lpBudgetInitial(),nav); _accounting();
     }
 
     function testInvalidSettlementHasNoBAndPreservesSinglePoolAccounting() public {
         _graduate();
         _formalBuy(bob, true, 5e18);
-        uint256 B = market.B();
+
         _finish(3);
-        assertEq(market.coverPaid(), 0);
-        assertEq(market.bBudgetInitial(), B);
         _accounting();
     }
 
@@ -49,7 +46,7 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
         vm.prank(alice);
         market.genesisSell(d, 0, type(uint64).max, 0);
         assertLt(market.R(), market.rTarget());
-        assertGe(market.B(), market.bTarget());
+
         assertEq(uint256(market.phase()), 0);
         _accounting();
     }
@@ -89,8 +86,7 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
         vm.expectRevert("PHASE");
         market.claimLP();
         vm.prank(alice);
-        vm.expectRevert("B_REMOVED");
-        market.claimB();
+        assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));
     }
 
     function testExactCoreCutoffDoesNotMeanOracleFinal() public {

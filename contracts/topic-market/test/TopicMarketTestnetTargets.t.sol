@@ -38,8 +38,7 @@ contract TopicMarketTestnetTargetsTest is Test {
     }
     function testFixedTargetsIgnoreUnavailableEthPriceAndKeepUsdBondSeparate() public {
         (TopicMarket m,OCPCore vault)=create();
-        assertEq(m.rTarget(),42e14);assertEq(m.bTarget(),0);
-        assertEq(vault.earlyTerminationBondRequired(),2e18); // 500USD /250USD per TSLA
+        assertEq(m.rTarget(),42e14);assertEq(vault.earlyTerminationBondRequired(),2e18); // 500USD /250USD per TSLA
         assertTrue(factory.fixedTestnetGraduation());assertEq(factory.marketRecord(address(m)).snapshot,0);
     }
     function testSmallFundedOrdersGraduateAtOnlyTheRTarget() public {
@@ -47,8 +46,7 @@ contract TopicMarketTestnetTargetsTest is Test {
         vm.startPrank(USER); IntegrationStock(STOCK).approve(address(m),1e18);
         m.genesisBuy(4e15,0,type(uint64).max,0); assertLt(m.R(),m.rTarget()); assertEq(uint256(m.phase()),0);
         m.genesisBuy(3e14,0,type(uint64).max,0); vm.stopPrank();
-        assertEq(uint256(m.phase()),1); assertGe(m.initialCollateral(),m.rTarget()); assertEq(m.B(),0); assertEq(address(m.bToken()),address(0));
-        assertTrue(checkMarketInvariants(m));
+        assertEq(uint256(m.phase()),1); assertGe(m.initialCollateral(),m.rTarget()); assertTrue(checkMarketInvariants(m));
     }
     function testProfileRejectsMainnetEvenWithCorrectBindings() public {
         vm.chainId(4663);

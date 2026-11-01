@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
+import {assertSelectorRemoved} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
@@ -63,8 +63,7 @@ contract TopicMarketStatefulHandler is Test {
             uint256 balance=market.lpToken().balanceOf(a);if(balance==0)return;
             vm.prank(a);try market.lpToken().transfer(b,bound(raw,1,balance)) returns(bool ok){if(ok){_ok();rightSuccesses++;}}catch{}
         }else{
-            assertEq(address(market.bToken()),address(0));
-            vm.prank(a);vm.expectRevert("B_REMOVED");market.claimB();_ok();
+            vm.prank(a);assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));_ok();
         }
     }
     function stake(uint256 who,uint256 side,uint256 raw) public {
@@ -121,13 +120,13 @@ contract TopicMarketStatefulInvariantTest is StdInvariant,Test {
         assertGe(usd.balanceOf(address(market)),market.accountedBalance());
         assertTrue(checkMarketInvariants(market));
         uint256 lp=market.lpToken().balanceOf(address(market));
-        uint256 b;uint256 unmaterialized;uint256 y=market.inventoryY();uint256 n=market.inventoryN();
+        uint256 unmaterialized;uint256 y=market.inventoryY();uint256 n=market.inventoryN();
         for(uint256 i;i<4;i++){
             address a=handler.actors(i);
-            lp+=market.lpToken().balanceOf(a);b+=removedBBalance(market,a);
+            lp+=market.lpToken().balanceOf(a);
             unmaterialized+=market.shares(a);y+=market.yes(a);n+=market.no(a);
         }
-        assertEq(lp,market.lpToken().totalSupply());assertEq(b,removedBSupply(market));
+        assertEq(lp,market.lpToken().totalSupply());
         assertEq(y,market.yesSupply());assertEq(n,market.noSupply());
         TopicMarket.Phase phase=market.phase();
         if(phase==TopicMarket.Phase.FORMAL||phase==TopicMarket.Phase.WAIT_CORE||phase==TopicMarket.Phase.SETTLED){

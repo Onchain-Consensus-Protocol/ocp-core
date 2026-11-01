@@ -60,8 +60,7 @@ contract TopicMarketFactoryTest is Test {
         assertEq(m.coreCutoff(), block.timestamp + 6 hours);
         assertEq(m.formalCutoff(), block.timestamp + 5 hours);
         assertEq(m.genesisCutoff(), block.timestamp + 4 hours);
-        assertEq(m.rTarget(), 4.2e6); assertEq(m.bTarget(), 0);
-        assertEq(factory.marketCount(), 1); assertEq(factory.markets(0), address(m));
+        assertEq(m.rTarget(), 4.2e6); assertEq(factory.marketCount(), 1); assertEq(factory.markets(0), address(m));
         TopicMarketFactory.MarketRecord memory r = factory.marketRecord(address(m));
         assertEq(r.creator, alice); assertEq(r.adapter, address(a)); assertEq(r.vault, address(v));
         assertEq(r.snapshot, 1e6); assertEq(r.createdAt, block.timestamp);

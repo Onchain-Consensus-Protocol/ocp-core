@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -94,8 +93,8 @@ contract RHSharedFactoryForkTest is Test {
         bytes32 custody=keccak256(abi.encode(token.balanceOf(address(m)),token.balanceOf(address(vaults[i])),
             token.balanceOf(address(routers[i])),token.balanceOf(address(exchanges[i])),token.balanceOf(ALICE),
             IERC20(USDG).balanceOf(address(routers[i])),IERC20(USDG).balanceOf(address(exchanges[i]))));
-        bytes32 ledger=keccak256(abi.encode(m.accountedBalance(),m.R(),m.B(),m.cash(),m.collateralCash(),
-            m.lpFees(),m.lpBudgetRemaining(),m.bBudgetRemaining(),vaults[i].resolved(),vaults[i].settlementReady()));
+        bytes32 ledger=keccak256(abi.encode(m.accountedBalance(),m.R(),0,m.cash(),m.collateralCash(),
+            m.lpFees(),m.lpBudgetRemaining(),0,vaults[i].resolved(),vaults[i].settlementReady()));
         OCPCore core=vaults[i];
         bytes32 requests=keccak256(abi.encode(core.earlyTerminationModule(),core.pendingEarlyTermination(),
             core.earlyTerminationRequestCount(),core.pendingBondEscrow(),core.totalEarlyBondRefunds(),
@@ -104,7 +103,7 @@ contract RHSharedFactoryForkTest is Test {
             core.officialMarketFeesClaimable(),core.historicalFeePoolRemaining(),core.forfeitedBonusPoolRemaining(),
             core.accYesFeePerStake(),core.accNoFeePerStake(),core.accInvalidFeePerStake()));
         return keccak256(abi.encode(custody,ledger,requests,fees,m.phase(),m.shares(ALICE),m.yes(ALICE),m.no(ALICE),
-            removedBBalance(m,ALICE),m.lpToken().balanceOf(ALICE),yes,no,invalid));
+            0,m.lpToken().balanceOf(ALICE),yes,no,invalid));
     }
     function _otherStates(uint256 active) private view returns(bytes32[5] memory states){
         for(uint256 i;i<5;i++)if(i!=active)states[i]=_assetState(i);
@@ -174,7 +173,7 @@ contract RHSharedFactoryForkTest is Test {
         vm.prank(ALICE);vm.expectRevert();routers[i].execute(r);
         assertEq(_assetState(i),beforeState);assertEq(IERC20(USDG).balanceOf(ALICE),usdBefore);_assertOthers(i,states);
         r.minOutput=1;_execute(i,r);assertGt(IERC20(USDG).balanceOf(ALICE),usdBefore);
-        assertEq(removedBBalance(m,ALICE),0);assertEq(m.lpToken().balanceOf(ALICE),0);
+        assertEq(m.lpToken().balanceOf(ALICE),0);
         assertEq(m.shares(ALICE),0);assertEq(m.yes(ALICE),0);
         r=_request(i,TopicMarketAssetRouter.Action.ClaimCore);r.minOutput=1;_execute(i,r);
         vm.prank(ALICE);vm.expectRevert();routers[i].execute(r);

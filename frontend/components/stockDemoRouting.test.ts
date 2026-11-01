@@ -10,7 +10,7 @@ describe('stock collateral demo routes',()=>{
   apply(v=>topicMarketBuy(v,0,1000/asset.price));expect(u[0]).toBeCloseTo(4000);expect(s.accounts[0].wallet).toBeCloseTo(5000/asset.price);expect(s.R).toBeCloseTo(990/asset.price);
   apply(v=>topicMarketSell(v,0,v.accounts[0].g/2));
   const old=JSON.stringify({s,u});expect(()=>routeStockDemo(s,u,0,asset.price,true,v=>topicMarketBuy(v,0,100000/asset.price))).toThrow();expect(JSON.stringify({s,u})).toBe(old);
-  apply(v=>topicMarketAdvanceTime(v,v.TG));apply(v=>topicMarketClaim(v,0));expect(s.accounts[0].g+s.accounts[0].z).toBe(0);expect(()=>routeStockDemo(s,u,0,asset.price,true,v=>topicMarketClaim(v,0))).toThrow();
+  apply(v=>topicMarketAdvanceTime(v,v.TG));apply(v=>topicMarketClaim(v,0));expect(s.accounts[0].g).toBe(0);expect(()=>routeStockDemo(s,u,0,asset.price,true,v=>topicMarketClaim(v,0))).toThrow();
  });
  it('graduates and routes formal/Core settlement to the original account',()=>{
  const price=250;let s=topicMarketCreate(createStockDemo(price)),u=[5000,5000,5000];
@@ -23,7 +23,7 @@ describe('stock collateral demo routes',()=>{
  const apply=(fn:Parameters<typeof routeStockDemo>[5])=>{const r=routeStockDemo(s,u,0,price,true,fn);s=r.state;u=r.stable};
  apply(v=>topicMarketCoreStake(v,0,'YES',1/price));expect(s.accounts[0].coreStake).toBeCloseTo(1/price);
  apply(v=>topicMarketFormalBuy(v,0,'YES',.1));apply(v=>topicMarketFormalSell(v,0,'YES',.1));apply(v=>topicMarketAdvanceTime(v,v.TC));apply(topicMarketFinalize);apply(v=>topicMarketClaim(v,0));apply(v=>topicMarketClaimCore(v,0));
- expect(s.accounts[0].lp+s.accounts[0].z).toBe(0);expect(topicMarketAccounting(s).total*price+u.reduce((a,b)=>a+b,0)).toBeCloseTo(30000,5);
+ expect(s.accounts[0].lp).toBe(0);expect(topicMarketAccounting(s).total*price+u.reduce((a,b)=>a+b,0)).toBeCloseTo(30000,5);
  });
  it('rejects invalid prices without mutating inputs',()=>{expect(()=>createStockDemo(0)).toThrow();expect(()=>createStockDemo(Infinity)).toThrow()});
 });

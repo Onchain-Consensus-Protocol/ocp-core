@@ -4,7 +4,7 @@
 
 # Topic Market contracts
 
-Development implementation of Genesis, a stock-collateral binary market, LP/B rights, Core staking and V3 asset routing. The deployment manifest describes the older immutable testnet release; current source changes do not upgrade that deployment. No mainnet deployment or independent audit is claimed.
+Development implementation of Genesis, a stock-collateral binary market, LP rights, Core staking and V3 asset routing. The deployment manifest describes the older immutable testnet release; current source changes do not upgrade that deployment. No mainnet deployment or independent audit is claimed.
 
 ## Build and test
 
@@ -21,7 +21,7 @@ Install Solidity0.8.20 before using offline mode. RPC-dependent fork tests requi
 
 Use `.env.example` as a reference for deployment variables. Supply your own verified asset, feed and router addresses and a configured wallet; never commit secrets. Deployment scripts are in `script/`. No deployment is performed by the build or test commands.
 
-Collateral supports validated6–18 decimal assets. Genesis and YES/NO positions are internal contract balances; LP and B are market-specific ERC20 rights. The web application's paper ledger is separate from these contracts.
+Collateral supports validated6–18 decimal assets. Genesis and YES/NO positions are internal contract balances; LP is a market-specific ERC20 right. The web application's paper ledger is separate from these contracts.
 
 
 ## Current source: fixed fee allocation and settlement payments
@@ -40,7 +40,7 @@ Active Core is `src/core/OCPCore.sol`; its interfaces are in `src/interfaces`, w
 
 The shared creation-code stores and factory-restricted deployers are in `src/deployers`. Legacy single-collateral Factory/oracle and the old deployment recipe are retained under `test/legacy` as fixtures, outside the production dependency graph. These fixtures are not a reproducible archive of historical deployed bytecode. Historical deployment manifests are unchanged.
 
-Locked `addLP`/`exitLP`, disabled Genesis `transferShares`, and the unused internal `mergedPairs` state are removed from the new ABI. Transferable LP/B tokens and player `redeemPairs()` are retained. Existing old contracts still expose their original ABI.
+Locked `addLP`/`exitLP`, disabled Genesis `transferShares`, and the unused internal `mergedPairs` state are removed from the new ABI. Transferable LP tokens and player `redeemPairs()` are retained. Existing old contracts still expose their original ABI.
 
 Testnet graduation constants remain in the dedicated chain-46630-only factory; production stock factories retain the live snapshot path. No Keeper is introduced.
 
@@ -48,6 +48,6 @@ Audit-only `checkInvariants()` now lives in `test/MarketInvariantCheck.sol`, wit
 
 ## Single-R patch (2026-11-01)
 
-Only existing Market, Core payment gas handling and factory graduation settings change. The launch threshold is 4.2 ETH equivalent (0.0042 TSLA in the dedicated testnet profile); the creation price domain is bounded so the target fits the existing market limit. Genesis gToken converts proportionally into the same LP token at graduation, with b fixed to the graduated R amount and no later LP issuance. Formal LP receives actual remaining pool NAV without B cover. A failed launch refunds remaining R only. Legacy B getters are zero and claimB reverts B_REMOVED; no B token is deployed or minted. Old immutable markets and their balances are not rewritten.
+Only existing Market, Core payment gas handling and factory graduation settings change. The launch threshold is 4.2 ETH equivalent (0.0042 TSLA in the dedicated testnet profile); the creation price domain is bounded so the target fits the existing market limit. Genesis gToken converts proportionally into the same LP token at graduation, with b fixed to the graduated R amount and no later LP issuance. Formal LP receives actual remaining pool NAV without B cover. A failed launch refunds remaining R only. B fields, claim methods, Router actions and frontend compatibility paths are removed. No B token is deployed or minted. Historical immutable contracts are not changed; the current frontend targets the new single-R interface and does not support historical double-pool markets.
 
 See validation/2026-11-01-single-r-fee-payment.md for targeted acceptance evidence.

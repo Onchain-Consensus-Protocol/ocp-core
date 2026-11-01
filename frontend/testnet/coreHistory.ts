@@ -4,7 +4,7 @@ import {getLogsInChunks,replayCheckpoint,type HistoryCheckpoint,type Timestamped
 import {loadHistoryCheckpoint,saveHistoryCheckpoint} from './coreHistoryCache';
 const iface=new Interface(coreAbi);
 export interface CoreHistoryCheckpoint {
-  version:1;factory:string;market:string;core:string;creationBlock:number;creationHash:string;
+  version:2;factory:string;market:string;core:string;creationBlock:number;creationHash:string;
   latestBlock:number;latestHash:string;logs:TimestampedMarketLog[];
 }
 export interface CoreHistory {events:ChainActivity[];latestBlock:number;complete:true}
@@ -54,7 +54,7 @@ export async function readCoreHistory(provider:Provider,core:string,origin:Histo
   const old=await loadHistoryCheckpoint(origin.factory,origin.market,core);
   let prefix:TimestampedMarketLog[]=[];let from=creation.blockNumber;
   if(old){try{
-    if(old.version!==1||getAddress(old.factory)!==getAddress(origin.factory)||getAddress(old.market)!==getAddress(origin.market)||getAddress(old.core)!==core||old.creationBlock!==from||old.creationHash!==creation.blockHash||!Number.isSafeInteger(old.latestBlock)||old.latestBlock<from||old.latestBlock>head.number||!Array.isArray(old.logs))throw Error('Invalid Core cache');
+    if(old.version!==2||getAddress(old.factory)!==getAddress(origin.factory)||getAddress(old.market)!==getAddress(origin.market)||getAddress(old.core)!==core||old.creationBlock!==from||old.creationHash!==creation.blockHash||!Number.isSafeInteger(old.latestBlock)||old.latestBlock<from||old.latestBlock>head.number||!Array.isArray(old.logs))throw Error('Invalid Core cache');
     for(const item of old.logs){if(!Number.isSafeInteger(item.timestamp)||!Number.isSafeInteger(item.log.blockNumber)||item.log.blockNumber<from||item.log.blockNumber>old.latestBlock||!/^0x[0-9a-fA-F]{64}$/.test(item.log.blockHash)||!/^0x[0-9a-fA-F]{64}$/.test(item.log.transactionHash))throw Error('Invalid Core log');}
     replayCoreHistory(old.logs,core);
     if((await provider.getBlock(old.latestBlock))?.hash===old.latestHash){prefix=old.logs;from=old.latestBlock+1;}
@@ -69,6 +69,6 @@ export async function readCoreHistory(provider:Provider,core:string,origin:Histo
   for(const log of logs){const header=headers.get(log.blockNumber)!;if(header.hash!==log.blockHash)throw Error('Core event reorganized');all.push({timestamp:header.timestamp,log:{address:log.address,blockNumber:log.blockNumber,blockHash:log.blockHash,transactionHash:log.transactionHash,transactionIndex:log.transactionIndex,index:log.index,data:log.data,topics:[...log.topics],removed:log.removed} as unknown as Log});}
   if((await provider.getBlock(head.number))?.hash!==head.hash)throw Error('Core head reorganized');
   const events=replayCoreHistory(all,core);
-  await saveHistoryCheckpoint({version:1,factory:origin.factory,market:origin.market,core,creationBlock:creation.blockNumber,creationHash:creation.blockHash,latestBlock:head.number,latestHash:head.hash,logs:all},from===creation.blockNumber?old?.latestHash:undefined);
+  await saveHistoryCheckpoint({version:2,factory:origin.factory,market:origin.market,core,creationBlock:creation.blockNumber,creationHash:creation.blockHash,latestBlock:head.number,latestHash:head.hash,logs:all},from===creation.blockNumber?old?.latestHash:undefined);
   return {events,latestBlock:head.number,complete:true};
 }

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import {removedBBalance,removedBSupply} from "./MarketInvariantCheck.sol";
 import {checkMarketInvariants} from "./MarketInvariantCheck.sol";
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -76,10 +75,10 @@ contract RHMainnetForkTest is Test {
         vm.warp(m.coreCutoff());VaultCoreAdapter(aa).finalizeMarket();
         // A failing final stablecoin slippage limit must restore all burnt rights and budgets.
         bytes32 protectedState=_claimState(m,stock,address(router),address(exchange));
-        uint256 b=removedBBalance(m,alice);uint256 lp=m.lpToken().balanceOf(alice);uint256 pending=m.shares(alice);
+        uint256 lp=m.lpToken().balanceOf(alice);uint256 pending=m.shares(alice);
         r=request(mm,TopicMarketAssetRouter.Action.ClaimMarket);r.minOutput=type(uint256).max;
         vm.prank(alice);vm.expectRevert();router.execute(r);
-        assertEq(removedBBalance(m,alice),b);assertEq(m.lpToken().balanceOf(alice),lp);assertEq(m.shares(alice),pending);assertEq(_claimState(m,stock,address(router),address(exchange)),protectedState);
+        assertEq(m.lpToken().balanceOf(alice),lp);assertEq(m.shares(alice),pending);assertEq(_claimState(m,stock,address(router),address(exchange)),protectedState);
         r.minOutput=1;uint256 before=IERC20(USDG).balanceOf(alice);vm.prank(alice);router.execute(r);assertGt(IERC20(USDG).balanceOf(alice),before);
         r=request(mm,TopicMarketAssetRouter.Action.ClaimCore);r.minOutput=1;vm.prank(alice);router.execute(r);
         assertEq(IERC20(stock).balanceOf(address(router)),0);assertEq(IERC20(USDG).balanceOf(address(router)),0);
@@ -87,7 +86,7 @@ contract RHMainnetForkTest is Test {
         vm.prank(alice);vm.expectRevert();router.execute(r);
     }
     function _claimState(TopicMarket m,address stock,address router,address exchange) private view returns(bytes32) {
-        return keccak256(abi.encode(m.lpBudgetRemaining(),m.bBudgetRemaining(),m.yes(alice),m.no(alice),IERC20(stock).balanceOf(address(m)),IERC20(stock).balanceOf(router),IERC20(stock).balanceOf(exchange),IERC20(stock).balanceOf(alice),IERC20(USDG).balanceOf(alice),IERC20(USDG).balanceOf(router),IERC20(stock).allowance(router,exchange)));
+        return keccak256(abi.encode(m.lpBudgetRemaining(),0,m.yes(alice),m.no(alice),IERC20(stock).balanceOf(address(m)),IERC20(stock).balanceOf(router),IERC20(stock).balanceOf(exchange),IERC20(stock).balanceOf(alice),IERC20(USDG).balanceOf(alice),IERC20(USDG).balanceOf(router),IERC20(stock).allowance(router,exchange)));
     }
     function testForkClassicRouterAbiIsRejectedAndFundsRestored() public {
         TopicMarketV3Exchange oldExchange=new TopicMarketV3Exchange(ITopicMarketV3SwapRouter(ROUTER02),TSLA,USDG,3000);

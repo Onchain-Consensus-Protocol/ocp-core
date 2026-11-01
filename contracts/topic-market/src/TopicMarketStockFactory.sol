@@ -12,7 +12,7 @@ interface IStockRouterBinding { function factory() external view returns (addres
 interface IStockOracleUnits { function unit() external view returns (uint256); }
 /// @notice Shared factory with append-only stock configurations and independent markets.
 contract TopicMarketStockFactory is Ownable2Step {
-    bool public constant singlePool = true;
+    uint256 public constant interfaceVersion = 2;
     struct StockConfig {
         ITopicMarketPriceSnapshot priceOracle;
         address trustedForwarder;

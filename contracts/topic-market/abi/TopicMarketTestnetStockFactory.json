@@ -127,6 +127,19 @@
   },
   {
     "type": "function",
+    "name": "interfaceVersion",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isMarket",
     "inputs": [
       {
@@ -383,19 +396,6 @@
   },
   {
     "type": "function",
-    "name": "singlePool",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "stockCount",
     "inputs": [],
     "outputs": [
@@ -461,19 +461,6 @@
         "name": "enabled",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "testBTarget",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"

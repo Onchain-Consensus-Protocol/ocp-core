@@ -12,10 +12,10 @@ function provider(chainId:bigint,code='0x01') {
   return {getNetwork:vi.fn(async()=>({chainId})),getCode:vi.fn(async()=>code)};
 }
 function transactionFixture(){
-  const abi=new Interface([...factoryAbi,...marketAbi,...routerAbi].filter(item=>item.type==='function'));
+  const abi=new Interface([...factoryAbi,...marketAbi,...routerAbi].filter(item=>item.type==='function').concat(['function interfaceVersion() view returns(uint256)'] as never));
   const p={...provider(46630n),getBlock:vi.fn(async()=>({timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
     const fragment=abi.getFunction(tx.data.slice(0,10))!;
-    const results:Record<string,unknown[]>={isMarket:[true],marketCollateral:[market],
+    const results:Record<string,unknown[]>={interfaceVersion:[2n],isMarket:[true],marketCollateral:[market],
       marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
       stocks:[market,market,1n,18,true],trustedForwarder:[market],factory:[factory],stablecoin:[true]};
     return abi.encodeFunctionResult(fragment,results[fragment.name]);
@@ -25,51 +25,59 @@ function transactionFixture(){
   return {writer,wallet,sendTransaction,readerProvider:p};
 }
 describe('testnet transaction boundary',()=>{
-  it.each([false,true])('reads fixed TSLA targets with singlePool=%s without an ETH feed',async(singlePool)=>{
+  it('uses the current router action numbering',()=>{expect(RouterAction.ClaimFailed).toBe(8);expect(RouterAction.ClaimCore).toBe(9);expect(RouterAction.RedeemPairs).toBe(10);});
+  it('reads fixed TSLA targets without an ETH feed',async()=>{
     const stock='0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E';
     const abi=new Interface([...factoryAbi,
       'function fixedTestnetGraduation() view returns(bool)',
-      'function singlePool() view returns(bool)',
+      'function interfaceVersion() view returns(uint256)',
       'function symbol() view returns(string)','function decimals() view returns(uint8)',
       'function collateralForUsd(uint256) view returns(uint256)',
       'function ethPrice6() view returns(uint256)']);
     const calls:string[]=[];
     const p={...provider(46630n),getBlock:vi.fn(async()=>({number:42,timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
       const fragment=abi.getFunction(tx.data.slice(0,10))!;calls.push(fragment.name);
-      if(fragment.name==='singlePool'&&!singlePool)throw new Error('legacy getter absent');
       if(fragment.name==='ethPrice6')throw new Error('ETH feed unavailable');
       const results:Record<string,unknown[]>={owner:[factory],stockCount:[1n],marketCount:[0n],
-        fixedTestnetGraduation:[true],singlePool:[true],stockTokens:[stock],stocks:[market,market,1n,18,true],
+        fixedTestnetGraduation:[true],interfaceVersion:[2n],stockTokens:[stock],stocks:[market,market,1n,18,true],
         symbol:['TSLA'],decimals:[18],collateralForUsd:[2n*10n**18n]};
       return abi.encodeFunctionResult(fragment,results[fragment.name]);
     })};
     const directory=await createChainClient(p as unknown as Provider,factory).readDirectory();
     expect(directory.fixedTestTargets).toBe(true);
-    expect(directory.stocks[0]).toMatchObject({fixedRTarget:singlePool?4200000000000000n:3600000000000000n,fixedBTarget:singlePool?0n:600000000000000n});
+    expect(directory.stocks[0]).toMatchObject({fixedRTarget:4200000000000000n});
     expect(directory.stocks[0].snapshotError).toBeUndefined();
     expect(calls).toContain('collateralForUsd');expect(calls).not.toContain('ethPrice6');
   });
-  it('reads zero B without calling an ERC20 at address zero for new markets',async()=>{
+  it('reads LP and holdings without querying unsupported token contracts',async()=>{
     const abi=new Interface([...factoryAbi,...marketAbi,...vaultAbi].filter(item=>item.type==='function').concat([
-      'function singlePool() view returns(bool)', 'function balanceOf(address) view returns(uint256)',
+      'function interfaceVersion() view returns(uint256)', 'function balanceOf(address) view returns(uint256)',
       'function allowance(address,address) view returns(uint256)',
     ] as never));
     const seen:string[]=[];
     const p={...provider(46630n),call:vi.fn(async(tx:{data:string;to:string})=>{
       seen.push(tx.to);if(BigInt(tx.to)===0n)throw new Error('ZERO_TOKEN_CALL');
       const f=abi.getFunction(tx.data.slice(0,10))!;
-      const results:Record<string,unknown[]>={isMarket:[true],marketCollateral:[market],
+      const results:Record<string,unknown[]>={interfaceVersion:[2n],isMarket:[true],marketCollateral:[market],
         marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
-        singlePool:[true],phase:[0n],outcome:[0n],R:[1n],B:[0n],S:[1n],rTarget:[42n],bTarget:[0n],k:[1n],cash:[0n],lpFees:[0n],
-        lpBudgetRemaining:[0n],bBudgetRemaining:[0n],resolved:[false],settlementReady:[false],totalStakeYes:[0n],totalStakeNo:[0n],totalStakeInvalid:[0n],
-        lpToken:[market],bToken:['0x0000000000000000000000000000000000000000'],trustedForwarder:[market],
+        phase:[0n],outcome:[0n],R:[1n],S:[1n],rTarget:[42n],k:[1n],cash:[0n],lpFees:[0n],
+        lpBudgetRemaining:[0n],resolved:[false],settlementReady:[false],totalStakeYes:[0n],totalStakeNo:[0n],totalStakeInvalid:[0n],
+        lpToken:[market],trustedForwarder:[market],
         balanceOf:[7n],shares:[1n],yes:[0n],no:[0n],stakeOf:[0n,0n,0n],allowance:[0n]};
       if(!results[f.name])throw new Error('optional view absent');
       return abi.encodeFunctionResult(f,results[f.name]);
     })};
     const state=await createChainClient(p as unknown as Provider,factory).readMarket(market,market);
-    expect(state.singlePool).toBe(true);expect(state.position?.b).toBe(0n);expect(state.position?.lp).toBe(7n);
+    expect(state.position?.lp).toBe(7n);
     expect(seen.every(to=>BigInt(to)!==0n)).toBe(true);
+  });
+  it.each([1n,0n])('rejects unsupported factory version %s before any wallet signature',async(version)=>{
+    const abi=new Interface(['function interfaceVersion() view returns(uint256)']);
+    const p={...provider(46630n),call:vi.fn(async()=>abi.encodeFunctionResult('interfaceVersion',[version]))};
+    const sendTransaction=vi.fn();const client=createChainClient(p as unknown as Provider,factory);
+    await expect(client.readDirectory()).rejects.toThrow('interfaceVersion 2');
+    await expect(client.withSigner({provider:p,sendTransaction} as unknown as Signer).claimMarket(market)).rejects.toThrow('interfaceVersion 2');
+    expect(sendTransaction).not.toHaveBeenCalled();
   });
   it('rejects a missing factory before creating a client',()=>{
     expect(()=>nonzeroAddress('0x0000000000000000000000000000000000000000')).toThrow('未配置');
