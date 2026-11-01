@@ -85,6 +85,10 @@ function App() {
                     <Terminal className="w-3.5 h-3.5 mr-2" />
                     {t.hero_btn_demo}
                   </a>
+                  <a href={`https://market.ocp-protocol.org/testnet.html?lang=${lang}`} className="inline-flex items-center justify-center px-6 py-3 border border-accent/50 rounded-lg text-accent hover:bg-accent/10 text-sm font-bold font-display">
+                    <Landmark className="w-3.5 h-3.5 mr-2" />
+                    {lang === 'zh' ? '进入测试网市场' : 'Enter Testnet Market'}
+                  </a>
                 </div>
               </div>
             </section>
