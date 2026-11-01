@@ -65,7 +65,7 @@ export class PaperStore {
   });
  }
  async listMarkets():Promise<StoredPaperMarket[]>{
-  await this.ready();const result=await this.pool.query('SELECT document FROM ocp_paper_markets ORDER BY created_at DESC,id LIMIT 100');return result.rows.map(row=>currentMarket(row.document as StoredPaperMarket));
+  await this.ready();const result=await this.pool.query("SELECT document FROM ocp_paper_markets WHERE document->>'schemaVersion' = '2' ORDER BY created_at DESC,id LIMIT 100");return result.rows.filter(row=>row.document?.schemaVersion===2).map(row=>currentMarket(row.document as StoredPaperMarket));
  }
  async getMarket(id:string):Promise<StoredPaperMarket|null>{
   if(!text(id,200))throw new PaperStoreError('MARKET_ID',400);
