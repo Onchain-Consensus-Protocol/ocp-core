@@ -34,7 +34,6 @@ const copy = {
     title: "How OCP Core & OCP Market Work",
     intro:
       "Launch a topic at zero initial capital. Trade gToken during Genesis. When the R funding target is met, Genesis ends and the formal market and OCP Core open together.",
-    notOracle: "OCP Market is a multiplayer virtual trading game. Markets follow real elapsed time on the server; funds are virtual and no on-chain transactions are required.",
     vault: "OCP Core",
     vaultDesc: "Opens only after Genesis graduation. Stake on YES, NO or INVALID; add only to your chosen side while staked. Full exit returns 90% and forfeits 10% plus accrued fee rewards; after exit you may choose another side. Core principal determines the result.",
     market: "Market",
@@ -94,7 +93,6 @@ const copy = {
     eyebrow: "资本共识 × 连续定价",
     title: "OCP Core 与市场如何协作",
     intro: "零初始本金发射话题，在 Genesis 买卖 gToken。R储备达标即毕业，正式市场与 OCP Core 同时开启，最后按 Core 结果结算。",
-    notOracle: "OCP Market 是多人虚拟交易游戏。市场按服务器的真实时间运行，资金为虚拟资金，不发起链上交易。",
     vault: "OCP Core",
     vaultDesc: "Genesis 毕业后才开启。选择 YES、NO 或 INVALID 质押，有仓时只可同侧追加；开放期可按规则全仓退出，退90%、罚没10%并放弃历史手续费，退出后可重新选边。Core本金决定最终结果。",
     market: "市场",
@@ -299,9 +297,7 @@ function HowPage() {
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent">{t.eyebrow}</div>
             <h1 className="mt-5 font-display text-3xl font-black tracking-wide text-text text-glow sm:text-5xl">{t.title}</h1>
             <p className="mx-auto mt-6 max-w-3xl text-sm leading-7 text-text-muted sm:text-base">{t.intro}</p>
-            <div className="mx-auto mt-7 inline-flex items-center gap-2 rounded-full border border-yellow-500/40 bg-yellow-50 px-4 py-2 text-[11px] font-bold text-yellow-800">
-              <TriangleAlert className="h-4 w-4" />{t.notOracle}
-            </div>
+
           </div>
         </section>
 
