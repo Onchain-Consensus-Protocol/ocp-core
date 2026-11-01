@@ -118,7 +118,7 @@ export function projectPaperMarket(market:StoredPaperMarket,userId:string|null,n
  outstanding:[s.accounts.reduce((n,a)=>n+a.yes,0),s.accounts.reduce((n,a)=>n+a.no,0)] as [number,number],
  lpEstimates:(['YES','NO','INVALID'] as const).map(outcome=>{const inventory=outcome==='YES'?s.inventory[0]:outcome==='NO'?s.inventory[1]:(s.inventory[0]+s.inventory[1])/2;const nav=s.cash+s.lpFees+inventory;return {outcome,lp:a&&s.lpSupply>0?nav*a.lp/s.lpSupply:0}})};
  const e=s.early!,request=e.pending,principal=a?.coreStake??0,exitPenalty=Math.min(principal,Math.ceil(principal*1e18/10)/1e18);
- const early={bondUSD:dollars(e.bond*m.assetPriceUSD),requestId:request?.id??0,requestedOutcome:request?.side??null,
+ const early={proposerLabel:request?`Player ${request.proposer+1}`:undefined,bondUSD:dollars(e.bond*m.assetPriceUSD),requestId:request?.id??0,requestedOutcome:request?.side??null,
  proposedAt:request?m.createdAt+request.proposedAt:0,processAfter:request?m.createdAt+request.processAfter:0,reason:request?.reason??'',due:topicMarketEarlyDue(s),
  penaltyUSD:dollars(e.penalty*m.assetPriceUSD),failedBondUSD:dollars(e.failedBonds*m.assetPriceUSD),bondRefundUSD:dollars((a?.bondRefund??0)*m.assetPriceUSD),
  exitRefundUSD:dollars((principal-exitPenalty)*m.assetPriceUSD),exitPenaltyUSD:dollars(exitPenalty*m.assetPriceUSD),effectiveCutoff:m.createdAt+(e.terminatedAt??s.TC)};

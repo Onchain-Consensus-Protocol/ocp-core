@@ -4,7 +4,7 @@ import type {Language} from '../types';
 import {topicMarketCoreExit,topicMarketProposeEarly,topicMarketProcessEarly,topicMarketClaimEarlyBond,type Side,type TopicMarketState} from './topicMarketDemoModel';
 export interface SimulationCoreLifecycle {
  bond:number;bondRefund:number;exitRefund:number;exitPenalty:number;
- request?:{id:number;side:Side;processAfter:number;reason:string};
+ request?:{id:number;side:Side;processAfter:number;reason:string;proposerLabel?:string};
  canExit:boolean;canPropose:boolean;canProcess:boolean;paused:boolean;
  exit:()=>void;propose:(side:Side,reason:string)=>void;process:()=>void;claimBond:()=>void;
 }
@@ -13,7 +13,7 @@ export function buildLocalCoreLifecycle(s:TopicMarketState,id:number,run:(fn:(va
  const paused=!!request&&s.now>=request.processAfter,open=s.core.openedAt!==null&&s.now<s.TC&&!terminal&&!paused;
  const penalty=Math.min(a.coreStake,Math.ceil(a.coreStake*1e18/10)/1e18);
  return {bond:s.early?.bond??500,bondRefund:a.bondRefund??0,exitRefund:a.coreStake-penalty,exitPenalty:penalty,
-  request:request?{id:request.id,side:request.side,processAfter:request.processAfter,reason:request.reason}:undefined,
+  request:request?{id:request.id,side:request.side,processAfter:request.processAfter,reason:request.reason,proposerLabel:`Player ${request.proposer+1}`}:undefined,
   canExit:open&&a.coreStake>0,canPropose:open&&!request&&s.core.yes+s.core.no+s.core.invalid>0&&s.now+3600<s.TC,
   canProcess:!!request&&s.now>=request.processAfter&&!terminal,paused,
   exit:()=>run(v=>topicMarketCoreExit(v,id)),propose:(side,reason)=>run(v=>topicMarketProposeEarly(v,id,side,reason)),process:()=>run(topicMarketProcessEarly),claimBond:()=>run(v=>topicMarketClaimEarlyBond(v,id))};
@@ -29,6 +29,7 @@ export function SimulationEarlyNotice({lifecycle:l,now,lang,busy,connected,onCon
    {seconds===0&&<Button size="sm" variant="outline" className="ml-auto" disabled={busy||connected&&!l.canProcess} onClick={connected?l.process:onConnect}>{connected?t('执行结算检查','Check settlement'):t('登录后处理','Sign in to process')}</Button>}
    <details className="ml-auto"><summary className="cursor-pointer text-text-muted">{t('规则','Details')}</summary><p className="mt-2 max-w-xl leading-6">{seconds>0?t('确认期内，未到原截止时间的买卖、质押和解除质押仍可进行。到期后暂停这些操作，由任意玩家处理；处理者不需要再次交保证金。','During the window, trading, staking and unstaking remain available before their original deadlines. They pause when the window ends until any player processes the request, without posting another bond.'):t('处理时按确认期结束时已冻结的 Core 本金判断；匹配申请方向则结算并退还保证金，不匹配（含 INVALID）则罚没保证金。仅恢复原截止时间尚未到的操作。','Processing checks Core principal frozen at the end of the window. A match settles and makes the bond refundable; a mismatch, including INVALID, forfeits the bond. Only operations before their original deadlines resume.')}</p></details>
   </div>
+  <div className="mt-2 text-xs space-y-1"><p>{t('发起玩家：','Proposer: ')}{l.request.proposerLabel??'—'}</p><p className="whitespace-pre-wrap break-words">{t('理由：','Reason: ')}{l.request.reason}</p></div>
  </section>;
 }
 export function SimulationCoreActions({lifecycle:l,lang,symbol,busy,connected,available,onConnect}:{lifecycle:SimulationCoreLifecycle;lang:Language;symbol:string;busy:boolean;connected:boolean;available:number;onConnect:()=>void}){

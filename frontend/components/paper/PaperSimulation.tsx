@@ -14,7 +14,7 @@ export function buildPaperLifecycle(m:PaperMarket,now:number,submit:(action:Pape
  const paused=early.requestId>0&&now>=early.processAfter;
  const coreOpen=m.coreOpenedAt!==null&&!terminal&&now<m.coreDeadline&&!paused;
  return {bond:native(early.bondUSD),bondRefund:native(early.bondRefundUSD),exitRefund:native(early.exitRefundUSD),exitPenalty:native(early.exitPenaltyUSD),
-  request:early.requestId>0&&early.requestedOutcome?{id:early.requestId,side:early.requestedOutcome,processAfter:early.processAfter-m.createdAt,reason:early.reason}:undefined,
+  request:early.requestId>0&&early.requestedOutcome?{id:early.requestId,side:early.requestedOutcome,processAfter:early.processAfter-m.createdAt,reason:early.reason,proposerLabel:early.proposerLabel}:undefined,
   canExit:coreOpen&&Number(m.position?.coreStake??0)>0,canPropose:coreOpen&&!early.requestId&&Number(m.coreYes)+Number(m.coreNo)+Number(m.coreInvalid)>0&&now+3600<m.coreDeadline,
   canProcess:early.requestId>0&&now>=early.processAfter&&!terminal,paused,
   exit:()=>submit({type:'CORE_EXIT'}),propose:(side,reason)=>submit({type:'EARLY_PROPOSE',side,reason}),

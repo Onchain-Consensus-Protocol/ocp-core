@@ -23,3 +23,5 @@ describe('public early resolution notice',()=>{
     expect(renderToStaticMarkup(<EarlyTerminationNotice {...base} now={5000} busy/>)).toContain('disabled');
   });
 });
+
+it('renders the on-chain proposer and public reason as safe text',()=>{const html=renderToStaticMarkup(<EarlyTerminationNotice request={{requestId:1n,requestedOutcome:1,processAfter:100n,proposer:'0x1556a9a5c01ecc4ef11e751cacc847dd36971be7',reasonText:'<script>bad</script> Topic ended'}} now={0} lang="en" connected busy={false} onConnect={()=>{}} onProcess={()=>{}}/>);expect(html).toContain('0x1556a9a5c01ecc4ef11e751cacc847dd36971be7');expect(html).toContain('Topic ended');expect(html).not.toContain('<script>');});

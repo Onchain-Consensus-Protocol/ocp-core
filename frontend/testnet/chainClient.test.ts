@@ -1,7 +1,7 @@
 import {ZeroHash} from 'ethers';
 import { describe, expect, it, vi } from 'vitest';
 import { Interface, id, type Provider, type Signer } from 'ethers';
-import { createChainClient, nonzeroAddress, RouterAction } from './chainClient';
+import { createChainClient, decodeEarlyReason, nonzeroAddress, RouterAction } from './chainClient';
 import factoryAbi from '../../contracts/topic-market/abi/TopicMarketStockFactory.json';
 import marketAbi from '../../contracts/topic-market/abi/TopicMarket.json';
 import routerAbi from '../../contracts/topic-market/abi/TopicMarketAssetRouter.json';
@@ -108,13 +108,23 @@ describe('testnet transaction boundary',()=>{
   it('encodes routed early actions with reason hash, testnet chain and protected refund output',async()=>{
     const {writer,sendTransaction}=transactionFixture();
     const request={market,action:RouterAction.ProposeEarly,paymentAsset:market,inputAmount:100n,quantity:0n,minCollateral:99n,businessLimit:99n,minOutput:0n,deadline:2000n,side:1 as const,graduationIntent:0 as const,reasonHash:id('reason')};
-    await writer.executeRouter(request);
+    await writer.executeRouter(request,'reason');
     await writer.executeRouter({...request,action:RouterAction.ClaimEarlyBond,inputAmount:0n,minCollateral:0n,businessLimit:0n,minOutput:98n,reasonHash:ZeroHash});
     const abi=new Interface(routerAbi);
     const first=sendTransaction.mock.calls[0][0] as {data:string;chainId:bigint},second=sendTransaction.mock.calls[1][0] as {data:string;chainId:bigint};
     expect(first.chainId).toBe(46630n);expect(second.chainId).toBe(46630n);
     const a=abi.decodeFunctionData('execute',first.data)[0];expect(a.action).toBe(11n);expect(a.reasonHash).toBe(id('reason'));expect(a.minCollateral).toBe(99n);
     const b=abi.decodeFunctionData('execute',second.data)[0];expect(b.action).toBe(12n);expect(b.minOutput).toBe(98n);expect(b.reasonHash).toBe(ZeroHash);
+  });
+  it('estimates and sends the same reason envelope for direct and routed proposals',async()=>{
+    const {readerProvider,wallet}=transactionFixture(),sendTransaction=vi.fn(async(_tx:unknown)=>({hash:'0x01'})),estimateGas=vi.fn(async(_tx:unknown)=>300000n);
+    const writer=createChainClient(readerProvider as unknown as Provider,factory).withSigner({provider:wallet,sendTransaction,estimateGas} as unknown as Signer);
+    const reason='所有人可读取的原因',hash=id(reason);
+    await writer.proposeEarlyTermination(market,1,reason);
+    await writer.executeRouter({market,action:RouterAction.ProposeEarly,paymentAsset:market,inputAmount:100n,quantity:0n,minCollateral:99n,businessLimit:99n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0,reasonHash:hash},reason);
+    for(let i=0;i<2;i++){const estimated=estimateGas.mock.calls[i][0] as {data:string};const sent=sendTransaction.mock.calls[i][0] as {data:string;chainId:bigint};expect(sent.data).toBe(estimated.data);expect(decodeEarlyReason(sent.data,hash)).toBe(reason);expect(sent.chainId).toBe(46630n);}
+    await expect(writer.executeRouter({market,action:RouterAction.ProposeEarly,paymentAsset:market,inputAmount:1n,quantity:0n,minCollateral:1n,businessLimit:1n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0,reasonHash:hash},'wrong')).rejects.toThrow('哈希');
+    expect(sendTransaction).toHaveBeenCalledTimes(2);
   });
   it('rejects a missing factory before creating a client',()=>{
     expect(()=>nonzeroAddress('0x0000000000000000000000000000000000000000')).toThrow('未配置');

@@ -1,5 +1,5 @@
 import {loadHistoryCheckpoint,saveHistoryCheckpoint} from './historyCache';
-import { Contract, ZeroAddress, ZeroHash, getAddress, id, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
+import { Contract, Interface, concat, getBytes, hexlify, toUtf8Bytes, toUtf8String, toBeHex, zeroPadValue, ZeroAddress, ZeroHash, getAddress, id, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
 import factoryAbi from './abi/TopicMarketStockFactory.json';
 import marketAbi from './abi/TopicMarket.json';
 import vaultAbi from './abi/OCPCore.json';
@@ -7,14 +7,14 @@ import adapterAbi from './abi/VaultCoreAdapter.json';
 import routerAbi from './abi/TopicMarketAssetRouter.json';
 import oracleAbi from './abi/TopicMarketStockPriceSnapshot.json';
 import {quoteExchange as quoteV3Exchange} from './exchangeQuote';
-import {readChainPriceHistory, replayCheckpoint, type ChainPriceHistory} from './priceHistory';
+import {getLogsInChunks, readChainPriceHistory, replayCheckpoint, type ChainPriceHistory} from './priceHistory';
 
 export const TESTNET_CHAIN_ID = 46630n;
 const tokenAbi = ['function symbol() view returns(string)', 'function decimals() view returns(uint8)', 'function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'];
 export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; fixedRTarget?:bigint; }
 export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;priceYes?:bigint;R?:bigint;rTarget?:bigint; }
 export interface AccountPosition { balance:bigint; genesisShares:bigint; yes:bigint; no:bigint; lp:bigint; coreYes:bigint; coreNo:bigint; coreInvalid:bigint; marketAllowance:bigint; vaultAllowance:bigint; routerAllowance:bigint }
-export interface CoreLifecycle {bond:bigint; requestId:bigint; requestedOutcome:number; processAfter:bigint; effectiveCutoff:bigint; due:boolean; refund?:bigint; penalty?:bigint; bondRefund?:bigint}
+export interface CoreLifecycle {proposer?:string;reasonHash?:string;reasonText?:string;bond:bigint; requestId:bigint; requestedOutcome:number; processAfter:bigint; effectiveCutoff:bigint; due:boolean; refund?:bigint; penalty?:bigint; bondRefund?:bigint}
 /** Prices/quantities are WAD; money and payouts use collateral native units. Unknown metrics stay absent. */
 export interface MarketPresentation {
   priceYes?:bigint;priceNo?:bigint;basisWad:bigint;bWad:bigint;
@@ -29,6 +29,63 @@ export interface CreateMarketInput { stock:string; topic:string; yesRule:string;
 export enum RouterAction { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket, ClaimOutcome, ClaimLP, ClaimFailed, ClaimCore, RedeemPairs, ProposeEarly, ClaimEarlyBond }
 export interface RouterRequest { market:string; action:RouterAction; paymentAsset:string; inputAmount:bigint; quantity:bigint; minCollateral:bigint; businessLimit:bigint; minOutput:bigint; deadline:bigint; side:0|1|2; graduationIntent:0|1|2; reasonHash:string }
 
+const REASON_MAGIC=id('OCP_EARLY_REASON_V1');
+export function normalizeEarlyReason(value:string):string {
+  const text=value.trim();
+  if(!text || text.length>1000 || toUtf8Bytes(text).length>4000)throw new Error('提前结算原因须为1至1000字符');
+  return text;
+}
+/** Versioned envelope outside ABI calldata: magic | UTF8 | uint32 byteLength | magic. */
+export function appendEarlyReason(data:string,reason:string):string {
+  const bytes=toUtf8Bytes(normalizeEarlyReason(reason));
+  return concat([data,REASON_MAGIC,bytes,toBeHex(bytes.length,4),REASON_MAGIC]);
+}
+export function decodeEarlyReason(data:string,reasonHash:string):string|undefined {
+  try {
+    const bytes=getBytes(data),end=bytes.length;
+    if(end<68 || hexlify(bytes.slice(end-32)).toLowerCase()!==REASON_MAGIC.toLowerCase())return;
+    const length=Number(BigInt(hexlify(bytes.slice(end-36,end-32))));
+    if(length<1||length>4000||end<68+length)return;
+    const start=end-36-length;
+    if(hexlify(bytes.slice(start-32,start)).toLowerCase()!==REASON_MAGIC.toLowerCase())return;
+    const text=toUtf8String(bytes.slice(start,end-36));
+    if(text!==normalizeEarlyReason(text)||id(text).toLowerCase()!==reasonHash.toLowerCase())return;
+    return text;
+  }catch{return;}
+}
+export interface PublishedEarlyReason {
+  factory:string;market:string;vault:string;router:string;createdAt:bigint;
+  requestId:bigint;proposedAt:bigint;proposer:string;requestedOutcome:number;processAfter:bigint;bond:bigint;reasonHash:string;
+}
+/** Public chain provenance only; failure leaves the immutable hash available, never a guessed preimage. */
+export async function readPublishedEarlyReason(provider:Provider,r:PublishedEarlyReason):Promise<string|undefined> {
+  const core=new Interface(vaultAbi),router=new Interface(routerAbi),factory=new Interface(factoryAbi);
+  const head=await provider.getBlock('latest');if(!head)return;
+  const lowerBound=async(time:bigint)=>{let low=1,high=head.number+1;while(low<high){const mid=Math.floor((low+high)/2),b=await provider.getBlock(mid);if(!b)throw new Error('Missing block');if(BigInt(b.timestamp)>=time)high=mid;else low=mid+1;}return low;};
+  const first=await lowerBound(r.createdAt),last=await lowerBound(r.createdAt+1n)-1;
+  const origins=await getLogsInChunks(provider,r.factory,first,last,[factory.getEvent('MarketCreated')!.topicHash,zeroPadValue(r.market,32)]);
+  const origin=origins.find(log=>!log.removed&&getAddress(log.address)===getAddress(r.factory)&&factory.parseLog(log)?.args.market.toLowerCase()===r.market.toLowerCase());if(!origin)return;
+  const originHeader=await provider.getBlock(origin.blockNumber);if(!originHeader||originHeader.hash!==origin.blockHash||BigInt(originHeader.timestamp)!==r.createdAt)return;
+  const eventFirst=Math.max(origin.blockNumber,await lowerBound(r.proposedAt)),eventLast=Math.min(head.number,await lowerBound(r.proposedAt+1n)-1);
+  if(eventFirst>eventLast)return;
+  const events=await getLogsInChunks(provider,r.vault,eventFirst,eventLast,[core.getEvent('EarlyTerminationProposed')!.topicHash,toBeHex(r.requestId,32)]);
+  for(const log of events){
+    if(log.removed||getAddress(log.address)!==getAddress(r.vault))continue;
+    const event=core.parseLog(log);if(!event)continue;const a=event.args;
+    if(a.requestId!==r.requestId||getAddress(a.proposer)!==getAddress(r.proposer)||Number(a.requestedOutcome)!==r.requestedOutcome||a.processAfter!==r.processAfter||a.bond!==r.bond||a.reasonHash.toLowerCase()!==r.reasonHash.toLowerCase())continue;
+    const [tx,block]=await Promise.all([provider.getTransaction(log.transactionHash),provider.getBlock(log.blockNumber)]);
+    if(!tx||!block||block.hash!==log.blockHash||tx.blockHash!==log.blockHash||tx.hash!==log.transactionHash||!tx.to||getAddress(tx.from)!==getAddress(r.proposer))continue;
+    if(getAddress(tx.to)===getAddress(r.vault)){
+      const call=core.parseTransaction({data:tx.data});if(call?.name!=='proposeEarlyTermination'||Number(call.args[0])!==r.requestedOutcome||call.args[1].toLowerCase()!==r.reasonHash.toLowerCase())continue;
+    }else if(getAddress(tx.to)===getAddress(r.router)){
+      const call=router.parseTransaction({data:tx.data}),q=call?.args[0];
+      if(call?.name!=='execute'||getAddress(q.market)!==getAddress(r.market)||Number(q.action)!==RouterAction.ProposeEarly||Number(q.side)+1!==r.requestedOutcome||q.reasonHash.toLowerCase()!==r.reasonHash.toLowerCase())continue;
+      if(getAddress(await new Contract(r.router,routerAbi,provider).factory())!==getAddress(r.factory))continue;
+    }else continue;
+    return decodeEarlyReason(tx.data,r.reasonHash);
+  }
+}
+
 export function nonzeroAddress(value:string):string {
   const address=getAddress(value);
   if(address===ZeroAddress) throw new Error('未配置合约地址');
@@ -42,6 +99,7 @@ export async function assertTestnet(provider:Provider):Promise<void> {
 export function createChainClient(provider:Provider, factoryAddress:string) {
   const address=nonzeroAddress(factoryAddress);
   const factory=new Contract(address,factoryAbi,provider);
+  const reasonReads=new Map<string,Promise<string|undefined>>();
   async function ready() {
     await assertTestnet(provider);
     if(await provider.getCode(address)==='0x') throw new Error('测试网工厂地址没有合约代码');
@@ -117,7 +175,13 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     }
     try {
       const [bond, request, due, effectiveCutoff] = await Promise.all([v.earlyTerminationBondRequired(),v.pendingEarlyTermination(),v.earlyTerminationProcessingDue(),v.effectiveResolutionTime()]);
-      state.early={bond,requestId:request.id,requestedOutcome:Number(request.requestedOutcome),processAfter:request.processAfter,effectiveCutoff,due};
+      state.early={bond,proposer:request.proposer,reasonHash:request.reasonHash,requestId:request.id,requestedOutcome:Number(request.requestedOutcome),processAfter:request.processAfter,effectiveCutoff,due};
+      if(request.id>0n){let timer:ReturnType<typeof setTimeout>|undefined;try{
+        const key=`${base.vault}:${request.id}:${request.reasonHash}:${request.proposer}`;
+        let read=reasonReads.get(key);
+        if(!read){read=(async()=>readPublishedEarlyReason(provider,{...base,factory:address,market:base.address,router:await m.trustedForwarder(),bond,requestId:request.id,proposedAt:request.proposedAt,proposer:request.proposer,requestedOutcome:Number(request.requestedOutcome),processAfter:request.processAfter,reasonHash:request.reasonHash}))().catch(()=>undefined);reasonReads.set(key,read);void read.then(text=>{if(text===undefined)reasonReads.delete(key);});}
+        state.early.reasonText=await Promise.race([read,new Promise<undefined>(resolve=>{timer=setTimeout(()=>resolve(undefined),5000);})]);
+      }catch{/* RPC/pruned history: show only the verified pending hash. */}finally{clearTimeout(timer);}}
       if(account){const [exit,bondRefund]=await Promise.all([v.previewExitStake(account),v.claimableEarlyBond(account)]);state.early.refund=exit[0];state.early.penalty=exit[1];state.early.bondRefund=bondRefund;}
     } catch { /* Leave unavailable RPC metrics absent; never synthesize lifecycle values. */ }
     try {
@@ -160,13 +224,13 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     return quoteV3Exchange(provider,route.exchange,input,output,amount,exact);
   }
   async function quoteEarlyProposalStable(marketAddress:string,side:0|1,reason:string,deadline:bigint){
-    if(!reason.trim())throw new Error('请填写提前结算原因');
+    const text=normalizeEarlyReason(reason);
     const [state,route]=await Promise.all([readMarket(marketAddress),readPaymentRoute(marketAddress)]);
     if(!state.early || state.early.requestId>0n || state.vaultResolved || ![1,2].includes(state.phase))throw new Error('提前结算申请当前不可用');
     const bond=state.early.bond;
     const swap=await quoteV3Exchange(provider,route.exchange,route.stable,route.stock,bond,'output');
     return {quotedAt:Date.now(),cash:swap.amountIn,request:{market:state.address,action:RouterAction.ProposeEarly,paymentAsset:route.stable,
-      inputAmount:(swap.amountIn*101n+99n)/100n,quantity:0n,minCollateral:bond,businessLimit:bond,minOutput:0n,deadline,side,graduationIntent:0,reasonHash:id(reason.trim())} as RouterRequest};
+      inputAmount:(swap.amountIn*101n+99n)/100n,quantity:0n,minCollateral:bond,businessLimit:bond,minOutput:0n,deadline,side,graduationIntent:0,reasonHash:id(text)} as RouterRequest};
   }
   async function readPriceHistory(marketAddress:string):Promise<ChainPriceHistory> {
     await ready();
@@ -197,8 +261,15 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
   }
   function withSigner(signer:Signer,validateSession?:()=>void) {
     async function writeReady(){if(!signer.provider) throw new Error('钱包未连接');await assertTestnet(signer.provider);await ready();}
-    async function submit(contract:Contract,method:string,args:unknown[],paymentGas=0n):Promise<ContractTransactionResponse>{
+    async function submit(contract:Contract,method:string,args:unknown[],paymentGas=0n,reasonText?:string):Promise<ContractTransactionResponse>{
       if(!signer.provider) throw new Error('钱包未连接');
+      if(reasonText!==undefined){
+        const tx=await contract[method].populateTransaction(...args,{chainId:TESTNET_CHAIN_ID});
+        const data=appendEarlyReason(tx.data!,reasonText);
+        const gasLimit=await signer.estimateGas({...tx,data,chainId:TESTNET_CHAIN_ID})+paymentGas;
+        await assertTestnet(signer.provider);validateSession?.();
+        return signer.sendTransaction({...tx,data,gasLimit,chainId:TESTNET_CHAIN_ID}) as Promise<ContractTransactionResponse>;
+      }
       // 在估算值上另加发费预算；避免估算绕过发费后钱包只提供冻结结算的gas。
       const gasLimit=paymentGas>0n?await contract[method].estimateGas(...args,{chainId:TESTNET_CHAIN_ID})+paymentGas:undefined;
       // 读取登记或授权配置期间用户可能切链；发送前再核验，并把链ID写入交易，
@@ -207,10 +278,10 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       validateSession?.();
       return contract[method](...args,{chainId:TESTNET_CHAIN_ID,...(gasLimit===undefined?{}:{gasLimit})});
     }
-    async function send(marketAddress:string,target:'market'|'vault'|'adapter',method:string,args:unknown[]):Promise<ContractTransactionResponse>{
+    async function send(marketAddress:string,target:'market'|'vault'|'adapter',method:string,args:unknown[],reasonText?:string):Promise<ContractTransactionResponse>{
       await writeReady();const base=await summary(marketAddress);
       const paymentGas=target==='adapter'&&method==='finalizeMarket'?600000n:target==='market'&&(method==='closeExpired'||method==='claimFees')?600000n:target==='vault'&&method==='claimOfficialMarketFees'?600000n:0n;
-      return submit(new Contract(target==='market'?base.address:base[target],target==='market'?marketAbi:target==='vault'?vaultAbi:adapterAbi,signer),method,args,paymentGas);
+      return submit(new Contract(target==='market'?base.address:base[target],target==='market'?marketAbi:target==='vault'?vaultAbi:adapterAbi,signer),method,args,paymentGas,reasonText);
     }
     return {
       async createMarket(input:CreateMarketInput):Promise<ContractTransactionResponse>{
@@ -233,8 +304,8 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       materializeLP:async(market:string)=>send(market,'market','materializeLP',[await signer.getAddress()]),
       exitCore:(market:string)=>send(market,'vault','exitStake',[]),
       proposeEarlyTermination:(market:string,outcome:1|2,reason:string)=>{
-        if(!reason.trim()) throw new Error('请填写提前结算原因');
-        return send(market,'vault','proposeEarlyTermination',[outcome,id(reason.trim())]);
+        const text=normalizeEarlyReason(reason);
+        return send(market,'vault','proposeEarlyTermination',[outcome,id(text)],text);
       },
       processEarlyTermination:(market:string)=>send(market,'adapter','finalizeMarket',[]),
       claimEarlyBond:(market:string)=>send(market,'vault','claimEarlyTerminationBond',[]),
@@ -244,13 +315,15 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       claimMarketFees:(market:string)=>send(market,'market','claimFees',[]),
       claimProtocolFees:(market:string)=>send(market,'vault','claimOfficialMarketFees',[]),
       claimCore:(market:string)=>send(market,'vault','withdraw',[]),
-      async executeRouter(request:RouterRequest):Promise<ContractTransactionResponse>{
+      async executeRouter(request:RouterRequest,reasonText?:string):Promise<ContractTransactionResponse>{
+        if(request.action===RouterAction.ProposeEarly){if(reasonText===undefined||id(normalizeEarlyReason(reasonText)).toLowerCase()!==request.reasonHash.toLowerCase())throw new Error('提前结算原因与链上哈希不一致');}
+        else if(reasonText!==undefined)throw new Error('此操作不支持原因原文');
         await writeReady();const base=await summary(request.market);const m=new Contract(base.address,marketAbi,provider);
         const router=nonzeroAddress(await m.trustedForwarder());const r=new Contract(router,routerAbi,provider);
         if(getAddress(await r.factory())!==address) throw new Error('路由未绑定当前工厂');
         const asset=nonzeroAddress(request.paymentAsset);
         if(asset!==getAddress(base.stock) && !await r.stablecoin(asset)) throw new Error('路由不支持该支付资产');
-        return submit(new Contract(router,routerAbi,signer),'execute',[request]);
+        return submit(new Contract(router,routerAbi,signer),'execute',[request],0n,reasonText);
       },
       async previewRouter(request:RouterRequest):Promise<bigint>{
         await writeReady();const route=await readPaymentRoute(request.market);
