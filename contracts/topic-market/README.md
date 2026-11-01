@@ -1,3 +1,5 @@
+> Current testnet configuration: k=0.000001 (kWad=1000000000000), factory `0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5`, Router `0xBD6b0d0b1cdf1BFd7D2DC50dF7cc4296d766a06C`. No markets were created in this deployment; create your own from the frontend. gToken display uses native units with no extra denomination multiplier.
+
 > 2026-11-01: Single-R interface v3 deployed on Robinhood testnet 46630. Factory `0x3A42205E931753B5e3F80dbf9536b048e7427113`, market `0xeeE8F99cBdBccBc506FA180424638c95c038bA54`. Graduation target 0.0042 TSLA; stock bond 1.25 TSLA fixed at creation. See deployments/46630.json for verification status. User performs frontend transaction testing.
 
 > 2026-10-30: Fee release deployed on Robinhood testnet 46630. New factory `0xCef7fCb7e4B3d5A273A9e5c6D84C2886cE93C3Aa`; fresh Genesis market `0xb11B7A34E540B6a66701C281408F510fF556078C`. See deployments/46630.json for verification status and the archived legacy deployment.

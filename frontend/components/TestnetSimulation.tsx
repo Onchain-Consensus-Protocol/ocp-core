@@ -10,7 +10,7 @@ export interface TestnetSimulationProps {
   market:MarketState;stock:StockState;lang:Language;now:number;walletAddress?:string;busy:boolean;
   onConnect:()=>void;controls:ReactNode;coreActions:ReactNode;status:string;
   onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void;
-  /** Confirmed chain history only. Prices are collateral per INTERNAL share, before display scaling. */
+  /** Confirmed chain history only. Prices are collateral per gToken. */
   history?:{price:number;at:number;kind:string}[];
   activity?:TopicMarketEvent[];
   coreActivity?:TopicMarketEvent[];

@@ -13,7 +13,7 @@ export interface ChainActivity {
   amount?:bigint;isYes?:boolean;phase?:number;outcome?:number;
 }
 export interface ChainGenesisPoint {
-  /** WAD collateral per internal Genesis share; displayed gToken denomination is 10 million per share. */
+  /** WAD collateral per native gToken. */
   price:bigint;supply:bigint;at:number;kind:string;blockNumber:number;blockHash:string;
   transactionHash:string;logIndex:number;
 }

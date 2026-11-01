@@ -42,5 +42,5 @@ export function createShareSnapshot(stored:StoredPaperMarket,userId:string,theme
    pnl={label:'MY SETTLEMENT P&L (EST.)',low:Math.min(...scenarios),high:Math.max(...scenarios),note:'YES / NO / INVALID at current positions. Future trades/stakes excluded; not withdrawable.'};
   }
  }
- return {schemaVersion:2,id:snapshotId,market,theme,at:Math.floor(nowMs/1000),revision:m.revision,prices,priceSince:first?.at??null,priceNote:s.phase==='FAILED'?'Trading stopped: not graduated.':s.phase==='SETTLED'?`Settled: ${s.result}. Prices are last retained trading quotes.`:'Change from earliest retained price record, not necessarily 24h.',pnl};
+ return {schemaVersion:3,id:snapshotId,market,theme,at:Math.floor(nowMs/1000),revision:m.revision,prices,priceSince:first?.at??null,priceNote:s.phase==='FAILED'?'Trading stopped: not graduated.':s.phase==='SETTLED'?`Settled: ${s.result}. Prices are last retained trading quotes.`:'Change from earliest retained price record, not necessarily 24h.',pnl};
 }

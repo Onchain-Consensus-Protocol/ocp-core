@@ -1,7 +1,5 @@
-/** 仅调整Genesis代币面额：1个内部计算份额 = 1,000万枚展示代币。
- * 买卖数量双向换算，报价与持仓使用同一面额，现金和权益比例不变。
- */
-export const GENESIS_TOKEN_UNIT = 10_000_000;
+/** Genesis quantities use native token units, matching on-chain 18-decimal balances. */
+export const GENESIS_TOKEN_UNIT = 1;
 export const genesisTokens = (shares: number) => shares * GENESIS_TOKEN_UNIT;
 export const genesisShares = (tokens: number) => tokens / GENESIS_TOKEN_UNIT;
 export const genesisPrice = (pricePerShare: number) => {

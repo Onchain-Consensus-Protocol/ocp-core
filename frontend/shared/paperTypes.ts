@@ -1,7 +1,7 @@
 import type {TopicMarketState, TopicMarketAccount, TopicMarketPayout, TopicMarketTradeQuote, Outcome, Side} from '../components/topicMarketDemoModel.js';
 
 export const PAPER_INITIAL_USD = '100000.000000';
-export const PAPER_GTOKEN_SCALE = 10_000_000;
+export const PAPER_GTOKEN_SCALE = 1;
 export type PaperAction =
  | {type:'CORE_EXIT'}
  | {type:'EARLY_PROPOSE';side:Side;reason:string}
@@ -21,7 +21,7 @@ export type PaperCreateInput = {
  title:string;yesRule:string;noRule:string;invalidRule:string;assetSymbol:string;
 } & ({coreHours:number;coreDeadline?:never}|{coreDeadline:number;coreHours?:never});
 /** Server persistence only: never serialize users or full model accounts to public clients. */
-export interface StoredPaperMarket { schemaVersion:2;
+export interface StoredPaperMarket { schemaVersion:3;
  id:string;creatorId:string;title:string;yesRule:string;noRule:string;invalidRule:string;
  assetSymbol:string;assetPriceUSD:number;createdAt:number;revision:number;
  users:string[];state:TopicMarketState;
@@ -38,7 +38,7 @@ export type PaperPresentation = Pick<TopicMarketState,'config'|'TG'|'TF'|'TC'|'T
  own:TopicMarketAccount|null;claim:TopicMarketPayout|null;corePayout:number;coreFees:number;genesisPnl:number;
  outstanding:[number,number];lpEstimates:{outcome:Outcome;lp:number}[];
 };
-export interface PaperMarket { schemaVersion:2;
+export interface PaperMarket { schemaVersion:3;
  id:string;title:string;yesRule:string;noRule:string;invalidRule:string;assetSymbol:string;
  assetPriceUSD:number;createdAt:number;serverNow:number;revision:number;phase:TopicMarketState['phase'];
  genesisDeadline:number;formalDeadline:number;coreDeadline:number;topicDeadline:number;

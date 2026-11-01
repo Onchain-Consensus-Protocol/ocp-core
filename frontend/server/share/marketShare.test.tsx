@@ -19,7 +19,7 @@ async function request(url:string,method='GET',load=vi.fn(async()=>market as Sha
 describe('public market share cards',()=>{
  it('serves frozen snapshots independent of visitor identity, URL theme, or later market changes',async()=>{
   const id='00000000-0000-4000-8000-000000000001';
-  const snapshot:MarketShareSnapshot={schemaVersion:2,id,market:{...market},at:1793088000,revision:1,theme:'dark',prices:[{label:'gTOKEN PRICE',value:'$0.0001',change:'+25.00%',positive:true}],priceSince:1793087000,priceNote:'Retained record comparison.',pnl:{label:'MY EXIT P&L',low:123,high:123,note:'Current positions only.'}};
+  const snapshot:MarketShareSnapshot={schemaVersion:3,id,market:{...market},at:1793088000,revision:1,theme:'dark',prices:[{label:'gTOKEN PRICE',value:'$0.0001',change:'+25.00%',positive:true}],priceSince:1793087000,priceNote:'Retained record comparison.',pnl:{label:'MY EXIT P&L',low:123,high:123,note:'Current positions only.'}};
   const frozen=vi.fn(async()=>snapshot),live=vi.fn(async()=>({...market,title:'Later changed title'}));
   const req=Object.assign(Readable.from([]),{method:'GET',url:`/api/market-share?snapshot=${id}&theme=light`,headers:{authorization:'Bearer ignored'}}) as IncomingMessage;
   const headers:Record<string,string>={};let html='';
