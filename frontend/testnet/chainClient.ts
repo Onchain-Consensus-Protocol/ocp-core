@@ -12,7 +12,7 @@ import {getLogsInChunks, readChainPriceHistory, replayCheckpoint, type ChainPric
 export const TESTNET_CHAIN_ID = 46630n;
 const tokenAbi = ['function symbol() view returns(string)', 'function decimals() view returns(uint8)', 'function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'];
 export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; fixedRTarget?:bigint; }
-export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;priceYes?:bigint;R?:bigint;rTarget?:bigint; }
+export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;outcome?:number;priceYes?:bigint;R?:bigint;rTarget?:bigint; }
 export interface AccountPosition { balance:bigint; genesisShares:bigint; yes:bigint; no:bigint; lp:bigint; coreYes:bigint; coreNo:bigint; coreInvalid:bigint; marketAllowance:bigint; vaultAllowance:bigint; routerAllowance:bigint }
 export interface CoreLifecycle {proposer?:string;reasonHash?:string;reasonText?:string;bond:bigint; requestId:bigint; requestedOutcome:number; processAfter:bigint; effectiveCutoff:bigint; due:boolean; refund?:bigint; penalty?:bigint; bondRefund?:bigint}
 /** Prices/quantities are WAD; money and payouts use collateral native units. Unknown metrics stay absent. */
@@ -119,6 +119,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
         if(names[i]==='phase')result.phase=Number(value.value);
         else result[names[i] as 'R'|'rTarget']=value.value;
       }});
+      if(result.phase===3){try{result.outcome=Number(await m.outcome());}catch{/* Final result remains unavailable instead of reusing trading odds. */}}
       if(result.phase===1||result.phase===2){
         const v=new Contract(result.vault,vaultAbi,provider);
         await Promise.all([

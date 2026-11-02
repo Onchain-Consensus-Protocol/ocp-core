@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import type {PaperMarket} from '../../shared/paperTypes';
-type Props={market:Pick<PaperMarket,'phase'|'result'|'R'|'rTarget'|'yesPrice'|'noPrice'>&Partial<Pick<PaperMarket,'early'|'serverNow'>>;lang:'zh'|'en'};
+type Props={market:Pick<PaperMarket,'phase'|'result'|'R'|'rTarget'|'yesPrice'|'noPrice'>&Partial<Pick<PaperMarket,'serverNow'>>&{early?:Pick<NonNullable<PaperMarket['early']>,'requestId'|'requestedOutcome'|'processAfter'>};lang:'zh'|'en'};
 const percent=(value:number)=>value.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 export function PaperMarketStatus({market:m,lang}:Props){
  const [now,setNow]=useState(m.serverNow??0);
