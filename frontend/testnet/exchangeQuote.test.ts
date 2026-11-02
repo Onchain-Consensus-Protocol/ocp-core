@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {Interface,ZeroAddress,getAddress,type Provider} from 'ethers';
-import {quoteExchange,readExchangeAssets,TESTNET_V3_QUOTER} from './exchangeQuote';
+import {exchangePriceImpactBps,quoteExchange,readExchangeAssets,TESTNET_V3_QUOTER} from './exchangeQuote';
 
 const EXCHANGE='0x1111111111111111111111111111111111111111';
 const STOCK='0x2222222222222222222222222222222222222222';
@@ -146,3 +146,5 @@ describe('read-only QuoterV2 exact input/output',()=>{
 });
 
 it('rejects exact output exceeding the real token balance before asking the quoter',async()=>{const {provider,calls}=fixture({outputBalance:99n});await expect(quoteExchange(provider,EXCHANGE,STABLE,STOCK,100n,'output')).rejects.toThrow('EXCHANGE_OUTPUT_BALANCE');expect(calls.some(c=>c.name==='quoteExactOutputSingle')).toBe(false);});
+
+it('measures exchange impact without treating the pool fee as price impact',()=>{expect(exchangePriceImpactBps(STOCK,STABLE,1000000n,997000n,1n<<96n,3000)).toBe(0);expect(exchangePriceImpactBps(STOCK,STABLE,1000000n,498500n,1n<<96n,3000)).toBe(5000);expect(exchangePriceImpactBps(STABLE,STOCK,1000000n,498500n,1n<<96n,3000)).toBe(5000);});

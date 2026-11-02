@@ -36,8 +36,19 @@ export interface ExchangeAssets {
   blockNumber:number;blockHash:string;
 }
 export interface ExchangeQuote {
-  amountIn:bigint;amountOut:bigint;blockNumber:number;blockHash:string;
+  amountIn:bigint;amountOut:bigint;priceImpactBps:number;blockNumber:number;blockHash:string;
   pool:string;factory:string;exchange:string;fee:number;
+}
+
+/** Compare executable output to the pre-trade spot quote, excluding the V3 fee. Raw units cancel. */
+export function exchangePriceImpactBps(input:string,output:string,amountIn:bigint,amountOut:bigint,sqrtPriceX96:bigint,fee:number):number {
+ const square=sqrtPriceX96*sqrtPriceX96,Q192=1n<<192n;
+ const zeroForOne=BigInt(input)<BigInt(output);
+ const numerator=amountIn*BigInt(1_000_000-fee)*(zeroForOne?square:Q192);
+ const denominator=1_000_000n*(zeroForOne?Q192:square);
+ if(numerator<=0n)return 0;
+ const received=amountOut*denominator;
+ return received>=numerator?0:Number((numerator-received)*10000n/numerator);
 }
 
 function address(value:string):string {
@@ -135,6 +146,7 @@ export async function quoteExchange(
   const block=await provider.getBlock(assets.blockNumber);
   if(block?.hash!==assets.blockHash)throw new Error('EXCHANGE_BLOCK_REORG');
   return {amountIn:exact==='input'?amount:quoted,amountOut:exact==='input'?quoted:amount,
+    priceImpactBps:exchangePriceImpactBps(tokenIn,tokenOut,exact==='input'?amount:quoted,exact==='input'?quoted:amount,assets.sqrtPriceX96,assets.fee),
     blockNumber:assets.blockNumber,blockHash:assets.blockHash,pool:assets.pool,factory:assets.factory,
     exchange:assets.exchange,fee:assets.fee};
 }

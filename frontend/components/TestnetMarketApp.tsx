@@ -23,7 +23,7 @@ const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)
 const units = (value: bigint | undefined, decimals = 18) => value === undefined ? '—' : (()=>{const [whole,fraction='']=formatUnits(value,decimals).split('.');return whole+'.'+fraction.padEnd(18,'0').slice(0,18);})();
 type Directory = Awaited<ReturnType<ReturnType<typeof createChainClient>['readDirectory']>>;
 type Wallet = {provider: BrowserProvider; address: string; chainId: number};
-type Quote = {key: string; quantity: bigint; cash: bigint; limit: bigint; shares?:bigint;route?:RouterRequest};
+type Quote = {key: string; quantity: bigint; cash: bigint; limit: bigint; shares?:bigint;exchangeImpactBps?:number;route?:RouterRequest};
 
 function errorText(error: unknown, zh = true): string {
   const value = error as {shortMessage?: string; reason?: string; message?: string};
@@ -260,7 +260,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   // 只有业务参数变化才废弃报价；目录轮询会生成新的对象引用，
   // 不能因此中断多轮 USDG 读取，否则慢请求的结果和错误都会永久被丢弃。
   const quoteKey = `${selected}:${tab}:${mode}:${amount}:${tradeSide}:${market?.phase}:${wallet?.address}:${earlyDue}:${payAsset}:${stock?.address}:${stock?.decimals}:${paymentRoute?.stable}:${paymentRoute?.router}:${payDecimals}:${confirmedRevision}`;
-  type QuoteBundle={sides?:Partial<Record<0|1,Quote>>;stake?:{key:string;input:bigint;minCollateral:bigint;estimated:bigint}};
+  type QuoteBundle={sides?:Partial<Record<0|1,Quote>>;stake?:{key:string;input:bigint;minCollateral:bigint;estimated:bigint;exchangeImpactBps?:number}};
   const quoteEnabled=!!reader&&!!market&&!!stock&&!!amount&&(!usingStable||!!paymentRoute)&&(tab!=='CORE'||usingStable);
   const quoteState=useAsyncQuote<QuoteBundle>(quoteEnabled?quoteKey:null,async()=>{
     if(!reader||!market||!stock)throw new Error('Market unavailable');
@@ -269,25 +269,26 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
       const value=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,input,'input');
       const minCollateral=value.amountOut*99n/100n;
       if(minCollateral<=0n)throw new Error(t('金额过小，无法兑换。','Amount is too small to swap.'));
-      return {stake:{key:quoteKey,input,minCollateral,estimated:value.amountOut}};
+      return {stake:{key:quoteKey,input,minCollateral,estimated:value.amountOut,exchangeImpactBps:value.priceImpactBps}};
     }
     const direction=genesis?0:tradeSide;
     const quantity=parseUnits(amount,genesis&&mode==='BUY'?payDecimals:18);if(quantity<=0n)return {};
+    let exchangeImpactBps:number|undefined;
     let cash:bigint,limit:bigint,shares:bigint|undefined,route:RouterRequest|undefined;
     const request=(action:RouterAction):RouterRequest=>({market:market.address,action,paymentAsset:paymentRoute!.stable,inputAmount:0n,quantity:0n,minCollateral:0n,businessLimit:0n,minOutput:0n,deadline:BigInt(Math.floor(Date.now()/1000)+chainTimeOffset.current+600),side:direction,graduationIntent:0,reasonHash:ZeroHash});
     if(genesis&&mode==='BUY'){
-      if(usingStable){const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,quantity,'input');const floor=swap.amountOut*995n/1000n;shares=await reader.quoteGenesisBuy(market.address,swap.amountOut);limit=(await reader.quoteGenesisBuy(market.address,floor))*995n/1000n;cash=quantity;route={...request(RouterAction.GenesisBuy),inputAmount:quantity,minCollateral:floor,businessLimit:limit};}
+      if(usingStable){const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,quantity,'input');exchangeImpactBps=swap.priceImpactBps;const floor=swap.amountOut*995n/1000n;shares=await reader.quoteGenesisBuy(market.address,swap.amountOut);limit=(await reader.quoteGenesisBuy(market.address,floor))*995n/1000n;cash=quantity;route={...request(RouterAction.GenesisBuy),inputAmount:quantity,minCollateral:floor,businessLimit:limit};}
       else{shares=await reader.quoteGenesisBuy(market.address,quantity);cash=quantity;limit=shares*99n/100n;}
     }else if(mode==='BUY'){
       const cost=await reader.quoteFormalBuy(market.address,direction===0,quantity);
-      if(usingStable){const maxStock=(cost*1005n+999n)/1000n;const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,maxStock,'output');cash=swap.amountIn;limit=(cash*1005n+999n)/1000n;route={...request(RouterAction.FormalBuy),inputAmount:limit,quantity,minCollateral:maxStock,businessLimit:maxStock};}
+      if(usingStable){const maxStock=(cost*1005n+999n)/1000n;const swap=await reader.quotePaymentSwap(market.address,paymentRoute!.stable,stock.address,maxStock,'output');exchangeImpactBps=swap.priceImpactBps;cash=swap.amountIn;limit=(cash*1005n+999n)/1000n;route={...request(RouterAction.FormalBuy),inputAmount:limit,quantity,minCollateral:maxStock,businessLimit:maxStock};}
       else{cash=cost;limit=(cash*101n+99n)/100n;}
     }else{
       const value=genesis?await reader.quoteGenesisSell(market.address,quantity,wallet?.address):await reader.quoteFormalSell(market.address,direction===0,quantity,wallet?.address);
-      if(usingStable){const stockFloor=value.seller*995n/1000n;const [swap,safeSwap]=await Promise.all([reader.quotePaymentSwap(market.address,stock.address,paymentRoute!.stable,value.seller,'input'),reader.quotePaymentSwap(market.address,stock.address,paymentRoute!.stable,stockFloor,'input')]);cash=swap.amountOut;limit=safeSwap.amountOut*995n/1000n;route={...request(genesis?RouterAction.GenesisSell:RouterAction.FormalSell),quantity,businessLimit:stockFloor,minOutput:limit};}
+      if(usingStable){const stockFloor=value.seller*995n/1000n;const [swap,safeSwap]=await Promise.all([reader.quotePaymentSwap(market.address,stock.address,paymentRoute!.stable,value.seller,'input'),reader.quotePaymentSwap(market.address,stock.address,paymentRoute!.stable,stockFloor,'input')]);exchangeImpactBps=swap.priceImpactBps;cash=swap.amountOut;limit=safeSwap.amountOut*995n/1000n;route={...request(genesis?RouterAction.GenesisSell:RouterAction.FormalSell),quantity,businessLimit:stockFloor,minOutput:limit};}
       else{cash=value.seller;limit=cash*99n/100n;}
     }
-    return {sides:{[direction]:{key:quoteKey+':'+direction,quantity,cash,limit,shares,route}}};
+    return {sides:{[direction]:{key:quoteKey+':'+direction,quantity,cash,limit,shares,route,exchangeImpactBps}}};
   });
   const sideQuotes=quoteState.expired?{}:quoteState.data?.sides??{};
   const stakeRouteQuote=quoteState.expired?undefined:quoteState.data?.stake;
@@ -391,6 +392,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
   const tradeControls=market&&stock?<div className="space-y-4 animate-fade-in" data-testid="chain-trade-controls">
     <div className={box+' space-y-2 text-xs'} data-testid="stock-route-panel"><strong>{stock.symbol} {t('股票代币底池','stock-token pool')}</strong><label className="flex justify-between items-center gap-2">{t('支付／收款资产','Pay / receive')}<select aria-label="Payment asset" className="border border-border rounded p-2 bg-white" value={payAsset} disabled={busy} onChange={e=>{setPayAsset(e.target.value as 'STOCK'|'STABLE');}}><option value="STOCK">{stock.symbol}</option>{paymentRoute&&<option value="STABLE">{paymentRoute.stableSymbol}</option>}</select></label>{row(t('可用余额','Available balance'),`${units(payBalance,payDecimals)} ${paySymbol}`)}<p className="text-text-muted">{usingStable?t('通过现有池兑换，使用真实 USDG 支付和收款。','Swap through the existing pool to pay and receive USDG.'):t('使用钱包中的测试股票支付和收款。','Pay and receive test stock tokens in your wallet.')}</p>{routeError&&<p className="text-text-muted">{routeError}</p>}</div>
     {quoteEnabled&&(quoteState.error||quoteState.expired)&&<div role="status" className="text-xs text-danger">{quoteState.expired?t('报价已过期，请刷新后操作。','Quote expired. Refresh before proceeding.'):t('报价读取失败，请重试。','Quote unavailable. Please retry.')} <button type="button" className="underline" onClick={quoteState.refresh}>{t('刷新报价','Refresh quote')}</button></div>}
+    {usingStable&&((tab==='CORE'?stakeRouteQuote?.exchangeImpactBps:quoteFor(genesis?0:tradeSide)?.exchangeImpactBps)??0)>=500&&<p role="alert" className="text-xs text-danger whitespace-pre-wrap" data-testid="exchange-price-impact">{t('兑换池深度不足，价格冲击约','Thin exchange liquidity. Price impact approximately')} {(((tab==='CORE'?stakeRouteQuote?.exchangeImpactBps:quoteFor(genesis?0:tradeSide)?.exchangeImpactBps)??0)/100).toFixed(2)}%。{t('请减少金额或改用股票。1%滑点保护不包含这部分报价内的价格冲击。','Reduce the amount or use stock. The 1% slippage limit does not cover price impact already included in this quote.')}</p>}
     {wallet&&tab==='CORE'&&coreAmount>0n&&!balanceEnough&&<p role="status" className="text-xs text-danger">{t('余额不足','Insufficient balance')} · {paySymbol}</p>}
     {wallet&&tab==='MARKET'&&mode==='BUY'&&quoteFor(genesis?0:tradeSide)&&!canSubmit(genesis?0:tradeSide)&&!earlyDue&&(genesis?genesisOpen:formalOpen)&&(payBalance??0n)<(quoteFor(genesis?0:tradeSide)!.route?.inputAmount??quoteFor(genesis?0:tradeSide)!.limit)&&<p role="status" className="text-xs text-danger">{t('余额不足','Insufficient balance')} · {paySymbol}</p>}
     {tab==='CORE'?<>
