@@ -27,5 +27,5 @@ export function useAsyncQuote<T>(key:string|null,load:()=>Promise<T>){
   },[key]);
   const state=snapshot?.key===key?snapshot.state:undefined;
   return {data:state?.data,error:state?.error,loading:key!==null&&(!state||state.loading),
-    expired:!!state?.data&&Date.now()>=state.expiresAt,refresh:()=>runner.current?.refresh()};
+    expiresAt:state?.expiresAt??0,expired:!!state?.data&&Date.now()>=state.expiresAt,refresh:()=>runner.current?.refresh()};
 }
