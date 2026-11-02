@@ -18,7 +18,7 @@ function transactionFixture(){
   const abi=new Interface([...factoryAbi,...marketAbi,...routerAbi].filter(item=>item.type==='function').concat(['function interfaceVersion() view returns(uint256)'] as never));
   const p={...provider(46630n),getBlock:vi.fn(async()=>({timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
     const fragment=abi.getFunction(tx.data.slice(0,10))!;
-    const results:Record<string,unknown[]>={interfaceVersion:[3n],isMarket:[true],marketCollateral:[market],
+    const results:Record<string,unknown[]>={interfaceVersion:[4n],isMarket:[true],marketCollateral:[market],
       marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
       stocks:[market,market,1n,18,true],trustedForwarder:[market],factory:[factory],stablecoin:[true]};
     return abi.encodeFunctionResult(fragment,results[fragment.name]);
@@ -42,7 +42,7 @@ describe('testnet transaction boundary',()=>{
       const fragment=abi.getFunction(tx.data.slice(0,10))!;calls.push(fragment.name);
       if(fragment.name==='ethPrice6')throw new Error('ETH feed unavailable');
       const results:Record<string,unknown[]>={owner:[factory],stockCount:[1n],marketCount:[0n],
-        fixedTestnetGraduation:[true],interfaceVersion:[3n],stockTokens:[stock],stocks:[market,market,1n,18,true],
+        fixedTestnetGraduation:[true],interfaceVersion:[4n],stockTokens:[stock],stocks:[market,market,1n,18,true],
         symbol:['TSLA'],decimals:[18],collateralForUsd:[2n*10n**18n]};
       return abi.encodeFunctionResult(fragment,results[fragment.name]);
     })};
@@ -61,7 +61,7 @@ describe('testnet transaction boundary',()=>{
     const p={...provider(46630n),call:vi.fn(async(tx:{data:string;to:string})=>{
       seen.push(tx.to);if(BigInt(tx.to)===0n)throw new Error('ZERO_TOKEN_CALL');
       const f=abi.getFunction(tx.data.slice(0,10))!;
-      const results:Record<string,unknown[]>={interfaceVersion:[3n],isMarket:[true],marketCollateral:[market],
+      const results:Record<string,unknown[]>={interfaceVersion:[4n],isMarket:[true],marketCollateral:[market],
         marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
         phase:[0n],outcome:[0n],R:[1n],S:[1n],rTarget:[42n],k:[1n],cash:[0n],lpFees:[0n],
         lpBudgetRemaining:[0n],resolved:[false],settlementReady:[false],totalStakeYes:[0n],totalStakeNo:[0n],totalStakeInvalid:[0n],
@@ -74,12 +74,12 @@ describe('testnet transaction boundary',()=>{
     expect(state.position?.lp).toBe(7n);
     expect(seen.every(to=>BigInt(to)!==0n)).toBe(true);
   });
-  it.each([2n,0n])('rejects unsupported factory version %s before any wallet signature',async(version)=>{
+  it.each([3n,0n])('rejects unsupported factory version %s before any wallet signature',async(version)=>{
     const abi=new Interface(['function interfaceVersion() view returns(uint256)']);
     const p={...provider(46630n),call:vi.fn(async()=>abi.encodeFunctionResult('interfaceVersion',[version]))};
     const sendTransaction=vi.fn();const client=createChainClient(p as unknown as Provider,factory);
-    await expect(client.readDirectory()).rejects.toThrow('interfaceVersion 3');
-    await expect(client.withSigner({provider:p,sendTransaction} as unknown as Signer).claimMarket(market)).rejects.toThrow('interfaceVersion 3');
+    await expect(client.readDirectory()).rejects.toThrow('interfaceVersion 4');
+    await expect(client.withSigner({provider:p,sendTransaction} as unknown as Signer).claimMarket(market)).rejects.toThrow('interfaceVersion 4');
     expect(sendTransaction).not.toHaveBeenCalled();
   });
   it('quotes USDG for the fixed stock bond with exact-output conversion and a rounded 1% input ceiling',async()=>{
@@ -90,7 +90,7 @@ describe('testnet transaction boundary',()=>{
     ] as never));
     const p={...provider(46630n),call:vi.fn(async(tx:{data:string})=>{
       const f=abi.getFunction(tx.data.slice(0,10))!;
-      const results:Record<string,unknown[]>={interfaceVersion:[3n],isMarket:[true],marketCollateral:[market],
+      const results:Record<string,unknown[]>={interfaceVersion:[4n],isMarket:[true],marketCollateral:[market],
         marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
         phase:[1n],outcome:[0n],R:[0n],S:[1n],rTarget:[42n],k:[1n],cash:[0n],lpFees:[0n],lpBudgetRemaining:[0n],
         resolved:[false],settlementReady:[false],totalStakeYes:[100n],totalStakeNo:[0n],totalStakeInvalid:[0n],

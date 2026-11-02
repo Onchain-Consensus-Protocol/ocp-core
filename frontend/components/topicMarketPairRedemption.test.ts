@@ -6,14 +6,14 @@ import { createTopicMarketDemo, topicMarketCreate, topicMarketBuy, topicMarketFo
 type State=ReturnType<typeof createTopicMarketDemo>;
 const formal=()=>{let s=topicMarketCreate(createTopicMarketDemo({Q:6000}));for(let id=0;id<3;id++)s=topicMarketBuy(s,id,9000);return s;};
 const bought=()=>topicMarketFormalBuy(topicMarketFormalBuy(formal(),0,"YES",100),0,"NO",80);
-const frozen=(s:State)=>({cash:s.cash,lpFees:s.lpFees,lpSupply:s.lpSupply,inventory:s.inventory,b:s.b});
+const frozen=(s:State)=>({lpFees:s.lpFees,lpSupply:s.lpSupply,inventory:s.inventory,b:s.b});
 const ledger=(s:State)=>{topicMarketAssertLedger(s);expect(topicMarketAccounting(s).error).toBeCloseTo(0,7);};
 describe("TopicMarket locked LP: directly purchased outcome pair redemption",()=>{
  it("redeems only real purchased YES+NO and leaves locked LP assets untouched",()=>{
   let s=bought();const before=s,other=frozen(s);s=topicMarketRedeemPairs(s,0,20);
   expect(s.accounts[0].yes).toBe(80);expect(s.accounts[0].no).toBe(60);
   expect(s.accounts[0].wallet-before.accounts[0].wallet).toBeCloseTo(20,8);
-  expect(s.collateral).toBeCloseTo(before.collateral-20,8);expect(s.redeemedPairs).toBe(20);
+  expect(s.cash).toBeCloseTo(before.cash-20,8);expect(s.redeemedPairs).toBe(20);
   expect(frozen(s)).toEqual(other);ledger(s);
  });
  it("accepts partial then remaining-pair redemption without minting or double paying",()=>{

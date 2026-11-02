@@ -16,9 +16,9 @@ contract TopicMarketMergeTest is TopicMarketBase {
         (uint256 y,uint256 n)=market.coordinates();
         uint256 extY=market.yes(alice)+market.yes(bob)+market.yes(carol)+market.yes(dave);
         uint256 extN=market.no(alice)+market.no(bob)+market.no(carol)+market.no(dave);
-        assertEq(y,extY+market.redeemedPairs()*market.SCALE());
-        assertEq(n,extN+market.redeemedPairs()*market.SCALE());
-        assertEq(market.collateralCash()+market.redeemedPairs(),market.initialCollateral());
+        assertEq(y,extY);
+        assertEq(n,extN);
+        assertEq(market.collateralCash(),0);assertGe(market.cash()*market.SCALE(),Math.max(extY,extN));
         _accounting();
     }
     function testLockedPoolActualBuyThenFullHoldingSellYesAndNo() public {
@@ -29,7 +29,7 @@ contract TopicMarketMergeTest is TopicMarketBase {
         assertEq(merge6,0); assertLe(gross,market.cash());
         _sell(dave,true,market.yes(dave)); _capacityInvariant();
         _sell(dave,false,market.no(dave)); _capacityInvariant();
-        assertEq(market.yes(dave)+market.no(dave),0); assertLe(market.cash(),10);
+        assertEq(market.yes(dave)+market.no(dave),0); assertLe(market.cash(),market.initialCollateral()+10);
     }
     function testOnlyYesHoldingCanSellWithoutPersonalNo() public {
         _three(); _formalBuy(dave,true,W/10); assertEq(market.no(dave),0);
@@ -38,9 +38,9 @@ contract TopicMarketMergeTest is TopicMarketBase {
     }
     function testPairsRedeemedThenAllRemainingHoldingsSell() public {
         _three(); _both(dave);
-        uint256 col=market.collateralCash(); uint256 basis=market.poolBasisWad(); uint256 b=market.bWad();
+        uint256 col=market.cash(); uint256 basis=market.poolBasisWad(); uint256 b=market.bWad();
         vm.prank(dave); market.redeemPairs(20000); _capacityInvariant();
-        assertEq(market.collateralCash(),col-20000); assertEq(market.poolBasisWad(),basis); assertEq(market.bWad(),b);
+        assertEq(market.cash(),col-20000); assertEq(market.poolBasisWad(),basis); assertEq(market.bWad(),b);
         _sell(dave,true,market.yes(dave)); _capacityInvariant();
         _sell(dave,false,market.no(dave)); _capacityInvariant();
         assertEq(market.yes(dave)+market.no(dave),0);
@@ -65,9 +65,9 @@ contract TopicMarketMergeTest is TopicMarketBase {
         _sell(dave,true,W/100); _capacityInvariant();
         uint256 snap=vm.snapshotState();
         for(uint8 result=1;result<=3;result++){
-            uint256 iv=result==1?market.inventoryY()/market.SCALE():result==2?market.inventoryN()/market.SCALE()
-                :(market.inventoryY()+market.inventoryN())/(2*market.SCALE());
-            uint256 nav=market.cash()+market.lpFees()+iv;
+            uint256 iv=result==1?market.yesSupply()/market.SCALE():result==2?market.noSupply()/market.SCALE()
+                :(market.yesSupply()+market.noSupply())/(2*market.SCALE());
+            uint256 nav=market.cash()+market.lpFees()-iv;
 
             _finish(result);
             assertEq(market.lpBudgetInitial(),nav);

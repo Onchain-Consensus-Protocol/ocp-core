@@ -107,7 +107,7 @@ contract TopicMarketStockIntegrationTest is Test {
         assertEq(c.balanceOf(address(router)),0);assertEq(u.balanceOf(address(router)),0);
     }
     function testRealFactoryRegistrationForwarderAndUnits() public view {
-        assertEq(factory.interfaceVersion(),3);assertTrue(factory.isMarket(address(m)));assertEq(m.rTarget(),336e17);assertTrue(m.isTrustedForwarder(address(router)));assertTrue(vault.isTrustedForwarder(address(router)));
+        assertEq(factory.interfaceVersion(),4);assertTrue(factory.isMarket(address(m)));assertEq(m.rTarget(),336e17);assertTrue(m.isTrustedForwarder(address(router)));assertTrue(vault.isTrustedForwarder(address(router)));
         assertEq(address(m.token()),address(c));assertEq(address(vault.stakeToken()),address(c));
         assertLe(address(m).code.length,24576);
     }
@@ -179,7 +179,7 @@ contract TopicMarketStockIntegrationTest is Test {
     function testStockDisableReenablePreservesMarketsAndConfig() public {
         (ITopicMarketPriceSnapshot price,address route,uint256 coefficient,,)=factory.stocks(address(c));
         factory.setStockEnabled(address(c),false);
-        assertEq(factory.interfaceVersion(),3);assertTrue(factory.isMarket(address(m)));
+        assertEq(factory.interfaceVersion(),4);assertTrue(factory.isMarket(address(m)));
         assertEq(factory.marketCollateral(address(m)),address(c));
         vm.expectRevert(bytes("STOCK_DISABLED"));
         factory.createMarket(address(c),"disabled","yes","no","invalid",uint64(block.timestamp+6 hours));

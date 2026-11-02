@@ -29,10 +29,10 @@ contract TopicMarketGraduationDepthTest is TopicMarketBase {
         assertEq(market.priceYes(),W/2);assertEq(market.bWad(),depth);
         assertLt(usd.balanceOf(bob),before);_accounting();
     }
-    function testInventoryBoundaryRemainsExplicit() public {
-        _graduate();uint256 cap=market.inventoryY();_formalBuy(bob,true,cap);
+    function testTradingContinuesPastFormerInventoryBoundary() public {
+        _graduate();uint256 cap=market.poolBasisWad();_formalBuy(bob,true,cap);
         assertApproxEqAbs(market.priceYes(),731058578630004879,100);
-        vm.expectRevert("INVENTORY");market.quoteFormalBuy(true,1);_accounting();
+        _formalBuy(bob,true,cap);assertGt(market.yesSupply(),market.poolBasisWad());_accounting();
     }
     function testMaximumCapitalTinyAndLargeRoundtripsNoFreeValue() public {
         uint256 paid=market.LIMIT();usd.mint(alice,paid);_buy(alice,paid);

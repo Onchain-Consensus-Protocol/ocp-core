@@ -49,7 +49,7 @@ contract TopicMarketStatefulHandler is Test {
     }
     function formalTrade(uint256 who,bool yesSide,bool buy,uint256 raw) public {
         address a=actors[who%4];
-        uint256 cap=buy?(yesSide?market.inventoryY():market.inventoryN()):(yesSide?market.yes(a):market.no(a));
+        uint256 cap=buy?2e18:(yesSide?market.yes(a):market.no(a));
         if(cap==0)return;
         uint256 amount=bound(raw,1,cap>2e18?2e18:cap);
         vm.prank(a);

@@ -11,7 +11,7 @@ import {Button} from './Button';
 import {GenesisPriceChart} from './GenesisPriceChart';
 import {genesisTokens,genesisShares,genesisPrice} from './genesisDisplay';
 import type {Language} from '../types';
-import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalBuy,topicMarketFormalSell,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalBuy,topicMarketQuoteFormalSell,topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketClaim,topicMarketClaimCore,topicMarketClaimPreview,topicMarketRedeemPairs,topicMarketPrices,type TopicMarketState,type TopicMarketTradeQuote,type Side,type Outcome} from './topicMarketDemoModel';
+import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalBuy,topicMarketFormalSell,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalBuy,topicMarketQuoteFormalSell,topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketClaim,topicMarketClaimCore,topicMarketClaimPreview,topicMarketPrices,type TopicMarketState,type TopicMarketTradeQuote,type Side,type Outcome} from './topicMarketDemoModel';
 export interface RemoteSimulation {
  lifecycle?:SimulationCoreLifecycle;
  chain?:{outstandingShares?:{yes:string;no:string};contractAddresses?:{market:string;core:string};poolBalances?:{yes:string;no:string;stock:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
@@ -43,7 +43,6 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const [id,setId]=useState(0),[tab,setTab]=useState<'MARKET'|'PROTOCOL'>('MARKET'),[mode,setMode]=useState<'BUY'|'SELL'>('BUY');
  const [amount,setAmount]=useState(10),[running,setRunning]=useState(false),[notice,setNotice]=useState('');
  const [snapshot,setSnapshot]=useState(2000),[depth,setDepth]=useState(150);
- const [pairs,setPairs]=useState(1);
  const [coreDateTime,setCoreDateTime]=useState(()=>defaultDeadlineLocal());
  const [createNow,setCreateNow]=useState(()=>Date.now());
  const coreDeadline=parseLocalDeadline(coreDateTime);
@@ -58,7 +57,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const px=remote?.prices??topicMarketPrices(s),preview=remote?.preview??topicMarketClaimPreview(s,id);
  const genesisCost=s.events.filter(e=>e.actor===id).reduce((v,e)=>{if(e.kind==='GENESIS_BUY')return {qty:v.qty+(e.quantity??0),cost:v.cost+(e.amount??0)};if(e.kind==='GENESIS_SELL'){const fraction=v.qty>0?Math.max(0,1-(e.quantity??0)/v.qty):0;return {qty:Math.max(0,v.qty-(e.quantity??0)),cost:v.cost*fraction}}return v},{qty:0,cost:0});
  const genesisPnl=remote?.genesisPnl??((a.g>0&&gen?topicMarketQuoteSell(s,a.g).net:0)-genesisCost.cost);
- const lpEstimates=remote?.lpEstimates??(['YES','NO','INVALID'] as Outcome[]).map(outcome=>{const inventory=outcome==='YES'?s.inventory[0]:outcome==='NO'?s.inventory[1]:(s.inventory[0]+s.inventory[1])/2;return {outcome,lp:s.lpSupply>0?(s.cash+s.lpFees+inventory)*a.lp/s.lpSupply:0}});
+ const lpEstimates=remote?.lpEstimates??(['YES','NO','INVALID'] as Outcome[]).map(outcome=>{const y=s.accounts.reduce((v,x)=>v+x.yes,0),n=s.accounts.reduce((v,x)=>v+x.no,0),debt=outcome==='YES'?y:outcome==='NO'?n:(y+n)/2;return {outcome,lp:s.lpSupply>0?(s.cash+s.lpFees-debt)*a.lp/s.lpSupply:0}});
  const lpValuePanel=s.phase==='SETTLED'?<div className="mt-2 text-[10px]"><span>{t("可领取金额","Claimable")}</span><div>LP {num(preview.lp)} {asset.symbol}</div></div>:['FORMAL','WAIT_CORE'].includes(s.phase)?<details className="mt-2 text-[10px]"><summary className="cursor-pointer">{t("LP 预计领取金额","Estimated LP payouts")}</summary><table className="w-full mt-2 text-right"><thead><tr><th className="text-left">{t("最终结果","Outcome")}</th><th>LP</th></tr></thead><tbody>{lpEstimates.map(v=><tr key={v.outcome}><td className="text-left">{v.outcome}</td><td>{num(v.lp)}</td></tr>)}</tbody></table><p className="mt-1">{t("按当前资金状态估算，不含未来交易及费用；以最终结算为准。","Current-state estimates exclude future trading and fees; final settlement determines payouts.")}</p></details>:null;
  const hasClaim=(s.phase==='FAILED'?a.g:a.lp+a.yes+a.no)>0;
  const errors:Record<string,string>={HOLDINGS:t('持仓不足，请检查数量。','Check holdings and amount.'),BALANCE:t('余额不足。','Insufficient balance.'),CLAIM:t('当前没有可领取权益。','No claim available.'),SIDE_LOCKED:t('Core方向已锁定，只能同侧追加。','Core side is locked.'),AMOUNT:t('请输入有效的正数。','Enter a positive amount.'),INVENTORY:t('可买份额不足，请减少数量。','Not enough shares available. Reduce the buy amount.'),CAPACITY:t('卖出数量超出可用范围，请减少数量。','Sell amount exceeds the available range. Reduce the amount.'),CORE_CLOSED:t('Core尚未开启或已经截止。','Core is not open.'),CASH:t('当前报价无法执行。','Quote cannot be executed.'),PHASE:t('当前阶段不可执行。','Unavailable in this phase.')};
@@ -113,7 +112,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
   const fee=q?q.creatorFee+q.protocolFee+q.lpFee+q.coreFee:0;
   const cash=q?(mode==='BUY'?q.gross:q.net):0;
   const before=side==='YES'?yesPrice:noPrice;
-  const endDifference=(s.basis-s.inventory[0])-(s.basis-s.inventory[1])+(side==='YES'?1:-1)*(mode==='BUY'?1:-1)*(q?.quantity??0);
+  const endDifference=marketShares.YES-marketShares.NO+(side==='YES'?1:-1)*(mode==='BUY'?1:-1)*(q?.quantity??0);
   const endYes=1/(1+Math.exp(-endDifference/s.b));const impact=gen?0:Math.abs((side==='YES'?endYes:1-endYes)-before)*100;
   return <div className="rounded-lg border border-border bg-white/60 px-2.5 py-2 text-[10px] font-mono"><div className={`mb-1.5 font-bold ${sideTextColor(side)}`}>{gen?'Genesis':side}</div><div className="space-y-1 text-text-muted"><Row label={t('平均成交价','Avg. price')} value={q?(gen?num(cash/tokens,10):num((mode==='BUY'?q.net:q.gross)/q.quantity,4)):'—'}/><Row label={gen?t('获得／卖出代币','Tokens'):t('价格影响','Price impact')} value={q?(gen?num(tokens):`${num(impact)}%`):'—'}/><Row label={t('手续费','Fee')} value={q?num(fee):'—'}/><div className="border-t border-border pt-1"><Row label={mode==='BUY'?t('预计支付','Est. payment'):t('预计到账','Est. receipt')} value={q?`${num(cash)} ${asset.symbol}${useStable?' ≈ '+num(cash*asset.price)+' dUSDC':''}`:'—'}/></div><Row label={mode==='BUY'?t('最大支付（滑点上限1%）','Max payment (1% slippage)'):t('最低到账（滑点上限1%）','Min receipt (1% slippage)')} value={q?`${num(cash*(mode==='BUY'?1.01:.99),6)} ${asset.symbol}${useStable?' ≈ '+num(cash*(mode==='BUY'?1.01:.99)*asset.price)+' dUSDC':''}`:'—'}/>{gen&&q?.wouldGraduate&&<p className="text-accent mt-2">{t('本笔触发毕业，持仓转为LP；权益估值可能低于成本。','This trade graduates into LP; value may be below cost.')}</p>}</div></div>
  };
@@ -390,7 +389,6 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
           </div>
         )}
 
-   {tab==='MARKET'&&['FORMAL','WAIT_CORE'].includes(s.phase)&&Math.min(a.yes,a.no)>0&&<details className={box+' text-xs'}><summary className="cursor-pointer">{t('YES＋NO成对兑换','Redeem YES + NO pairs')}</summary><p className="my-3 text-text-muted">{t('每对兑回1 dUSDC，不收交易费。','Each pair redeems 1 dUSDC, fee-free.')}</p><input aria-label={t('成对兑换数量','Pair redemption amount')} type="number" value={pairs} onChange={e=>setPairs(Number(e.target.value))} className="w-full p-3 border border-border rounded-lg"/><Button className="w-full mt-3" disabled={!(pairs>0)||pairs>Math.min(a.yes,a.no)} onClick={()=>remote?remote.redeemPairs(pairs):act(v=>topicMarketRedeemPairs(v,id,pairs))}>{t('确认成对兑换','Redeem pairs')}</Button></details>}
         {!remote&&ticking && (
           <Button onClick={fastForward} variant="ghost" size="sm" className="w-full">
             {zh ? "时间快进10分钟" : "Advance time by 10 minutes"}
@@ -480,7 +478,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
           )}
         </div>
 
-        {activeTab==='MARKET'&&remote?.chain?.poolBalances&&!gen&&<div className="border border-border rounded-xl p-4 mb-5 text-xs" data-testid="market-pool-balances"><h3 className="text-text-muted font-bold mb-2">{t('池内资产','Pool assets')}</h3><Row label={t('池内 YES 份额','Pool YES shares')} value={`${remote.chain.poolBalances.yes} ${t('份','shares')}`}/><Row label={t('池内 NO 份额','Pool NO shares')} value={`${remote.chain.poolBalances.no} ${t('份','shares')}`}/><Row label={t('市场合约股票余额','Market stock balance')} value={`${remote.chain.poolBalances.stock} ${asset.symbol}`}/></div>}
+        {activeTab==='MARKET'&&remote?.chain?.poolBalances&&!gen&&<div className="border border-border rounded-xl p-4 mb-5 text-xs" data-testid="market-pool-balances"><h3 className="text-text-muted font-bold mb-2">{t('池内资产','Pool assets')}</h3><p className="text-text-muted mb-2">{t('结果份额按成交铸造或销毁；池中份额余额不是可购买上限。','Outcome shares are minted or burned on trades; pool holdings are not a purchase limit.')}</p><Row label={t('池内 YES 份额','Pool YES shares')} value={`${remote.chain.poolBalances.yes} ${t('份','shares')}`}/><Row label={t('池内 NO 份额','Pool NO shares')} value={`${remote.chain.poolBalances.no} ${t('份','shares')}`}/><Row label={t('市场合约股票余额','Market stock balance')} value={`${remote.chain.poolBalances.stock} ${asset.symbol}`}/></div>}
 
         <div className={` ${gen?"hidden":"grid"} grid-cols-2 gap-4 mb-6`}>
           <div className="border border-border rounded-xl p-4">

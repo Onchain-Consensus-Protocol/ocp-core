@@ -1,6 +1,6 @@
 {
   "schema": "topicMarket-evm-parity-snapshots-v1",
-  "source": "TopicMarketRealCore.t.sol::testDemoParityLockedTokensBurn; Foundry -vv, 2026-11-01",
+  "source": "TopicMarketRealCore.t.sol::testDemoParityLockedTokensBurn; Foundry -vv, 2026-11-02",
   "units": "suffix6=6-decimal collateral raw units; suffixWad=1e18 shares",
   "tests": {
     "testDemoParityLockedTokensBurn": [
@@ -29,10 +29,10 @@
             "noWad": "0"
           }
         ],
-        "collateral6": "26730000000",
-        "cash6": "0",
-        "inventoryYWad": "26730000000000000000000",
-        "inventoryNWad": "26730000000000000000000",
+        "collateral6": "0",
+        "cash6": "26730000000",
+        "inventoryYWad": "0",
+        "inventoryNWad": "0",
         "basisWad": "26730000000000000000000",
         "bWad": "26730000000000000000000",
         "liquiditySupplyWad": "163493119121264549932",
@@ -68,10 +68,10 @@
             "noWad": "0"
           }
         ],
-        "collateral6": "26730000000",
-        "cash6": "40029930",
-        "inventoryYWad": "26650000000000000000000",
-        "inventoryNWad": "26730000000000000000000",
+        "collateral6": "0",
+        "cash6": "26770029930",
+        "inventoryYWad": "0",
+        "inventoryNWad": "0",
         "basisWad": "26730000000000000000000",
         "bWad": "26730000000000000000000",
         "liquiditySupplyWad": "163493119121264549932",
@@ -107,10 +107,10 @@
             "noWad": "0"
           }
         ],
-        "collateral6": "26730000000",
-        "cash6": "40029930",
-        "inventoryYWad": "26650000000000000000000",
-        "inventoryNWad": "26730000000000000000000",
+        "collateral6": "0",
+        "cash6": "26770029930",
+        "inventoryYWad": "0",
+        "inventoryNWad": "0",
         "basisWad": "26730000000000000000000",
         "bWad": "26730000000000000000000",
         "liquiditySupplyWad": "163493119121264549932",
@@ -146,10 +146,10 @@
             "noWad": "0"
           }
         ],
-        "collateral6": "26730000000",
-        "cash6": "40029930",
-        "inventoryYWad": "26650000000000000000000",
-        "inventoryNWad": "26730000000000000000000",
+        "collateral6": "0",
+        "cash6": "26770029930",
+        "inventoryYWad": "0",
+        "inventoryNWad": "0",
         "basisWad": "26730000000000000000000",
         "bWad": "26730000000000000000000",
         "liquiditySupplyWad": "163493119121264549932",
@@ -185,10 +185,10 @@
             "noWad": "0"
           }
         ],
-        "collateral6": "26730000000",
-        "cash6": "25011694",
-        "inventoryYWad": "26680000000000000000000",
-        "inventoryNWad": "26730000000000000000000",
+        "collateral6": "0",
+        "cash6": "26755011694",
+        "inventoryYWad": "0",
+        "inventoryNWad": "0",
         "basisWad": "26730000000000000000000",
         "bWad": "26730000000000000000000",
         "liquiditySupplyWad": "163493119121264549932",
@@ -396,7 +396,7 @@
     "viaIR": true,
     "optimizerRuns": 1,
     "sha256": {
-      "contracts/topic-market/src/TopicMarket.sol": "ff1f4b636484dfe9c642bafcd21b11a6df1fdb4eaa68a38f51f2374c687d550b",
+      "contracts/topic-market/src/TopicMarket.sol": "f6ec7b9a3d33fcd2d6be15ec0f53c10ad4b8998aa25156f5b390d73bf0aa27b3",
       "contracts/topic-market/src/core/OCPCore.sol": "f618b5e44710c57e8cee87e1575082af90499b472f7970eece37a7a3adf21fd5",
       "contracts/topic-market/src/VaultCoreAdapter.sol": "b651be0f6c5c8195da5de05831c1d49cabcae594592d4d6e8eb7fc4371da4e0b",
       "contracts/topic-market/test/TopicMarketRealCore.t.sol": "a413314bd3c6f048961cce991cd94d20e5e6584a0792774f8543ceae837c35c6"

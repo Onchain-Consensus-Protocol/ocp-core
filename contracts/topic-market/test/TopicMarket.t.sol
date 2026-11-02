@@ -126,14 +126,13 @@ contract TopicMarketTest is TopicMarketBase {
         _accounting();
     }
 
-    function testFormalOversellAndInventoryProtection() public {
+    function testFormalOversellRejectedButFormerInventoryIsNotACap() public {
         _graduate();
         vm.prank(bob);
         vm.expectRevert("HOLDINGS");
         market.formalSell(true, 1e18, 0, type(uint64).max);
-        uint256 tooMuch = market.inventoryY() + 1;
-        vm.expectRevert("INVENTORY");
-        market.quoteFormalBuy(true, tooMuch);
+        uint256 amount = market.poolBasisWad()*2;
+        _formalBuy(bob,true,amount);assertEq(market.yes(bob),amount);assertGt(market.yesSupply(),market.poolBasisWad());_accounting();
     }
 
     function testFormalMaxPriceProtectsWallet() public {

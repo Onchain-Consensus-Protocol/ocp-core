@@ -39,7 +39,7 @@ contract TopicMarketSinglePoolTest is TopicMarketBase {
     }
     function testFormalFeeIsOnePercentForLPAndNeverChangesDepthOrB() public {
         _graduate();uint256 depth=market.bWad();uint256 gross=market.quoteFormalBuy(true,W);
-        _formalBuy(bob,true,W);assertEq(market.lpFees(),gross/100);assertEq(market.cash(),gross*98/100);
+        _formalBuy(bob,true,W);assertEq(market.lpFees(),gross/100);assertEq(market.cash(),market.initialCollateral()+gross*98/100);
         assertEq(market.coreFeesSent(),gross*7/1000);
         (uint256 sellGross,)=market.quoteFormalSell(true,W);vm.prank(bob);market.formalSell(true,W,0,type(uint64).max);
         assertEq(market.lpFees(),gross/100+sellGross/100);assertEq(market.bWad(),depth);_accounting();
@@ -48,8 +48,8 @@ contract TopicMarketSinglePoolTest is TopicMarketBase {
         _buy(alice,1e6);_buy(bob,13e6);_formalBuy(carol,true,W);_formalBuy(carol,false,W/2);
         uint256 snapshot=vm.snapshotState();
         for(uint8 result=1;result<=3;result++){
-            uint256 inventoryValue=result==1?market.inventoryY()/market.SCALE():result==2?market.inventoryN()/market.SCALE():(market.inventoryY()+market.inventoryN())/(2*market.SCALE());
-            uint256 nav=market.cash()+market.lpFees()+inventoryValue;
+            uint256 inventoryValue=result==1?market.yesSupply()/market.SCALE():result==2?market.noSupply()/market.SCALE():(market.yesSupply()+market.noSupply())/(2*market.SCALE());
+            uint256 nav=market.cash()+market.lpFees()-inventoryValue;
             _finish(result);assertEq(market.lpBudgetInitial(),nav);
             _claimAll(alice);_claimAll(bob);_claimAll(carol);assertEq(market.liquiditySupply(),0);assertEq(market.yesSupply()+market.noSupply(),0);_accounting();
             assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB(uint256)",1));

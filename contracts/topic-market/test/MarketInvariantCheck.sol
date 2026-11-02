@@ -11,10 +11,9 @@ function checkMarketInvariants(TopicMarket m) view returns (bool) {
             require(m.lpToken().balanceOf(address(m)) >= m.unmaterializedLP(), "LP_ESCROW");
         }
         if (m.phase() == TopicMarket.Phase.FORMAL || m.phase() == TopicMarket.Phase.WAIT_CORE) {
-            require(m.yesSupply() == m.collateralCash() * m.SCALE() && m.noSupply() == m.collateralCash() * m.SCALE(), "PAIR_SUPPLY");
-            require(m.collateralCash() + m.redeemedPairs() == m.initialCollateral(), "COLLATERAL_LEDGER");
-            require(m.inventoryY() <= m.poolBasisWad() && m.inventoryN() <= m.poolBasisWad(), "COORDINATES");
-            require(m.inventoryY() <= m.yesSupply() && m.inventoryN() <= m.noSupply(), "INVENTORY_SUPPLY");
+            require(m.inventoryY() == 0 && m.inventoryN() == 0 && m.collateralCash() == 0, "NO_PREMINT");
+            require(m.cash() >= (m.yesSupply() + m.SCALE() - 1) / m.SCALE() && m.cash() >= (m.noSupply() + m.SCALE() - 1) / m.SCALE(), "OUTCOME_SOLVENCY");
+            (uint256 qY,uint256 qN)=m.coordinates();require(qY==m.yesSupply() && qN==m.noSupply(), "OUTSTANDING_COORDINATES");
         }
         return true;
 }

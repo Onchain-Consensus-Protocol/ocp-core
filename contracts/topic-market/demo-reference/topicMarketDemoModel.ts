@@ -84,8 +84,8 @@ function graduate(s: TopicMarketState, id: number, kind: string) {
   if (!(s.R >= s.rTarget)) return;
   // 多人模拟按毕业时真实入池资本确定曲线深度；不创造资金、不增加结果份额。
   s.b=s.R;
-  s.phase = "FORMAL"; s.M0 = s.R; s.collateral = s.R; s.basis = s.R; s.R = 0;
-  s.inventory = [s.M0, s.M0]; s.lpSupply = s.S;
+  s.phase = "FORMAL"; s.M0 = s.R; s.collateral = 0; s.cash=s.R; s.basis = s.R; s.R = 0;
+  s.inventory = [0, 0]; s.lpSupply = s.S;
   s.accounts.forEach(a => { a.lp = a.g; a.g = 0; });
   s.core.openedAt = s.now;
   record(s, "GRADUATE", id, s.M0, s.lpSupply, kind);
@@ -116,10 +116,10 @@ export function topicMarketCost(y: number, n: number, b: number): number {
   if (![y, n].every(x => Number.isFinite(x) && x >= -EPS) || !positive(b)) throw new Error("NUMERIC");
   return Math.max(y, n) + b * Math.log1p(Math.exp(-Math.abs(y - n) / b));
 }
-export function topicMarketCoordinates(s: TopicMarketState): [number, number] { return [s.basis - s.inventory[0], s.basis - s.inventory[1]]; }
+export function topicMarketCoordinates(s: TopicMarketState): [number, number] { return [sum(s.accounts.map(a=>a.yes)),sum(s.accounts.map(a=>a.no))]; }
 export function topicMarketPrices(s: TopicMarketState) {
   const genesis = 2 * s.k * s.S;
-  if (!s.lpSupply || s.liquidityClosed) return { genesis, probability: null as [number, number] | null };
+  if (!s.lpSupply || s.liquidityClosed || s.phase==="SETTLED" || s.phase==="FAILED") return { genesis, probability: null as [number, number] | null };
   const [y, n] = topicMarketCoordinates(s), d = (y - n) / s.b;
   const p = d >= 0 ? 1 / (1 + Math.exp(-d)) : Math.exp(d) / (1 + Math.exp(d));
   return { genesis, probability: [p, 1 - p] as [number, number] };
@@ -155,10 +155,18 @@ export function topicMarketSell(state: TopicMarketState, id: number, tokens: num
   s.R -= q.gross; s.S -= tokens; s.accounts[id].g -= tokens; accrueGenesis(s, id, q.gross); receive(s, id, q.net);
   record(s, "GENESIS_SELL", id, q.net, tokens); graduate(s, id, "SELL"); return result(s);
 }
+/** Stable single-side cost delta; avoids subtracting two large, nearly equal costs. */
+function curveDelta(q:[number,number],i:0|1,tokens:number,b:number){
+ const d=(q[i]-q[1-i])/b,end=d+tokens/b;
+ return d>=0?tokens+b*(Math.log1p(Math.exp(-end))-Math.log1p(Math.exp(-d)))
+   :b*((end>=0?end+Math.log1p(Math.exp(-end)):Math.log1p(Math.exp(end)))-Math.log1p(Math.exp(d)));
+}
+export const MAX_TOPIC_OUTCOME_SUPPLY=Number((1n<<192n)-1n)/1e18;
 export function topicMarketQuoteFormalBuy(s: TopicMarketState, side: Side, tokens: number): TopicMarketTradeQuote {
-  const i = sideIndex(side); if (!positive(tokens) || tokens > s.inventory[i] || !positive(s.b)) throw new Error("INVENTORY");
-  const q = topicMarketCoordinates(s), end: [number, number] = [...q]; end[i] += tokens;
-  const net = Math.max(0, topicMarketCost(...end, s.b) - topicMarketCost(...q, s.b));
+  const i = sideIndex(side); if (!positive(tokens) || !positive(s.b)) throw new Error("AMOUNT");
+  const q = topicMarketCoordinates(s), end: [number, number] = [...q]; if(tokens>MAX_TOPIC_OUTCOME_SUPPLY-q[i])throw new Error("SUPPLY_LIMIT");end[i] += tokens;
+  const net = Math.max(0,curveDelta(q,i,tokens,s.b));
+  if(!(net>0))throw new Error("TINY");
   const gross = net / .98;
   return { quantity: tokens, gross, net, R: 0, lpFee: .01 * gross,
     creatorFee: 0, protocolFee: .003 * gross, coreFee: .007 * gross, wouldGraduate: false, average: gross / tokens,
@@ -167,33 +175,31 @@ export function topicMarketQuoteFormalBuy(s: TopicMarketState, side: Side, token
 export function topicMarketQuoteFormalSell(s: TopicMarketState, side: Side, tokens: number): TopicMarketTradeQuote {
   const i = sideIndex(side), q = topicMarketCoordinates(s);
   if (!positive(tokens) || !positive(s.b) || s.liquidityClosed) throw new Error("CAPACITY");
-  // 用户只交付卖侧份额；池内部提供对侧库存合并，释放抵押，不能要求用户自己持有另一侧。
-  const mergePairs = Math.max(0, tokens - q[i]);
-  if (mergePairs > Math.min(s.inventory[i] + tokens, s.inventory[1-i], s.collateral) + EPS) throw new Error("CAPACITY");
-  const end: [number, number] = [q[0] + mergePairs, q[1] + mergePairs]; end[i] -= tokens;
-  // C(q+m·1)=C(q)+m：坐标平移只改变抵押形态，不改变单边LMSR成交价。
-  const gross = Math.max(0, topicMarketCost(...q, s.b) + mergePairs - topicMarketCost(...end, s.b));
-  if (gross > s.cash + mergePairs + EPS) throw new Error("CASH");
-  return { quantity: tokens, gross, net: .98 * gross, mergePairs, R: 0, lpFee: .01 * gross,
+  if(tokens>q[i])throw new Error("HOLDINGS");
+  const end:[number,number]=[...q];end[i]-=tokens;
+  const gross=Math.max(0,curveDelta(end,i,tokens,s.b));
+  if(!(gross>0))throw new Error("TINY");
+  if(gross>s.cash+EPS)throw new Error("CASH");
+  return { quantity: tokens, gross, net: .98 * gross, mergePairs:0, R: 0, lpFee: .01 * gross,
     creatorFee: 0, protocolFee: .003 * gross, coreFee: .007 * gross, wouldGraduate: false, average: .98 * gross / tokens,
     actual: .98 * gross, fees: { creator: 0, lp: .01 * gross, protocol: .003 * gross, core: .007 * gross } };
 }
 export function topicMarketFormalBuy(state: TopicMarketState, id: number, side: Side, tokens: number): TopicMarketState {
   requireFormal(state); const q = topicMarketQuoteFormalBuy(state, side, tokens), s = copy(state), i = sideIndex(side);
   pay(s, id, q.gross); s.cash += q.net; s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
-  s.inventory[i] -= tokens; if (i === 0) s.accounts[id].yes += tokens; else s.accounts[id].no += tokens;
+  if (i === 0) s.accounts[id].yes += tokens; else s.accounts[id].no += tokens;
   record(s, "FORMAL_BUY", id, q.gross, tokens, side); return result(s);
 }
-/** 预算为最大实付；有限库存会产生未用预算，不自动增发结果份额。 */
+/** 按真实LMSR曲线反求预算份额；仅受技术供应上限限制，不受毕业资本数量限制。 */
 export function topicMarketQuoteFormalBuyBudget(s: TopicMarketState, side: Side, budget: number): TopicMarketTradeQuote {
   if (!positive(budget)) throw new Error("AMOUNT");
-  const i = sideIndex(side); let lo = 0, hi = s.inventory[i];
-  if (!(hi > 0) || s.liquidityClosed) throw new Error("INVENTORY");
-  const all = topicMarketQuoteFormalBuy(s, side, hi);
-  if (all.gross <= budget) return { ...all, unused: budget - all.gross };
+  const i=sideIndex(side),coordinates=topicMarketCoordinates(s);let lo=0,hi=Math.min(MAX_TOPIC_OUTCOME_SUPPLY-coordinates[i],.98*budget+Math.max(0,coordinates[1-i]-coordinates[i])+s.b*Math.LN2+1);
+  if(!(hi>0)||s.liquidityClosed)throw new Error("SUPPLY_LIMIT");
+  const all=topicMarketQuoteFormalBuy(s,side,hi);
+  if(all.gross<=budget)return {...all,unused:budget-all.gross};
   for (let n = 0; n < 70; n++) {
     const mid = (lo + hi) / 2;
-    if (topicMarketQuoteFormalBuy(s, side, mid).gross <= budget) lo = mid; else hi = mid;
+    try{if(topicMarketQuoteFormalBuy(s,side,mid).gross<=budget)lo=mid;else hi=mid;}catch(error){if(error instanceof Error&&error.message==="TINY")lo=mid;else throw error;}
   }
   if (!(lo > 0)) throw new Error("TINY");
   const q = topicMarketQuoteFormalBuy(s, side, lo); if (!(q.gross > 0)) throw new Error("TINY");
@@ -208,11 +214,8 @@ export function topicMarketFormalSell(state: TopicMarketState, id: number, side:
   requireFormal(state); const i = sideIndex(side), a = account(state, id);
   if (tokens > (i === 0 ? a.yes : a.no)) throw new Error("HOLDINGS");
   const q = topicMarketQuoteFormalSell(state, side, tokens), s = copy(state);
-  const mergePairs = q.mergePairs ?? 0;
-  s.inventory[i] += tokens; if (i === 0) s.accounts[id].yes -= tokens; else s.accounts[id].no -= tokens;
-  s.inventory[0] -= mergePairs; s.inventory[1] -= mergePairs;
-  s.collateral -= mergePairs; s.redeemedPairs += mergePairs;
-  s.cash += mergePairs - q.gross; s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
+  if (i === 0) s.accounts[id].yes -= tokens; else s.accounts[id].no -= tokens;
+  s.cash -= q.gross; s.lpFees += q.lpFee;s.lpFeesEarned+=q.lpFee;s.formalVolume+=q.gross; s.creatorFees += q.creatorFee; s.protocolFees += q.protocolFee; accrueCoreFee(s, q.coreFee);
   receive(s, id, q.net); record(s, "FORMAL_SELL", id, q.net, tokens, side); return result(s);
 }
 // 旧版本入口明确禁用，不能从LP权益转让绕回底层提款。
@@ -236,18 +239,17 @@ export function topicMarketRedeemPairs(state: TopicMarketState, id: number, pair
   if (!positive(pairs)) throw new Error("AMOUNT");
   const a = account(state, id);
   if (pairs > Math.min(a.yes, a.no)) throw new Error("HOLDINGS");
-  if (pairs > state.collateral) throw new Error("COLLATERAL");
+  if (pairs > state.cash) throw new Error("CASH");
   const s = copy(state);
   s.accounts[id].yes -= pairs; s.accounts[id].no -= pairs;
-  s.collateral -= pairs; s.redeemedPairs += pairs;
+  s.cash -= pairs; s.redeemedPairs += pairs;
   receive(s, id, pairs); record(s, "REDEEM_PAIRS", id, pairs, pairs); return result(s);
 }
 /** 回购可使用真实现金及池内完整组合释放的抵押，仍受持仓和对侧库存限制。 */
 export function topicMarketMaxFormalSellTokens(s: TopicMarketState, id: number, side: Side): number {
   const i = sideIndex(side), a = account(s, id);
   if (s.phase !== "FORMAL" || s.now >= s.TF || s.liquidityClosed) return 0;
-  const capacity = Math.max(0, topicMarketCoordinates(s)[i] + Math.min(s.inventory[1-i], s.collateral));
-  let lo = 0, hi = Math.min(i === 0 ? a.yes : a.no, capacity);
+  let lo=0,hi=i===0?a.yes:a.no;
   if (!(hi > 0)) return 0;
   try { topicMarketQuoteFormalSell(s, side, hi); return hi; } catch { /* 真实现金可能小于完整回购所需。 */ }
   for (let n = 0; n < 64; n++) {
@@ -306,10 +308,11 @@ function settle(s: TopicMarketState) {
   const totalStake = s.core.yes + s.core.no + s.core.invalid;
   const outcome: Outcome = s.core.yes > totalStake / 2 ? "YES" : s.core.no > totalStake / 2 ? "NO" : "INVALID";
   s.result = outcome; s.core.result = outcome; s.phase = "SETTLED";
-  const inventoryValue = outcomeValue(...s.inventory, outcome);
-  s.collateral -= inventoryValue; s.outcomeBudget = s.collateral; s.collateral = 0;
-  const nav = s.cash + s.lpFees + inventoryValue;
-  s.lpBudget = nav;
+  const liability=outcomeValue(...topicMarketCoordinates(s),outcome);
+  s.outcomeBudget=liability;s.collateral=0;
+  const nav=s.cash+s.lpFees-liability;
+  if(nav < -EPS)throw new Error("SETTLEMENT_INSOLVENT");
+  s.lpBudget=Math.max(0,nav);
   s.lpClaimSupply=s.lpSupply;
   s.lpBudgetInitial=s.lpBudget;
   s.payouts=[];
@@ -393,11 +396,9 @@ export function topicMarketClaimFees(state: TopicMarketState, kind: "CREATOR" | 
 export function topicMarketMaxBuy(s: TopicMarketState, id: number): number { return account(s, id).wallet; }
 export function topicMarketHoldings(s: TopicMarketState, id: number) { const a = account(s, id); return { g: a.g, lp: a.lp, yes: a.yes, no: a.no, wallet: a.wallet, core: a.coreStake }; }
 export function topicMarketMaxFormalBuyTokens(s: TopicMarketState, id: number, side: Side): number {
-  const i = sideIndex(side), wallet = account(s, id).wallet; let lo = 0, hi = s.inventory[i];
-  if (!hi || s.liquidityClosed) return 0;
-  for (let n = 0; n < 70; n++) { const mid = (lo + hi) / 2; if (!mid) break;
-    if (topicMarketQuoteFormalBuy(s, side, mid).gross <= wallet) lo = mid; else hi = mid; }
-  return lo;
+  if(s.liquidityClosed)return 0;
+  const wallet=account(s,id).wallet;
+  return wallet>0?topicMarketQuoteFormalBuyBudget(s,side,wallet).quantity:0;
 }
 export function topicMarketAccounting(s: TopicMarketState) {
   const wallets = sum(s.accounts.map(a => a.wallet));
@@ -414,10 +415,12 @@ export function topicMarketAssertLedger(s: TopicMarketState) {
   if (balances.some(x => !Number.isFinite(x) || x < -EPS) || Math.abs(a.error) > EPS) throw new Error("LEDGER");
   if (s.phase === "GENESIS" && (Math.abs(sum(s.accounts.map(x => x.g)) - s.S) > EPS || Math.abs(s.R - s.k * s.S * s.S) > EPS)) throw new Error("CURVE");
   if (s.phase === "FORMAL" || s.phase === "WAIT_CORE") {
-    if (Math.abs(s.collateral + s.redeemedPairs - s.M0) > EPS) throw new Error("COLLATERAL_LEDGER");
-    if (Math.abs(sum(s.accounts.map(x => x.lp)) - s.lpSupply) > EPS || s.inventory.some(x => x > s.basis + EPS)) throw new Error("LP_LEDGER");
-    if (Math.abs(s.inventory[0] + sum(s.accounts.map(x => x.yes)) + s.redeemedPairs - s.M0) > EPS
-      || Math.abs(s.inventory[1] + sum(s.accounts.map(x => x.no)) + s.redeemedPairs - s.M0) > EPS) throw new Error("OUTCOME_LEDGER");
+    if (Math.abs(sum(s.accounts.map(x => x.lp)) - s.lpSupply) > EPS) throw new Error("LP_LEDGER");
+    const q=topicMarketCoordinates(s);
+    if(s.inventory[0]!==0||s.inventory[1]!==0||s.collateral!==0)throw new Error("OUTCOME_LEDGER");
+    if(s.cash+EPS<Math.max(...q))throw new Error("SOLVENCY");
+    const expected=s.M0+topicMarketCost(...q,s.b)-s.b*Math.LN2;
+    if(Math.abs(s.cash-expected)>EPS)throw new Error("LMSR_LEDGER");
   }
 }
 export function topicMarketScenario(kind: TopicMarketScenario, config: TopicMarketConfig = {}): TopicMarketState {

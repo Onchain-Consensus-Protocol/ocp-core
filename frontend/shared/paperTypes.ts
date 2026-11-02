@@ -21,7 +21,7 @@ export type PaperCreateInput = {
  title:string;yesRule:string;noRule:string;invalidRule:string;assetSymbol:string;
 } & ({coreHours:number;coreDeadline?:never}|{coreDeadline:number;coreHours?:never});
 /** Server persistence only: never serialize users or full model accounts to public clients. */
-export interface StoredPaperMarket { schemaVersion:3;
+export interface StoredPaperMarket { schemaVersion:4;
  id:string;creatorId:string;title:string;yesRule:string;noRule:string;invalidRule:string;
  assetSymbol:string;assetPriceUSD:number;createdAt:number;revision:number;
  users:string[];state:TopicMarketState;
@@ -38,7 +38,7 @@ export type PaperPresentation = Pick<TopicMarketState,'config'|'TG'|'TF'|'TC'|'T
  own:TopicMarketAccount|null;claim:TopicMarketPayout|null;corePayout:number;coreFees:number;genesisPnl:number;
  outstanding:[number,number];lpEstimates:{outcome:Outcome;lp:number}[];
 };
-export interface PaperMarket { schemaVersion:3;
+export interface PaperMarket { schemaVersion:4;
  id:string;title:string;yesRule:string;noRule:string;invalidRule:string;assetSymbol:string;
  assetPriceUSD:number;createdAt:number;serverNow:number;revision:number;phase:TopicMarketState['phase'];
  genesisDeadline:number;formalDeadline:number;coreDeadline:number;topicDeadline:number;

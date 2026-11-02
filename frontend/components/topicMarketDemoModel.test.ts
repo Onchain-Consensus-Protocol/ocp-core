@@ -66,19 +66,13 @@ describe("TopicMarket: independent full lifecycle and settlement", () => {
     }
   });
 
-  it("spends only the actual filled Formal budget and never mints beyond inventory", () => {
-    let s = topicMarketBuy(topicMarketCreate(createTopicMarketDemo({  Q: 1 })), 0, 30);
-    const beforeWallet = s.accounts[1].wallet;
-    const inventory = s.inventory[0];
-    const quote = topicMarketQuoteFormalBuyBudget(s, "YES", 100);
-    expect(quote.unused).toBeGreaterThan(0);
-    expect(quote.quantity).toBe(inventory);
-    s = topicMarketFormalBuyBudget(s, 1, "YES", 100);
-    expect(beforeWallet - s.accounts[1].wallet).toBeCloseTo(quote.actual, 8);
-    expect(s.accounts[1].yes).toBe(inventory);
-    expect(s.inventory[0]).toBe(0);
-    rejectsUnchanged(s, () => topicMarketFormalBuyBudget(s, 1, "YES", 1));
-    ledger(s);
+  it("uses the full Formal budget to mint shares beyond graduation capital without minting LP",()=>{
+    let s=topicMarketBuy(topicMarketCreate(createTopicMarketDemo({Q:1})),0,30);
+    const supply=s.lpSupply,b=s.b,q=topicMarketQuoteFormalBuyBudget(s,'YES',100);
+    expect(q.quantity).toBeGreaterThan(s.M0);expect(q.unused).toBeCloseTo(0,7);
+    const wallet=s.accounts[1].wallet;s=topicMarketFormalBuyBudget(s,1,'YES',100);
+    expect(wallet-s.accounts[1].wallet).toBeCloseTo(100,7);expect(s.accounts[1].yes).toBeCloseTo(q.quantity,7);
+    expect(s.lpSupply).toBe(supply);expect(s.b).toBe(b);expect(s.inventory).toEqual([0,0]);ledger(s);
   });
 
   it("refunds remaining reserve once after Genesis failure",()=>{let s=topicMarketBuy(active(),0,100);s=topicMarketSell(s,0,s.accounts[0].g/2);const remaining=s.R;s=topicMarketAdvanceTime(s,s.TG);const before=s.accounts[0].wallet;s=topicMarketClaim(s,0);expect(s.accounts[0].wallet-before).toBeCloseTo(remaining,7);rejectsUnchanged(s,()=>topicMarketClaim(s,0));ledger(s);});
@@ -150,22 +144,22 @@ describe("TopicMarket: independent full lifecycle and settlement", () => {
     ledger(s);
   });
 
-  it("includes retained LP fees in the terminal LP budget",()=>{let s=topicMarketFormalBuy(graduated(),0,'YES',100);s=topicMarketCoreStake(s,2,'YES',1);const nav=s.cash+s.lpFees+s.inventory[0];s=topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));expect(s.lpBudget).toBeCloseTo(nav,7);ledger(s);});
+  it("includes retained LP fees in the terminal LP budget",()=>{let s=topicMarketFormalBuy(graduated(),0,'YES',100);s=topicMarketCoreStake(s,2,'YES',1);const nav=s.cash+s.lpFees-s.accounts.reduce((v,a)=>v+a.yes,0);s=topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));expect(s.lpBudget).toBeCloseTo(nav,7);ledger(s);});
 
   it("fixes depth to actual graduation reserve rather than an oversized research input",()=>{const s=topicMarketBuy(topicMarketCreate(createTopicMarketDemo({Q:1,b:150})),0,30);expect(s.b).toBeCloseTo(29.7);expect(s.b).toBe(s.M0);ledger(s);});
 
-  it("makes terminal LP value independent of LP transfer fractions",()=>{let s=topicMarketFormalBuy(graduated(),0,'YES',100);s=topicMarketTransferLP(s,0,2,s.accounts[0].lp*.9);const nav=s.cash+s.lpFees+s.inventory[0];s=topicMarketCoreStake(s,2,'YES',1);s=topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));expect(s.lpBudget).toBeCloseTo(nav,7);ledger(s);});
+  it("makes terminal LP value independent of LP transfer fractions",()=>{let s=topicMarketFormalBuy(graduated(),0,'YES',100);s=topicMarketTransferLP(s,0,2,s.accounts[0].lp*.9);const nav=s.cash+s.lpFees-s.accounts.reduce((v,a)=>v+a.yes,0);s=topicMarketCoreStake(s,2,'YES',1);s=topicMarketFinalize(topicMarketAdvanceTime(s,s.TC));expect(s.lpBudget).toBeCloseTo(nav,7);ledger(s);});
 
   it("charges real round-trip fees without creating additional outcome collateral", () => {
     let s = graduated();
     const M = s.M0;
     s = topicMarketFormalBuy(s, 0, "YES", 100);
     s = topicMarketFormalSell(s, 0, "YES", 100);
-    expect(s.cash).toBeCloseTo(0, 8);
+    expect(s.cash).toBeCloseTo(M, 8);
     expect(s.lpFees).toBeGreaterThan(0);
     expect(s.accounts[0].yes).toBeCloseTo(0, 8);
-    expect(s.inventory[0]).toBeCloseTo(M, 8);
-    expect(s.collateral).toBe(M);
+    expect(s.inventory[0]).toBe(0);
+    expect(s.collateral).toBe(0);
     rejectsUnchanged(s, () => topicMarketClaimFees(s, "CREATOR", 0));
     if(s.creatorFees>0)s = topicMarketClaimFees(s, "CREATOR", 1);
     rejectsUnchanged(s, () => topicMarketClaimFees(s, "CREATOR", 1));

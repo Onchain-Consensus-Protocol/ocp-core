@@ -26,6 +26,7 @@ interface ITopicMarketCore {
 contract TopicMarket {
     using Math for uint256;
     bool public constant automaticFeePayout = true;
+    uint256 public constant MAX_OUTCOME_SUPPLY = type(uint192).max;
     address public immutable trustedForwarder;
     uint256 public SCALE; // collateral native units -> outcome WAD
     uint256 public LIMIT; // 1e12 whole collateral-token research bound
@@ -269,15 +270,12 @@ contract TopicMarket {
         // 一次性把全部毕业LP放到市场托管，当前ERC20总量永远包含未物化权益。
         lpToken.mint(address(this), S);
         initialCollateral = R;
-        collateralCash = R;
+        // 唯一真实风险本金：不预先拆抵押、不预铸结果，不重复承诺LP与用户负债。
+        cash = R;
         R = 0;
         poolBasisWad = initialCollateral * SCALE;
-        inventoryY = poolBasisWad;
-        inventoryN = poolBasisWad;
-        yesSupply = poolBasisWad;
-        noSupply = poolBasisWad;
         // 深度取毕业时实际进入正式市场的抵押本金，统一为18位份额单位。
-        // 不计入B准备金，也不增加现金/抵押/结果份额；此后买卖不改变b。
+        // 此后买卖、配对赎回均不改变b，也不增发LP。
         bWad = poolBasisWad;
         core.open(coreCutoff);
         require(core.deadline() == coreCutoff && core.openedAt() == block.timestamp, "CORE_OPEN");
@@ -289,7 +287,7 @@ contract TopicMarket {
     }
 
     function coordinates() public view returns (uint256 qY, uint256 qN) {
-        return (poolBasisWad - inventoryY, poolBasisWad - inventoryN);
+        return (yesSupply, noSupply);
     }
 
     function priceYes() external view returns (uint256) {
@@ -324,7 +322,7 @@ contract TopicMarket {
     }
 
     function quoteFormalBuy(bool isYes, uint256 amount) public view returns (uint256 gross) {
-        require(amount > 0 && amount <= (isYes ? inventoryY : inventoryN), "INVENTORY");
+        require(amount > 0 && amount <= MAX_OUTCOME_SUPPLY - (isYes ? yesSupply : noSupply), "AMOUNT");
         require(bWad > 0, "NO_LIQUIDITY");
         (uint256 y, uint256 n) = coordinates();
         uint256 beforeCost = TopicMarketMath.cost(y, n, bWad);
@@ -332,6 +330,7 @@ contract TopicMarket {
         require(afterCost >= beforeCost, "NUMERIC");
         uint256 requiredNet = Math.ceilDiv(afterCost - beforeCost, SCALE) + _formalGuard();
         gross = Math.mulDiv(requiredNet, 100, 98, Math.Rounding.Ceil);
+        require(gross <= LIMIT, "AMOUNT");
     }
 
     function formalBuy(bool isYes, uint256 amount, uint256 maxPaid, uint64 expiry) external lock {
@@ -349,18 +348,18 @@ contract TopicMarket {
         protocolFees += protocolPart;
         dust += rem - protocolPart;
         if (isYes) {
-            inventoryY -= amount;
+            yesSupply += amount;
             yes[user] += amount;
         } else {
-            inventoryN -= amount;
+            noSupply += amount;
             no[user] += amount;
         }
+        _assertOutcomeSolvency();
         _sendCoreFee(coreFee);
         emit FormalTrade(user, true, isYes, amount, gross);
     }
 
-    /// @dev 底层LP已锁定且没有外部结果增发：q_i=外部持仓_i+已兑完整组合D。
-    /// 因此合法持有人卖量永不超q_i；仍保留明确容量、现金和数值边界保护。
+    /// @dev 经典LMSR：q_i为当前外部未兑份额；卖出烧毁份额，无库存或裸卖路径。
     function quoteFormalSellDetailed(bool isYes, uint256 amount)
         public view returns (uint256 gross, uint256 seller, uint256 merge6)
     {
@@ -405,10 +404,10 @@ contract TopicMarket {
         (, uint256 lpFee, uint256 coreFee, uint256 rem) = _splitFormal(gross);
         if (isYes) {
             yes[user] -= amount;
-            inventoryY += amount;
+            yesSupply -= amount;
         } else {
             no[user] -= amount;
-            inventoryN += amount;
+            noSupply -= amount;
         }
         cash -= gross;
         lpFees += lpFee;
@@ -416,9 +415,16 @@ contract TopicMarket {
         uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
         protocolFees += protocolPart;
         dust += rem - protocolPart;
+        _assertOutcomeSolvency();
         _sendCoreFee(coreFee);
         emit FormalTrade(user, false, isYes, amount, gross);
         _send(msg.sender, Math.mulDiv(gross, 98, 100));
+    }
+
+    /// @dev Independent integer check, excluding fee/debt buckets: all YES/NO/INVALID liabilities
+    /// are covered by trading cash alone. Initial R=b exceeds the classical maximum loss b*ln(2).
+    function _assertOutcomeSolvency() private view {
+        require(cash >= Math.ceilDiv(Math.max(yesSupply, noSupply), SCALE), "OUTCOME_SOLVENCY");
     }
 
     /// @notice 免交易费完整组合兑换；参数为collateral native units金额，两侧各烧amount6*SCALE份。
@@ -427,15 +433,17 @@ contract TopicMarket {
         _requireCoreTrading();
         address user = _actor();
         require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "PHASE");
-        require(amount6 > 0 && amount6 <= collateralCash, "AMOUNT");
+        require(amount6 > 0 && amount6 <= cash, "AMOUNT");
         uint256 burn = amount6 * SCALE;
         require(yes[user] >= burn && no[user] >= burn, "HOLDINGS");
         yes[user] -= burn;
         no[user] -= burn;
         yesSupply -= burn;
         noSupply -= burn;
-        collateralCash -= amount6;
+        // C(qY-a,qN-a)=C(qY,qN)-a：烧完整组合与实付一份抵押同步，不留隐藏坐标偏移。
+        cash -= amount6;
         redeemedPairs += amount6;
+        _assertOutcomeSolvency();
         emit PairsRedeemed(user, amount6, burn);
         _send(msg.sender, amount6);
     }
@@ -484,14 +492,11 @@ contract TopicMarket {
         require(result >= 1 && result <= 3, "CORE_PENDING");
         outcome = result;
         phase = Phase.SETTLED;
-        uint256 inventoryValue = _value(inventoryY, inventoryN, result);
-        // Burn the pool's outcome rights BEFORE crediting the same value to LP cash.
-        yesSupply -= inventoryY;
-        noSupply -= inventoryN;
-        inventoryY = 0;
-        inventoryN = 0;
-        collateralCash -= inventoryValue;
-        uint256 nav = cash + lpFees + inventoryValue;
+        uint256 liability = _value(yesSupply, noSupply, result);
+        require(cash >= liability, "OUTCOME_SOLVENCY");
+        // 先隔离全部玩家兑付预算；LP只享有剩余真实资产，领取次序不改变偿付。
+        collateralCash = liability;
+        uint256 nav = cash + lpFees - liability;
         cash = 0;
         lpFees = 0;
         // 固定原始毕业总份额，不能因物化、转让或已领取销毁而缩小分母。
@@ -574,7 +579,7 @@ contract TopicMarket {
             return lpBudgetInitial;
         }
         require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "PHASE");
-        uint256 nav = cash + lpFees + _value(inventoryY, inventoryN, result);
+        uint256 nav = cash + lpFees - _value(yesSupply, noSupply, result);
         return nav;
     }
 

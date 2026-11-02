@@ -13,11 +13,11 @@ it('fails explicitly without DATABASE_URL and never uses a local fallback',()=>{
 
 it('excludes old paper schemas without breaking the current market directory',async()=>{
  const market=createPaperMarket('current','creator',{title:'Current market',yesRule:'Yes',noRule:'No',invalidRule:'Invalid',assetSymbol:'TSLA',coreHours:6},Date.now());
- const query=vi.fn().mockResolvedValue({rows:[{document:{...market,schemaVersion:2}},{document:market},{document:{...market,schemaVersion:undefined}}]});
+ const query=vi.fn().mockResolvedValue({rows:[{document:{...market,schemaVersion:3}},{document:market},{document:{...market,schemaVersion:undefined}}]});
  const store=Object.create(PaperStore.prototype) as PaperStore;
  Object.defineProperties(store,{pool:{value:{query}},ready:{value:async()=>{}}});
  expect(await store.listMarkets()).toEqual([market]);
- expect(query.mock.calls[0][0]).toContain("WHERE document->>'schemaVersion' = '3'");
+ expect(query.mock.calls[0][0]).toContain("WHERE document->>'schemaVersion' = '4'");
 });
 
 // Explicit opt-in only: never use DATABASE_URL or another application's production database for tests.

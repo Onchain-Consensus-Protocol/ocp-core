@@ -45,7 +45,7 @@ contract TopicMarketStockCollateralTest is Test {
         (StockCollateralMock t,MockCore c,TopicMarket m)=_market(18);
         m.genesisBuy(14e18,0,type(uint64).max,1);
         assertEq(m.poolBasisWad(),1386e16);
-        assertEq(m.inventoryY(),1386e16);
+        assertEq(m.inventoryY()+m.inventoryN(),0);assertEq(m.cash(),m.initialCollateral());
         uint256 paid=m.quoteFormalBuy(true,1e18);
         m.formalBuy(true,1e18,paid,type(uint64).max);
         assertEq(m.yes(address(this)),1e18);

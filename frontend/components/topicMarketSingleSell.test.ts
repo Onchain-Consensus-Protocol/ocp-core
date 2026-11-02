@@ -13,7 +13,7 @@ describe("TopicMarket locked LP: single-side sales sourced only from real outcom
   expect(s.collateral).toBe(before.collateral);expect(s.redeemedPairs).toBe(0);
   expect(topicMarketPrices(s).probability![i]).toBeLessThan(topicMarketPrices(before).probability![i]);topicMarketAssertLedger(s);
  });
- it("cannot obtain sellable outcome tokens by transferring LP or B",()=>{
+ it("cannot obtain sellable outcome tokens by transferring LP",()=>{
   let s=formal();s=topicMarketTransferLP(s,0,1,s.accounts[0].lp);
   expect(s.accounts[1].yes+s.accounts[1].no).toBe(0);expect(topicMarketMaxFormalSellTokens(s,1,"YES")).toBe(0);
   expect(()=>topicMarketFormalSell(s,1,"YES",1)).toThrow();topicMarketAssertLedger(s);
@@ -29,7 +29,7 @@ describe("TopicMarket locked LP: single-side sales sourced only from real outcom
   let s=formal();const before=s.accounts[0].wallet,collateral=s.collateral;
   for(let n=0;n<5;n++){s=topicMarketFormalBuy(s,0,"YES",40);s=topicMarketFormalSell(s,0,"YES",40);topicMarketAssertLedger(s);}
   expect(s.accounts[0].wallet).toBeLessThan(before);expect(s.accounts[0].yes).toBeCloseTo(0,8);
-  expect(s.collateral).toBe(collateral);expect(s.redeemedPairs).toBe(0);expect(s.cash).toBeCloseTo(0,7);expect(topicMarketAccounting(s).error).toBeCloseTo(0,7);
+  expect(s.collateral).toBe(collateral);expect(s.redeemedPairs).toBe(0);expect(s.cash).toBeCloseTo(s.M0,7);expect(topicMarketAccounting(s).error).toBeCloseTo(0,7);
  });
  it("rejects overselling and stops sells at Formal cutoff while Core remains open",()=>{
   let s=bought();const before=JSON.stringify(s);expect(()=>topicMarketFormalSell(s,0,"YES",101)).toThrow();expect(JSON.stringify(s)).toBe(before);

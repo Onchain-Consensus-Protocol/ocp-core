@@ -23,7 +23,7 @@ contract TopicMarketFeesV19Test is TopicMarketBase {
           uint256 balance=usd.balanceOf(address(market));
         _formalBuy(bob,true,amount);
         uint256 net=Math.mulDiv(paid,98,100); uint256 lp=paid/100; uint256 core=paid*7/1000;
-        assertEq(market.cash(),net); assertEq(market.lpFees()-lp0,lp);
+        assertEq(market.cash(),market.initialCollateral()+net); assertEq(market.lpFees()-lp0,lp);
         assertEq(market.coreFeesSent(),core); assertEq(market.creatorFees(),creator0); assertEq(market.protocolFees(),14e6*3/1000+paid*3/1000);
         assertEq(market.dust()-dust0,paid-net-lp-core-paid*3/1000);
         assertEq(usd.balanceOf(address(market))-balance,paid-core);
@@ -46,8 +46,8 @@ contract TopicMarketFeesV19Test is TopicMarketBase {
         _finish(3); _claimAll(alice); _claimAll(bob); _accounting();
     }
     function testLPBearsActualNetAssetValueWithoutBFirstLossCover() public {
-        _graduate(); _formalBuy(bob,true,market.inventoryY());
-        uint256 nav=market.cash()+market.lpFees()+market.inventoryY()/market.SCALE();
+        _graduate(); _formalBuy(bob,true,market.poolBasisWad());
+        uint256 nav=market.cash()+market.lpFees()-market.yesSupply()/market.SCALE();
         _finish(1); assertEq(market.lpBudgetInitial(),nav);
         _claimAll(alice); _claimAll(bob); _accounting();
     }

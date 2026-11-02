@@ -414,7 +414,7 @@ export function TestnetMarketApp({lang = 'zh'}: {lang?: Language}) {
     {tab==='MARKET'&&[1,2,3].includes(market.phase)&&(market.position?.genesisShares??0n)>0n&&<div className={box+' text-xs space-y-2'}><p>{t('领取托管的LP代币到钱包；不会提走池中本金。本金仅在结算或未毕业清算后领取。','Receive escrowed LP tokens in your wallet. This does not withdraw pool capital; Capital payouts require settlement or a failed launch.')}</p><Button variant="outline" disabled={!canAct} onClick={()=>void transact(c=>c.materializeLP(market.address))}>{t('领取 LP 代币到钱包','Receive LP tokens')}</Button></div>}
     {feePanel}
     {market.vaultResolved&&<Button className="w-full" disabled={!canAct||!market.vaultSettlementReady} onClick={()=>claimSelected('core')}>{t('领取 Core 结算款','Claim Core payout')}</Button>}
-    {((market.phase===0&&now>=Number(market.genesisCutoff))||(market.phase===1&&now>=Number(market.formalCutoff)))&&<Button variant="outline" disabled={!canAct} onClick={()=>void transact(c=>c.closeExpired(market.address))}>{t('推进已截止阶段','Close expired stage')}</Button>}
+    {((market.phase===0&&now>=Number(market.genesisCutoff))||(market.phase===1&&now>=Number(market.formalCutoff)))&&<Button variant="outline" disabled={!canAct} onClick={()=>void transact(c=>c.closeExpired(market.address))}>{t('确认阶段截止','Confirm phase closure')}</Button>}
     {[1,2].includes(market.phase)&&(now>=Number(market.coreCutoff)||market.vaultResolved)&&<Button variant="outline" disabled={!canAct} onClick={()=>void transact(c=>c.finalizeMarket(market.address))}>{t('执行最终结算','Finalize settlement')}</Button>}
   </div>:null;
   const hasCorePrincipal=!!market&&(market.totalStakeYes+market.totalStakeNo+market.totalStakeInvalid)>0n;

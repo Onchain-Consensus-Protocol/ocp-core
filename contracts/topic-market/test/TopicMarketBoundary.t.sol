@@ -15,7 +15,7 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
         vm.prank(bob);
         usd.approve(address(market), type(uint256).max);
         _graduate();
-        _formalBuy(bob, true, market.inventoryY());
+        _formalBuy(bob, true, market.poolBasisWad());
 
         uint256 initial = market.initialCollateral();
         _finish(1);
@@ -26,8 +26,8 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
     }
 
     function testLPReceivesNetAssetsWithoutSyntheticBCompensation() public {
-        _graduate(); _formalBuy(bob,true,market.inventoryY()/20);
-        uint256 nav=market.cash()+market.lpFees()+market.inventoryY()/market.SCALE();
+        _graduate(); _formalBuy(bob,true,market.poolBasisWad()/20);
+        uint256 nav=market.cash()+market.lpFees()-market.yesSupply()/market.SCALE();
         _finish(1); assertEq(market.lpBudgetInitial(),nav); _accounting();
     }
 
@@ -94,7 +94,7 @@ contract TopicMarketBoundaryTest is TopicMarketBase {
         vm.warp(market.coreCutoff());
         vm.expectRevert("CORE_PENDING");
         market.finalize();
-        assertGt(market.collateralCash(), 0);
+        assertGt(market.cash(), 0);
         _accounting();
     }
 

@@ -28,7 +28,7 @@ function actor(m:StoredPaperMarket,userId:string):number {
  return id;
 }
 function timestamp(now:number):number {if(!Number.isSafeInteger(now)||now<0)throw new Error('TIME');return now;}
-function history(m:StoredPaperMarket){const p=topicMarketPrices(m.state),last=m.history.at(-1);const point={at:m.createdAt+m.state.now,genesisPriceUSD:(m.state.phase==='FAILED'?2*m.state.k*m.state.failedSupply:p.genesis)*m.assetPriceUSD/PAPER_GTOKEN_SCALE,yesPrice:p.probability?.[0]??null};if(!last||last.genesisPriceUSD!==point.genesisPriceUSD||last.yesPrice!==point.yesPrice)m.history.push(point);if(m.history.length>500)m.history.splice(0,m.history.length-500);}
+function history(m:StoredPaperMarket){if(m.state.phase==='SETTLED'&&m.history.length>0)return;const p=topicMarketPrices(m.state),last=m.history.at(-1);const point={at:m.createdAt+m.state.now,genesisPriceUSD:(m.state.phase==='FAILED'?2*m.state.k*m.state.failedSupply:p.genesis)*m.assetPriceUSD/PAPER_GTOKEN_SCALE,yesPrice:p.probability?.[0]??null};if(!last||last.genesisPriceUSD!==point.genesisPriceUSD||last.yesPrice!==point.yesPrice)m.history.push(point);if(m.history.length>500)m.history.splice(0,m.history.length-500);}
 export function createPaperMarket(id:string,creatorId:string,input:PaperCreateInput,nowMs:number):StoredPaperMarket {
  timestamp(nowMs);if(!id||!creatorId)throw new Error('IDENTITY');
  for(const [value,max] of [[input.title,512],[input.yesRule,2048],[input.noRule,2048],[input.invalidRule,2048]] as const){if(typeof value!=='string'||!value.trim()||new TextEncoder().encode(value).length>max)throw new Error('METADATA');}
@@ -43,10 +43,10 @@ export function createPaperMarket(id:string,creatorId:string,input:PaperCreateIn
  const TC=hasDeadline?input.coreDeadline!-createdAt:input.coreHours!*3600;
  if(!Number.isSafeInteger(TC)||TC<=14400||!Number.isSafeInteger(createdAt+TC))throw new Error('TIME');
  const s=createStockDemo(asset.price,2000,150,{TC});s.early!.bond=500/asset.price;s.accounts=[];s.initialCapital=0;s.config={creatorAccount:0,protocolAccount:-1,depthPolicy:"GRADUATION_CAPITAL"};s.accounts.push(emptyAccount());
- const m:StoredPaperMarket={schemaVersion:3,id,creatorId,title:input.title.trim(),yesRule:input.yesRule.trim(),noRule:input.noRule.trim(),invalidRule:input.invalidRule.trim(),assetSymbol:asset.symbol,assetPriceUSD:asset.price,createdAt:Math.floor(nowMs/1000),revision:0,users:[creatorId],state:topicMarketCreate(s),history:[]};history(m);return m;
+ const m:StoredPaperMarket={schemaVersion:4,id,creatorId,title:input.title.trim(),yesRule:input.yesRule.trim(),noRule:input.noRule.trim(),invalidRule:input.invalidRule.trim(),assetSymbol:asset.symbol,assetPriceUSD:asset.price,createdAt:Math.floor(nowMs/1000),revision:0,users:[creatorId],state:topicMarketCreate(s),history:[]};history(m);return m;
 }
 export function advancePaperMarket(market:StoredPaperMarket,nowMs:number):StoredPaperMarket {
- if(market.schemaVersion!==3)throw new Error('UNSUPPORTED_PAPER_SCHEMA');
+ if(market.schemaVersion!==4)throw new Error('UNSUPPORTED_PAPER_SCHEMA');
  const m=structuredClone(market);
  m.state.early??={bond:500/m.assetPriceUSD,count:0,pending:null,penalty:0,failedBonds:0,forfeited:[0,0,0],terminatedAt:null};
  if(m.state.phase==='GENESIS')m.state.config.depthPolicy="GRADUATION_CAPITAL";const now=Math.max(m.state.now,Math.floor(timestamp(nowMs)/1000)-m.createdAt);
@@ -62,7 +62,7 @@ function execute(m:StoredPaperMarket,id:number,action:PaperAction):void {
  case 'GENESIS_BUY':m.state=topicMarketBuy(s,id,budget);break;
  case 'GENESIS_SELL':m.state=topicMarketSell(s,id,quantity(action.quantity)/PAPER_GTOKEN_SCALE);break;
  case 'FORMAL_BUY':m.state=topicMarketFormalBuyBudget(s,id,action.side,budget);break;
- case 'FORMAL_BUY_SHARES':m.state=topicMarketFormalBuy(s,id,action.side,quantity(action.quantity));break;
+ case 'FORMAL_BUY_SHARES':{const tokens=quantity(action.quantity),q=topicMarketQuoteFormalBuy(s,action.side,tokens);if(q.gross*m.assetPriceUSD<.000001)throw new Error('TINY');m.state=topicMarketFormalBuy(s,id,action.side,tokens);break;}
  case 'REDEEM_PAIRS':m.state=topicMarketRedeemPairs(s,id,quantity(action.quantity));break;
  case 'FORMAL_SELL':m.state=topicMarketFormalSell(s,id,action.side,quantity(action.quantity));break;
  case 'CORE_EXIT':m.state=topicMarketCoreExit(s,id);break;
@@ -105,6 +105,7 @@ export function quotePaperAction(market:StoredPaperMarket,userId:string,action:P
  default:{const temp=structuredClone(m);const credit=action.type==='EARLY_PROPOSE'?temp.state.early!.bond:budgetC(action,price);temp.state.accounts[id].wallet+=credit;temp.state.initialCapital=(temp.state.initialCapital??0)+credit;const before=temp.state.accounts[id].wallet;execute(temp,id,action);const delta=temp.state.accounts[id].wallet-before;return {revision:m.revision,expiresAt:Math.floor(nowMs/1000)+15,payUSD:dollars(-delta*price),receiveUSD:dollars(delta*price),quantity:'0',feeUSD:'0.000000',wouldGraduate:false};}
  }
  const buy=action.type==='GENESIS_BUY'||action.type==='FORMAL_BUY'||action.type==='FORMAL_BUY_SHARES';
+ if(buy&&q.gross*price<.000001)throw new Error('TINY');
  return {detail:q,revision:m.revision,expiresAt:Math.floor(nowMs/1000)+15,payUSD:dollars(buy?q.gross*price:0),receiveUSD:dollars(buy?0:q.net*price),quantity:numberString(q.quantity*(action.type.startsWith('GENESIS')?PAPER_GTOKEN_SCALE:1)),feeUSD:dollars((q.creatorFee+q.lpFee+q.coreFee+q.protocolFee)*price),wouldGraduate:q.wouldGraduate};
 }
 export function projectPaperMarket(market:StoredPaperMarket,userId:string|null,nowMs:number):PaperMarket {
@@ -116,11 +117,11 @@ export function projectPaperMarket(market:StoredPaperMarket,userId:string|null,n
  // 仅公开聚合状态及请求者自己的账户，绝不序列化其他玩家账户或身份。
  own:a?{...a,name:'Player',wallet:0}:null,claim,corePayout:id>=0?s.corePayouts[id]??0:0,coreFees:s.core.feeTotal,genesisPnl:a&&s.phase==='GENESIS'?(a.g>0?topicMarketQuoteSell(s,a.g).net:0)-genesisCost.cost:0,
  outstanding:[s.accounts.reduce((n,a)=>n+a.yes,0),s.accounts.reduce((n,a)=>n+a.no,0)] as [number,number],
- lpEstimates:(['YES','NO','INVALID'] as const).map(outcome=>{const inventory=outcome==='YES'?s.inventory[0]:outcome==='NO'?s.inventory[1]:(s.inventory[0]+s.inventory[1])/2;const nav=s.cash+s.lpFees+inventory;return {outcome,lp:a&&s.lpSupply>0?nav*a.lp/s.lpSupply:0}})};
+ lpEstimates:(['YES','NO','INVALID'] as const).map(outcome=>{const y=s.accounts.reduce((v,x)=>v+x.yes,0),n=s.accounts.reduce((v,x)=>v+x.no,0),debt=outcome==='YES'?y:outcome==='NO'?n:(y+n)/2;const nav=s.cash+s.lpFees-debt;return {outcome,lp:a&&s.lpSupply>0?nav*a.lp/s.lpSupply:0}})};
  const e=s.early!,request=e.pending,principal=a?.coreStake??0,exitPenalty=Math.min(principal,Math.ceil(principal*1e18/10)/1e18);
  const early={proposerLabel:request?`Player ${request.proposer+1}`:undefined,bondUSD:dollars(e.bond*m.assetPriceUSD),requestId:request?.id??0,requestedOutcome:request?.side??null,
  proposedAt:request?m.createdAt+request.proposedAt:0,processAfter:request?m.createdAt+request.processAfter:0,reason:request?.reason??'',due:topicMarketEarlyDue(s),
  penaltyUSD:dollars(e.penalty*m.assetPriceUSD),failedBondUSD:dollars(e.failedBonds*m.assetPriceUSD),bondRefundUSD:dollars((a?.bondRefund??0)*m.assetPriceUSD),
  exitRefundUSD:dollars((principal-exitPenalty)*m.assetPriceUSD),exitPenaltyUSD:dollars(exitPenalty*m.assetPriceUSD),effectiveCutoff:m.createdAt+(e.terminatedAt??s.TC)};
- return {schemaVersion:3,early,presentation,id:m.id,title:m.title,yesRule:m.yesRule,noRule:m.noRule,invalidRule:m.invalidRule,assetSymbol:m.assetSymbol,assetPriceUSD:m.assetPriceUSD,createdAt:m.createdAt,serverNow:Math.floor(nowMs/1000),revision:m.revision,phase:s.phase,genesisDeadline:m.createdAt+s.TG,formalDeadline:m.createdAt+s.TF,coreDeadline:m.createdAt+s.TC,topicDeadline:m.createdAt+s.TT,R:numberString(s.R),rTarget:numberString(s.rTarget),genesisPriceUSD:(s.phase==='FAILED'?2*s.k*s.failedSupply:p.genesis)*m.assetPriceUSD/PAPER_GTOKEN_SCALE+'',yesPrice:p.probability?.[0]??.5,noPrice:p.probability?.[1]??.5,coreYes:numberString(s.core.yes),coreNo:numberString(s.core.no),coreInvalid:numberString(s.core.invalid),coreOpenedAt:s.core.openedAt===null?null:m.createdAt+s.core.openedAt,result:s.result,volumeUSD:dollars(s.formalVolume*m.assetPriceUSD),participants:m.users.length,events:s.events.map(e=>({at:m.createdAt+e.at,kind:e.kind,actor:e.actor===undefined?'':`Player ${e.actor+1}`,amount:dollars((e.amount??0)*m.assetPriceUSD),detail:e.detail??'',source:e.source})),history:m.history,position,isCreator:userId===m.creatorId};
+ return {schemaVersion:4,early,presentation,id:m.id,title:m.title,yesRule:m.yesRule,noRule:m.noRule,invalidRule:m.invalidRule,assetSymbol:m.assetSymbol,assetPriceUSD:m.assetPriceUSD,createdAt:m.createdAt,serverNow:Math.floor(nowMs/1000),revision:m.revision,phase:s.phase,genesisDeadline:m.createdAt+s.TG,formalDeadline:m.createdAt+s.TF,coreDeadline:m.createdAt+s.TC,topicDeadline:m.createdAt+s.TT,R:numberString(s.R),rTarget:numberString(s.rTarget),genesisPriceUSD:(s.phase==='FAILED'?2*s.k*s.failedSupply:p.genesis)*m.assetPriceUSD/PAPER_GTOKEN_SCALE+'',yesPrice:p.probability?.[0]??.5,noPrice:p.probability?.[1]??.5,coreYes:numberString(s.core.yes),coreNo:numberString(s.core.no),coreInvalid:numberString(s.core.invalid),coreOpenedAt:s.core.openedAt===null?null:m.createdAt+s.core.openedAt,result:s.result,volumeUSD:dollars(s.formalVolume*m.assetPriceUSD),participants:m.users.length,events:s.events.map(e=>({at:m.createdAt+e.at,kind:e.kind,actor:e.actor===undefined?'':`Player ${e.actor+1}`,amount:dollars((e.amount??0)*m.assetPriceUSD),detail:e.detail??'',source:e.source})),history:m.history,position,isCreator:userId===m.creatorId};
 }

@@ -1,4 +1,16 @@
-> Current testnet configuration: k=0.000001 (kWad=1000000000000), factory `0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5`, Router `0xBD6b0d0b1cdf1BFd7D2DC50dF7cc4296d766a06C`. No markets were created in this deployment; create your own from the frontend. gToken display uses native units with no extra denomination multiplier.
+## Continuous LMSR release (Robinhood testnet 46630)
+
+Current source uses continuous outcome issuance, not a finite pool of pre-minted YES/NO shares. This does not change any existing immutable deployment. This revision is deployed at factory `0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8`; no market was created.
+
+- Graduation deposits the actual R once into trading `cash`, fixes `bWad = R * SCALE`, and converts existing gToken into proportional LP rights. No additional LP, separate risk pool or free complete-set mint is introduced; Genesis k and fee allocations stay unchanged.
+- `yesSupply` and `noSupply` are outstanding user claims and are the nonnegative LMSR coordinates. Buying mints the bought side; selling burns shares the seller actually owns. `inventoryY/N` remain zero, not executable capacity. `poolBasisWad` records initial capital and is not an issuance limit.
+- Buy/sell prices are cost differences of C(q)=b*ln(exp(qY/b)+exp(qN/b)), rounded conservatively with the existing numerical guards. The independent integer invariant after every trade and pair redemption is `cash >= ceil(max(yesSupply,noSupply)/SCALE)`. Fees payable to LP/Core/creator/protocol are separate buckets and are not counted toward that check.
+- Initial R=b covers the classic risk bound b*ln(2): R+C(q)-C(0) >= max(q)+R-b*ln(2). The on-chain integer invariant remains mandatory even if numerical approximation differs from this ideal formula. A uint192 outstanding-supply ceiling and the existing per-buy gross research bound protect arithmetic; neither is an initial inventory cap.
+- Fee-free pair redemption burns an equal amount on both sides and pays that collateral from cash. Coordinates both decrease, so C(qY-a,qN-a)-C(qY,qN) = -a under a common-coordinate shift and price is unchanged. There is no hidden redeemed offset and no public free pair-creation entry.
+- Settlement isolates aggregate external liability: YES pays qY, NO pays qN, INVALID pays half their sum. Only `cash + lpFees - liability` becomes LP's frozen budget. Outcome and LP claims may be made in either order; per-user flooring cannot exceed the isolated aggregate budget. True residuals stay protected until all rights are burned.
+- Early-request freezes, Core staking/history, automatic fixed-beneficiary fees and their gas requirements are preserved. Factory interfaceVersion is 4 so current readers cannot mistake older finite-inventory deployments for this revision.
+
+> Current testnet configuration: k=0.000001 (kWad=1000000000000), factory `0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8`, Router `0x277a48840fd9cB417A38a21F879A2CFCA633d2Cb`. No markets were created in this deployment; create your own from the frontend. gToken display uses native units with no extra denomination multiplier.
 
 > 2026-11-01: Single-R interface v3 deployed on Robinhood testnet 46630. Factory `0x3A42205E931753B5e3F80dbf9536b048e7427113`, market `0xeeE8F99cBdBccBc506FA180424638c95c038bA54`. Graduation target 0.0042 TSLA; stock bond 1.25 TSLA fixed at creation. See deployments/46630.json for verification status. User performs frontend transaction testing.
 

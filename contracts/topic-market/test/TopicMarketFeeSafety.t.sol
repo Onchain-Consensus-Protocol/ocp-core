@@ -26,7 +26,7 @@ contract TopicMarketFeeSafetyTest is TopicMarketBase {
         _graduate();uint256 gross=market.quoteFormalBuy(true,W/3);
         uint256 creator=market.creatorFees();
         _formalBuy(bob,true,W/3);
-        assertEq(market.cash(),gross*98/100);assertEq(market.lpFees(),gross/100);
+        assertEq(market.cash(),market.initialCollateral()+gross*98/100);assertEq(market.lpFees(),gross/100);
         assertEq(oracle.fees(),gross*7/1000);
         assertEq(market.protocolFees(),14e6*3/1000+gross*3/1000);assertEq(market.creatorFees(),creator);
         _accounting();
@@ -43,11 +43,11 @@ contract TopicMarketFeeSafetyTest is TopicMarketBase {
     function testCoreFailureRollsBackNewBFeesAndAllFunds() public {
         _graduate();uint256 B=0;uint256 wallet=usd.balanceOf(bob);uint256 collateral=market.collateralCash();
         oracle.setRejectFee(true);vm.prank(bob);vm.expectRevert("MOCK_FEE");market.formalBuy(true,W,type(uint256).max,type(uint64).max);
-        assertEq(market.cash(),0);assertEq(market.lpFees(),0);assertEq(market.yes(bob),0);
+        assertEq(market.cash(),market.initialCollateral());assertEq(market.lpFees(),0);assertEq(market.yes(bob),0);
         assertEq(usd.balanceOf(bob),wallet);assertEq(market.collateralCash(),collateral);_accounting();
     }
     function testCoverUsesNetLPFeesOnceAndOnlyThenSplitsBResidual() public {
-        _graduate();_formalBuy(bob,true,4*W);uint256 nav=market.cash()+market.lpFees()+market.inventoryY()/market.SCALE();
+        _graduate();_formalBuy(bob,true,4*W);uint256 nav=market.cash()+market.lpFees()-market.yesSupply()/market.SCALE();
 
         _finish(1);
         assertEq(market.lpBudgetInitial(),nav);assertEq(market.lpBudgetInitial()+0,nav);_accounting();

@@ -3,183 +3,185 @@
   "wallet": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
   "contracts": {
     "TopicMarketCoreDeployer": {
-      "address": "0x1508e502176184f06766c392F6AaF40967CdA405",
-      "transactionHash": "0x93ae2818680bef45b08e0df2c2246174b5499a30a777e46268c5810a0e7c47ff",
+      "address": "0xD60DbDff3c9D94Cc883494093C1b9570C7A9BAE4",
+      "transactionHash": "0x7250d67459a7680ab3789fc4cf877ac91245ba218ad2ef32dd2bd0ac952a2922",
       "source": "src/deployers/TopicMarketCoreDeployer.sol:TopicMarketCoreDeployer",
       "args": [
-        "0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5"
+        "0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8"
       ],
-      "constructorArgs": "00000000000000000000000031647df2eeab14673f0faf90b72df77aae3c66e5",
+      "constructorArgs": "0000000000000000000000002b1e91cd45ecc51c521ff4b080cf50c70c639ca8",
       "sourceVerification": "submitted; not confirmed"
     },
     "TopicMarketDeployer": {
-      "address": "0x0D6FB295574a43b5648d60f631844D771855e222",
-      "transactionHash": "0x2433d410e1babd47927d5b4faf85a36a7087ba756aad5582318279332b71ee6a",
+      "address": "0x64C3F0Aee1E4172928eAb39e215fE3922b1a7353",
+      "transactionHash": "0x1524af303c55416dbbd0b108e65cd9ba3507e42643a73d50cc6d72a31ffa2829",
       "source": "src/deployers/TopicMarketDeployer.sol:TopicMarketDeployer",
       "args": [
-        "0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5"
+        "0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8"
       ],
-      "constructorArgs": "00000000000000000000000031647df2eeab14673f0faf90b72df77aae3c66e5",
-      "sourceVerification": "verified"
+      "constructorArgs": "0000000000000000000000002b1e91cd45ecc51c521ff4b080cf50c70c639ca8",
+      "sourceVerification": "submitted; not confirmed"
     },
     "TopicMarketTestnetStockFactory": {
-      "address": "0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5",
-      "transactionHash": "0x32c54673b2d9553832a3e3d1ce2120fc543f3a80bd1b31750501670c683622e0",
+      "address": "0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8",
+      "transactionHash": "0x53ad0a4a6c85a2f5aab0f037ed21f749a2f7f03c8ebcb56c61ebd5be36839dfa",
       "source": "src/TopicMarketTestnetStockFactory.sol:TopicMarketTestnetStockFactory",
       "args": [
         "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
         "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
-        "0x1508e502176184f06766c392F6AaF40967CdA405",
-        "0x0D6FB295574a43b5648d60f631844D771855e222"
+        "0xD60DbDff3c9D94Cc883494093C1b9570C7A9BAE4",
+        "0x64C3F0Aee1E4172928eAb39e215fE3922b1a7353"
       ],
-      "constructorArgs": "0000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be70000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be70000000000000000000000001508e502176184f06766c392f6aaf40967cda4050000000000000000000000000d6fb295574a43b5648d60f631844d771855e222",
+      "constructorArgs": "0000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be70000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be7000000000000000000000000d60dbdff3c9d94cc883494093c1b9570c7a9bae400000000000000000000000064c3f0aee1e4172928eab39e215fe3922b1a7353",
       "sourceVerification": "submitted; not confirmed"
     },
     "TopicMarketAssetRouter": {
-      "address": "0xBD6b0d0b1cdf1BFd7D2DC50dF7cc4296d766a06C",
-      "transactionHash": "0x13612bec231cf38490ce0f7e0e9a60fb235e6118edd22e335a8d589fb76fc5dd",
+      "address": "0x277a48840fd9cB417A38a21F879A2CFCA633d2Cb",
+      "transactionHash": "0x421effbc64c840fad178729710d0147b5e7e69638b19ed81e4dd87eb31740ab2",
       "source": "src/TopicMarketAssetRouter.sol:TopicMarketAssetRouter",
       "args": [
-        "0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5",
+        "0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8",
         "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300",
         [
           "0x7E955252E15c84f5768B83c41a71F9eba181802F"
         ]
       ],
-      "constructorArgs": "00000000000000000000000031647df2eeab14673f0faf90b72df77aae3c66e50000000000000000000000003b277dfda0851bbb2888d07d1ec4bd059b805300000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000007e955252e15c84f5768b83c41a71f9eba181802f",
+      "constructorArgs": "0000000000000000000000002b1e91cd45ecc51c521ff4b080cf50c70c639ca80000000000000000000000003b277dfda0851bbb2888d07d1ec4bd059b805300000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000007e955252e15c84f5768b83c41a71f9eba181802f",
       "sourceVerification": "verified"
     }
   },
   "transactions": [
     {
       "label": "deploy TopicMarketCoreDeployer",
-      "nonce": 93,
-      "hash": "0x93ae2818680bef45b08e0df2c2246174b5499a30a777e46268c5810a0e7c47ff",
+      "nonce": 119,
+      "hash": "0x7250d67459a7680ab3789fc4cf877ac91245ba218ad2ef32dd2bd0ac952a2922",
       "status": 1,
-      "block": 146560268,
+      "block": 146795031,
       "gasUsed": "8676803",
-      "contractAddress": "0x1508e502176184f06766c392F6AaF40967CdA405"
+      "contractAddress": "0xD60DbDff3c9D94Cc883494093C1b9570C7A9BAE4"
     },
     {
       "label": "deploy TopicMarketDeployer",
-      "nonce": 94,
-      "hash": "0x2433d410e1babd47927d5b4faf85a36a7087ba756aad5582318279332b71ee6a",
+      "nonce": 120,
+      "hash": "0x1524af303c55416dbbd0b108e65cd9ba3507e42643a73d50cc6d72a31ffa2829",
       "status": 1,
-      "block": 146560295,
-      "gasUsed": "6437172",
-      "contractAddress": "0x0D6FB295574a43b5648d60f631844D771855e222"
+      "block": 146795067,
+      "gasUsed": "6446294",
+      "contractAddress": "0x64C3F0Aee1E4172928eAb39e215fE3922b1a7353"
     },
     {
       "label": "deploy TopicMarketTestnetStockFactory",
-      "nonce": 95,
-      "hash": "0x32c54673b2d9553832a3e3d1ce2120fc543f3a80bd1b31750501670c683622e0",
+      "nonce": 121,
+      "hash": "0x53ad0a4a6c85a2f5aab0f037ed21f749a2f7f03c8ebcb56c61ebd5be36839dfa",
       "status": 1,
-      "block": 146560320,
+      "block": 146795100,
       "gasUsed": "1914809",
-      "contractAddress": "0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5"
+      "contractAddress": "0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8"
     },
     {
       "label": "deploy TopicMarketAssetRouter",
-      "nonce": 96,
-      "hash": "0x13612bec231cf38490ce0f7e0e9a60fb235e6118edd22e335a8d589fb76fc5dd",
+      "nonce": 122,
+      "hash": "0x421effbc64c840fad178729710d0147b5e7e69638b19ed81e4dd87eb31740ab2",
       "status": 1,
-      "block": 146560391,
+      "block": 146795159,
       "gasUsed": "1571594",
-      "contractAddress": "0xBD6b0d0b1cdf1BFd7D2DC50dF7cc4296d766a06C"
+      "contractAddress": "0x277a48840fd9cB417A38a21F879A2CFCA633d2Cb"
     },
     {
       "label": "register test TSLA",
-      "nonce": 97,
-      "hash": "0xffda0f95858bad9e2262e8abd1fa5c5c6760c05e5ef416e0d51bf80f1b653cad",
+      "nonce": 123,
+      "hash": "0x610285b931b512f66e501532226b99f0066a33a53d7d528393e937530d92ccb2",
       "status": 1,
-      "block": 146560421,
+      "block": 146795190,
       "gasUsed": "182762",
       "contractAddress": null
     }
   ],
   "testPrice": "400 USD/TSLA, fixed test-only price; no ETH quote",
   "pool": "0x8cC4de04B1a61c25ad7b4a3Cf23D15547aC670DB",
-  "startNonce": 93,
-  "predictedFactory": "0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5",
+  "startNonce": 119,
+  "predictedFactory": "0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8",
   "internal": {
-    "implementation": "0xdE236Fd429431e7c41FBc4C458C90A5f888fD3C0",
-    "coreCodeA": "0x730Ed8BF3930a60C0411A481aB89e78fD20Ef596",
-    "coreCodeB": "0xD8586f99480568DA354155b6F46f20823edDC57F",
-    "marketCodeA": "0xC58Cc116533bcc84D7aD72A763E266E7457382fE",
-    "marketCodeB": "0x907C66d00BB6EB2e2437EBF9Cd834DB8b571Da91"
+    "implementation": "0x910F6E818AAe67912e6cB0f65d3ee3d986f272c6",
+    "coreCodeA": "0xb52B92a357285A00dB8f4272d4A89B2543dafE18",
+    "coreCodeB": "0xA16A3BB3Fb945aa8b9FEf0d08B3bF5a2716B5c76",
+    "marketCodeA": "0x10B91408421eE8Ce3Fdb0968d6f62DaC70568aE7",
+    "marketCodeB": "0x5bFd205190ACB8cfe770C34BA84b0581D9903f3D"
   },
   "stock": {
     "token": "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
     "stable": "0x7E955252E15c84f5768B83c41a71F9eba181802F",
     "oracle": "0x7Dce9f918bcaDB559035449599764D75eb3BaE4B",
     "exchange": "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300",
-    "router": "0xBD6b0d0b1cdf1BFd7D2DC50dF7cc4296d766a06C"
+    "router": "0x277a48840fd9cB417A38a21F879A2CFCA633d2Cb"
   },
   "acceptance": {
-    "checkedAtBlock": 146560623,
-    "interfaceVersion": 3,
+    "checkedAtBlock": 146795202,
+    "interfaceVersion": 4,
     "kWad": "1000000000000",
     "marketCount": 0,
     "noMarketCreated": true
   },
-  "sourceCommit": "f9e4bff044e23dfd4450aa9ea718fed0f612e855",
-  "k": "0.000001",
+  "interfaceVersion": 4,
   "kWad": "1000000000000",
+  "k": "0.000001",
   "marketCount": 0,
+  "model": "continuous-lmsr",
+  "verificationStatus": "all submitted; see verification list for confirmation",
   "verification": [
     {
       "name": "TopicMarketCoreDeployer",
-      "address": "0x1508e502176184f06766c392F6AaF40967CdA405",
+      "address": "0xD60DbDff3c9D94Cc883494093C1b9570C7A9BAE4",
       "verified": false,
       "contractName": null
     },
     {
       "name": "TopicMarketDeployer",
-      "address": "0x0D6FB295574a43b5648d60f631844D771855e222",
-      "verified": true,
-      "contractName": "TopicMarketDeployer"
+      "address": "0x64C3F0Aee1E4172928eAb39e215fE3922b1a7353",
+      "verified": false,
+      "contractName": null
     },
     {
       "name": "TopicMarketTestnetStockFactory",
-      "address": "0x31647Df2eEaB14673F0fAF90B72dF77AAE3C66e5",
+      "address": "0x2b1e91Cd45eCc51C521FF4b080cf50c70c639cA8",
       "verified": false,
       "contractName": null
     },
     {
       "name": "TopicMarketAssetRouter",
-      "address": "0xBD6b0d0b1cdf1BFd7D2DC50dF7cc4296d766a06C",
+      "address": "0x277a48840fd9cB417A38a21F879A2CFCA633d2Cb",
       "verified": true,
       "contractName": "TopicMarketAssetRouter"
     },
     {
       "name": "TopicMarketEarlyTerminationModule",
-      "address": "0xdE236Fd429431e7c41FBc4C458C90A5f888fD3C0",
+      "address": "0x910F6E818AAe67912e6cB0f65d3ee3d986f272c6",
       "verified": true,
       "contractName": "TopicMarketEarlyTerminationModule"
     },
     {
       "name": "coreCodeA",
-      "address": "0x730Ed8BF3930a60C0411A481aB89e78fD20Ef596",
+      "address": "0xb52B92a357285A00dB8f4272d4A89B2543dafE18",
       "verified": true,
       "contractName": "TopicMarketCreationCodeStore"
     },
     {
       "name": "coreCodeB",
-      "address": "0xD8586f99480568DA354155b6F46f20823edDC57F",
+      "address": "0xA16A3BB3Fb945aa8b9FEf0d08B3bF5a2716B5c76",
       "verified": true,
       "contractName": "TopicMarketCreationCodeStore"
     },
     {
       "name": "marketCodeA",
-      "address": "0xC58Cc116533bcc84D7aD72A763E266E7457382fE",
-      "verified": false,
-      "contractName": null
+      "address": "0x10B91408421eE8Ce3Fdb0968d6f62DaC70568aE7",
+      "verified": true,
+      "contractName": "TopicMarketCreationCodeStore"
     },
     {
       "name": "marketCodeB",
-      "address": "0x907C66d00BB6EB2e2437EBF9Cd834DB8b571Da91",
-      "verified": false,
-      "contractName": null
+      "address": "0x5bFd205190ACB8cfe770C34BA84b0581D9903f3D",
+      "verified": true,
+      "contractName": "TopicMarketCreationCodeStore"
     }
   ]
 }

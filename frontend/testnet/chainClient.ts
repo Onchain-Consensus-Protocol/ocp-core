@@ -104,7 +104,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     await assertTestnet(provider);
     if(await provider.getCode(address)==='0x') throw new Error('测试网工厂地址没有合约代码');
     const version=await new Contract(address,['function interfaceVersion() view returns(uint256)'],provider).interfaceVersion().catch(()=>0n);
-    if(version!==3n)throw new Error('测试网合约版本不支持：需要 interfaceVersion 3，请更新部署配置');
+    if(version!==4n)throw new Error('测试网合约版本不支持：需要 interfaceVersion 4，请更新部署配置');
   }
   async function summary(marketAddress:string,includePresentation=false):Promise<MarketSummary> {
     const market=nonzeroAddress(marketAddress);

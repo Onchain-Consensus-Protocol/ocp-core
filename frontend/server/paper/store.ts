@@ -12,7 +12,7 @@ export interface PaperMutationUpdate {market:StoredPaperMarket;response:PaperMut
 export class PaperStoreError extends Error {
  constructor(message:string,public readonly status:number){super(message);this.name='PaperStoreError';}
 }
-function currentMarket(value:StoredPaperMarket):StoredPaperMarket {if(value?.schemaVersion!==3)throw new PaperStoreError('UNSUPPORTED_PAPER_SCHEMA',409);return value;}
+function currentMarket(value:StoredPaperMarket):StoredPaperMarket {if(value?.schemaVersion!==4)throw new PaperStoreError('UNSUPPORTED_PAPER_SCHEMA',409);return value;}
 const INITIAL_GRANT=100_000_000_000n;
 const MAX_WALLET=9_223_372_036_854_775_807n;
 const fromRow=(row:Record<string,unknown>):PaperStoreUser=>({id:String(row.id),name:String(row.name),email:String(row.email),balanceMicros:BigInt(String(row.balance_micros))});
@@ -65,7 +65,7 @@ export class PaperStore {
   });
  }
  async listMarkets():Promise<StoredPaperMarket[]>{
-  await this.ready();const result=await this.pool.query("SELECT document FROM ocp_paper_markets WHERE document->>'schemaVersion' = '3' ORDER BY created_at DESC,id LIMIT 100");return result.rows.filter(row=>row.document?.schemaVersion===3).map(row=>currentMarket(row.document as StoredPaperMarket));
+  await this.ready();const result=await this.pool.query("SELECT document FROM ocp_paper_markets WHERE document->>'schemaVersion' = '4' ORDER BY created_at DESC,id LIMIT 100");return result.rows.filter(row=>row.document?.schemaVersion===4).map(row=>currentMarket(row.document as StoredPaperMarket));
  }
  async getMarket(id:string):Promise<StoredPaperMarket|null>{
   if(!text(id,200))throw new PaperStoreError('MARKET_ID',400);
@@ -78,7 +78,7 @@ export class PaperStore {
    const user=await client.query('SELECT id FROM ocp_paper_users WHERE id=$1 FOR UPDATE',[userId]);
    if(!user.rows[0])throw new PaperStoreError('AUTH_REQUIRED',401);
    const old=await client.query('SELECT market_id,theme,document FROM ocp_paper_share_snapshots WHERE user_id=$1 AND request_id=$2',[userId,requestId]);
-   if(old.rows[0]){if(old.rows[0].market_id!==marketId||old.rows[0].theme!==theme)throw new PaperStoreError('IDEMPOTENCY_CONFLICT',409);if(old.rows[0].document?.schemaVersion!==3)throw new PaperStoreError('UNSUPPORTED_PAPER_SCHEMA',409);return old.rows[0].document;}
+   if(old.rows[0]){if(old.rows[0].market_id!==marketId||old.rows[0].theme!==theme)throw new PaperStoreError('IDEMPOTENCY_CONFLICT',409);if(old.rows[0].document?.schemaVersion!==4)throw new PaperStoreError('UNSUPPORTED_PAPER_SCHEMA',409);return old.rows[0].document;}
    const count=await client.query("SELECT count(*)::int AS total,count(*) FILTER (WHERE created_at>now()-interval '1 minute')::int AS recent FROM ocp_paper_share_snapshots WHERE user_id=$1",[userId]);
    if(count.rows[0].recent>=10||count.rows[0].total>=2000)throw new PaperStoreError('SHARE_LIMIT',429);
    const selected=await client.query('SELECT document FROM ocp_paper_markets WHERE id=$1',[marketId]);
@@ -90,7 +90,7 @@ export class PaperStore {
  }
  async getShareSnapshot(id:string):Promise<MarketShareSnapshot|null>{
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))return null;
-  await this.ready();const found=await this.pool.query('SELECT document FROM ocp_paper_share_snapshots WHERE id=$1',[id]);if(found.rows[0]?.document?.schemaVersion!==3)return null;return found.rows[0].document;
+  await this.ready();const found=await this.pool.query('SELECT document FROM ocp_paper_share_snapshots WHERE id=$1',[id]);if(found.rows[0]?.document?.schemaVersion!==4)return null;return found.rows[0].document;
  }
  async mutate(userId:string,requestId:string,payloadHash:string,marketId:string|null,
   callback:(context:PaperMutationContext)=>PaperMutationUpdate|Promise<PaperMutationUpdate>):Promise<PaperMutationResult>{
@@ -102,7 +102,7 @@ export class PaperStore {
    const previous=await client.query('SELECT payload_hash,market_id,response FROM ocp_paper_requests WHERE user_id=$1 AND request_id=$2',[userId,requestId]);
    if(previous.rows[0]){
     if(previous.rows[0].payload_hash!==payloadHash||(marketId!==null&&previous.rows[0].market_id!==marketId))throw new PaperStoreError('IDEMPOTENCY_CONFLICT',409);
-    if(previous.rows[0].response?.market?.schemaVersion!==3)throw new PaperStoreError('UNSUPPORTED_PAPER_SCHEMA',409);
+    if(previous.rows[0].response?.market?.schemaVersion!==4)throw new PaperStoreError('UNSUPPORTED_PAPER_SCHEMA',409);
     return {...previous.rows[0].response,replayed:true} as PaperMutationResult;
    }
    const user=fromRow(users.rows[0]);let market:StoredPaperMarket|null=null;
