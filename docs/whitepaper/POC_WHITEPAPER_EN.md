@@ -1,6 +1,7 @@
 # Proof of Commitment (POC): A Scheme for Costly Social Consensus
 
 > **Implementation Status**: This document defines the mechanism layer (POC) of OCP. The OnChain consensus narrative framework is in the [OCP Whitepaper](./OCP_WHITEPAPER_EN.md).
+> **Targeted update, 2026-11-04:** original structure and theory retained; costly-exit rules corrected. Stock markets, historical fees, and bonded early settlement are added in the [current implementation supplement](./CURRENT_MECHANISM_EN.md).
 
 ---
 
@@ -8,8 +9,8 @@
 
 This paper proposes a **triadic OnChain protocol** to form anti-manipulation capital consensus over external propositions. The protocol runs in three phases:
 
-1. **Staking**: participants choose YES, NO, or INVALID and lock capital until finality.
-2. **Locking**: each address remains on its first side and may only add to that side before the fixed deadline.
+1. **Staking**: participants choose YES, NO, or INVALID and bear outcome risk; an open-period full exit has a penalty and forfeits accrued fees.
+2. **Locking**: an active position allows same-side additions only; a costly full exit permits subsequent re-entry on another side.
 3. **Finality**: after the deadline, YES or NO wins only with a strict majority of all principal; otherwise the outcome is INVALID.
 
 This protocol does not produce truth; it is a **stress-testing furnace for consensus**, serving as a trust-minimized base layer for prediction, arbitration, and governance. Its core logic is **Proof of Commitment (POC)**: the authority of consensus is proven by verifiable capital lock-in.
@@ -28,7 +29,7 @@ Oracles rely on off-chain authorities or heavy governance. OnChain courts (e.g.,
 
 ### 1.2 Core Thesis
 
-The strongest form of credible commitment is the willingness to bear **large, verifiable financial risk**. This protocol encodes that principle: no external judge is introduced; **capital itself** forms consensus under a fixed deadline. Its weight comes from irreversible capital lock-up and the loss borne by an incorrect side.
+The strongest form of credible commitment is the willingness to bear **large, verifiable financial risk**. This protocol encodes that principle: no external judge is introduced; **capital itself** forms consensus under a fixed deadline. Its weight comes from wrong-side losses and verifiable exit penalties and fee forfeiture.
 
 ### 1.3 Protocol Philosophy
 
@@ -48,11 +49,11 @@ Participants may stake YES, NO, or INVALID until a fixed deadline $t_0$. One add
 
 ### 2.2 One-Side Lock and Fixed Deadline
 
-The first stake fixes the address's direction. Funds cannot be withdrawn or switched before settlement. The deadline is known at creation and cannot be extended.
+An active position permits same-side additions only. While open, a full exit returns principal less a rounded-up 10% penalty and forfeits accrued fee rights. The address can then re-enter on another side without recovering old fee history. Exited principal and penalties do not vote. The original deadline cannot be extended; a qualifying bonded request may finalize earlier.
 
 ### 2.3 Consensus Formation
 
-After $t_0$, any address may finalize. YES or NO wins only if its principal is strictly more than 50% of total YES + NO + INVALID principal. Otherwise, including exactly 50%, the result is INVALID. A binary winner shares the pool pro rata; INVALID returns funds to all participants pro rata.
+After $t_0$, any address may finalize. YES or NO wins only if its principal is strictly more than 50% of total YES + NO + INVALID principal. Otherwise, including exactly 50%, the result is INVALID. A binary winner shares the pool pro rata; INVALID distributes the principal settlement pool among remaining active participants pro rata; historical trading fees follow separate eligibility rules. At an expired early-request window, affected operations freeze until anyone processes it; rejection does not extend original deadlines.
 
 ### 2.4 Parent-Child Events and History
 
@@ -63,21 +64,21 @@ Parent-child references and historical analysis may be built above the vault. Th
 | Expression | Category |
 |---|---|
 | deposit, voting weight, capital signal | **Staking** |
-| immutable side, no withdrawal, no switching | **Lock** |
+| single-sided active position; costly full exit | **Lock** |
 | strict majority, INVALID, settlement | **Finality** |
 
 ### 2.6 Key Properties
 
 | Property | Meaning |
 |---|---|
-| Minimality | Stake, finalize, and withdraw |
+| Minimality | Stake, add, exit at a cost, finalize, and claim |
 | Three-state finality | YES, NO, or INVALID |
 | Fixed deadline | No extension or extra round |
 | Capital verifiability | Amount, side, and time are OnChain |
 
 ---
 
-## 3. Theoretical Analysis: Irreversible Commitment
+## 3. Theoretical Analysis: Costly Commitment
 
 ### 3.1 Expected Utility
 
@@ -87,11 +88,11 @@ $$
 \mathbb{E}[U_{stake}] = q\left(\frac{x}{W}P-x\right) - (1-q)x-c
 $$
 
-The contract cannot verify whether $q$ comes from independent information, so the result is capital confidence rather than objective truth.
+This simplified binary expression assumes holding through settlement; it omits INVALID, historical fees, and exit choices. The contract cannot verify whether $q$ comes from independent information, so the result is capital confidence rather than objective truth.
 
 ### 3.2 Security Philosophy
 
-No withdrawal prevents costless exit; no switching prevents following the visible leader as a free option; a fixed deadline prevents indefinite games; INVALID prevents a forced binary result without strict majority support.
+Exit penalties and fee forfeiture make leaving costly; single-sided active positions prevent direct switching; a fixed deadline prevents indefinite games; INVALID prevents a forced binary result without strict majority support.
 
 ### 3.3 Transparent Capital Flow
 
@@ -112,11 +113,11 @@ Equivalent framing: **Capital-Weighted Schelling Game with Fixed Finality**.
 
 ### 4.1 Oracle-Free
 
-Consensus and settlement are fully endogenous and decided by OnChain capital distribution.
+Core results are determined by active OnChain principal without an external fact adjudicator. Creation-price snapshots and USDG conversions remain external dependencies described in the supplement.
 
 ### 4.2 Trust Minimization
 
-Trust only code and participant incentive alignment. No centralized admin and no off-chain committee.
+Code and participant capital determine the result, without an administrator selecting outcomes or an off-chain committee. Factory owners still manage asset admission; token issuers, creation prices, and exchange routes remain dependencies.
 
 ### 4.3 Security Boundary
 
@@ -126,18 +127,18 @@ When capital is systemically misled (e.g., ideology-dominated events, unverifiab
 
 ## 5. Application Scenarios
 
-All applications are concrete instantiations of the same Staking–Lock–Finality flow.
+These examples retain the Staking–Lock–Finality framing. The current prediction-market implementation is detailed in the supplement; other application integrations remain future directions.
 
 ### 5.1 Prediction Markets
 
-- **Staking**: users lock USDC on YES, NO, or INVALID until the fixed deadline
-- **Locking**: each address may only add to its original side
+- **Staking**: users stake registered stock collateral on YES, NO, or INVALID in Core, separately from Market outcome trades
+- **Locking**: active positions allow same-side additions; full exits incur a penalty and forfeit accrued fees
 - **Finality**: a binary side needs a strict majority; otherwise the outcome is INVALID
 
 ### 5.2 Decentralized Arbitration
 
 - **Staking**: participants collateralize YES, NO, or INVALID positions
-- **Locking**: positions cannot be withdrawn or switched before the deadline
+- **Locking**: active positions stay single-sided; using current Core applies its costly-exit rules
 - **Finality**: the strict-majority rule produces the final capital vote
 
 ### 5.3 High-Stakes Governance
@@ -148,7 +149,7 @@ All applications are concrete instantiations of the same Staking–Lock–Finali
 
 ### 5.4 Belief Signaling and Commitment
 
-The core value is the observed commitment hardness created by public staking and irreversible side lock, even when payout itself is secondary.
+The core value is the observed commitment hardness created by public staking and single-sided active positions and exit costs, even when payout itself is secondary.
 
 ---
 
@@ -158,7 +159,7 @@ The core value is the observed commitment hardness created by public staking and
 
 | Parameter | Set by | Too small | Too large |
 |---|---|---|---|
-| $b$ (= minimum vault deposit) | vault creator | small transactions and noise increase | participation is suppressed |
+| Minimum stake (currently positive amounts only) | Core implementation and deployment | small transactions and noise increase | participation is suppressed |
 | Staking duration | application layer | insufficient information aggregation | longer capital lock-up |
 
 ### 6.2 Limitations
@@ -179,7 +180,7 @@ The core value is the observed commitment hardness created by public staking and
 
 POC provides a base primitive to **capitalize social belief and stress-test it**. Its output measures hardness of collective commitment, not absolute truth.
 
-**The protocol is a game machine that converts staking into consensus, and irreversible lock is its commitment boundary.**
+**The protocol is a game machine that converts staking into consensus, with outcome risk and costly exits defining the commitment boundary.**
 
 If Bitcoin formalized trustless value transfer, POC formalizes **trustless costly commitment** for broader social coordination.
 
@@ -190,16 +191,16 @@ If Bitcoin formalized trustless value transfer, POC formalizes **trustless costl
 | Term | Precise definition |
 |---|---|
 | **Staking** | unilateral capital binding to one proposition during a period; belief signal plus explicit cost |
-| **Lock** | first stake fixes one side; funds cannot withdraw or switch |
+| **Lock** | active positions stay single-sided; a full exit incurs a penalty and forfeits fees |
 | **Consensus** | irreversible outcome formed by strict majority at the fixed deadline |
 | **POC** | authority of consensus proven by verifiable capital lock-in, not identity claims |
-| **Staking phase** | until $t_0$, users stake to YES/NO/INVALID with full lock-up |
+| **Staking phase** | graduation to the effective cutoff; each active position has one side |
 | **Fixed deadline** | closes staking at the precommitted time |
-| **One-side lock** | same-side additions only; no withdrawal or switching |
+| **One-side lock** | same-side additions while active; costly full exit permits re-entry |
 | **One-shot finality** | immutable protocol-level rule for globally consistent final consensus |
 | **Capital confidence** | maximum commitment capital can bear for an outcome |
-| **INVALID** | broken premise / absent fact / unverifiable proposition; all refunded |
-| **$b$** | vault minimum stake amount |
+| **INVALID** | no strict binary majority; active principal and historical fees settle separately |
+| **$b$** | current Formal LMSR depth, not the Core minimum stake |
 
 ---
 
@@ -212,4 +213,4 @@ If Bitcoin formalized trustless value transfer, POC formalizes **trustless costl
 
 ---
 
-*Document Version: 1.0 | POC Mechanism Whitepaper | Three-state game, $b$ as minimum deposit, future application-layer extensions*
+*Document Version: 1.1 · 2026-11-04 | Original structure retained; see the [current implementation supplement](./CURRENT_MECHANISM_EN.md).*

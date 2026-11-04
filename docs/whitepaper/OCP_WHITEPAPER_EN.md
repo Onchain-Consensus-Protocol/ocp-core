@@ -3,6 +3,7 @@
 ## 共识上链协议 · Proof of Commitment (POC)
 
 > **OCP Master Whitepaper**. For mechanism details see the [POC Whitepaper](./POC_WHITEPAPER_EN.md).
+> **Targeted update, 2026-11-04:** the structure and vision are retained. Creation, exit, and deadline rules are corrected; see the [current implementation supplement](./CURRENT_MECHANISM_EN.md) for the stock market, fees, and early settlement.
 
 ---
 
@@ -14,11 +15,11 @@
 
 ## Abstract
 
-If the Bitcoin protocol solved “value OnChain,” the OnChain Consensus Protocol (OCP) aims to solve “**facts OnChain**.” The official Factory owner creates propositions; once created, staking, finalization, and withdrawal are permissionless.
+If the Bitcoin protocol solved “value OnChain,” the OnChain Consensus Protocol (OCP) aims to solve “**facts OnChain**.” The shared stock Factory owner registers assets; anyone may create propositions for enabled stocks and participate, finalize, and claim within the applicable lifecycle.
 
-This document presents the **OnChain Consensus Protocol (OCP)**. Its core thesis: blockchains can carry not only money and contracts but **consensus about the external world**. Through a minimal “stake–lock–finalize” game, the official Factory owner creates a proposition and opens it to public participation, ultimately producing **Finalized Consensus**. The underlying logic is **Proof of Commitment (POC)**: the authority of consensus comes from **verifiable capital lock-up**, not identity or claims. The protocol does not produce “truth”; it outputs **capital-confidence outcomes**.
+This document presents the **OnChain Consensus Protocol (OCP)**. Its core thesis: blockchains can carry not only money and contracts but **consensus about the external world**. Through a minimal “stake–lock–finalize” game, anyone may create a proposition for an enabled registered stock and open it to public participation, ultimately producing **Finalized Consensus**. The underlying logic is **Proof of Commitment (POC)**: the authority of consensus comes from **verifiable capital lock-up**, not identity or claims. The protocol does not produce “truth”; it outputs **capital-confidence outcomes**.
 
-The protocol uses a **three-outcome game**: YES (fact holds), NO (fact reversed), and INVALID (fact broken / premise absent / unverifiable). When an event is cancelled, truth is unknowable, or the proposition is ambiguous, INVALID acts as a circuit breaker and triggers full refunds, avoiding unfair binary outcomes for either side.
+The protocol uses a **three-outcome game**: YES (fact holds), NO (fact reversed), and INVALID (fact broken / premise absent / unverifiable). Participants may use INVALID for cancellation, uncertainty, or ambiguity, but contracts still apply the strict-majority rule. INVALID distributes the principal settlement pool among remaining active principal; external events do not automatically trigger refunds.
 
 This whitepaper describes OCP as a base layer and presents its first application: a fully endogenous prediction market.
 
@@ -42,7 +43,7 @@ Common issue: **the last mile of consensus**—how to bring off-chain disputes O
 
 ### 1.3 Our Approach
 
-**OCP**: A protocol layer that treats consensus itself as a **settleable asset**. Proposition creation is controlled by the Factory owner; participation and finalization are permissionless. At its core is **Proof of Commitment (POC)**—the authority of consensus is proved by verifiable capital lock-up.
+**OCP**: A protocol layer that treats consensus itself as a **settleable asset**. The Factory owner manages asset admission; creation for enabled assets, participation, and finalization are permissionless. At its core is **Proof of Commitment (POC)**—the authority of consensus is proved by verifiable capital lock-up.
 
 ---
 
@@ -52,7 +53,7 @@ Common issue: **the last mile of consensus**—how to bring off-chain disputes O
 
 Define how a dispute over a **binary proposition** is “moved” OnChain and resolved. The protocol’s only output is **Finalized Consensus**—a programmable, irreversible “OnChain fact” asset.
 
-**Three outcomes**: The protocol outputs three possible results—YES (fact holds), NO (fact reversed), INVALID (fact broken / premise absent / unverifiable). When a match is cancelled, truth is unknowable, or the proposition is ambiguous, a binary verdict is unfair to one side; INVALID must be introduced as a circuit breaker. If neither YES nor NO has a strict majority at the fixed staking deadline, the Vault resolves INVALID.
+**Three outcomes**: The protocol outputs three possible results—YES (fact holds), NO (fact reversed), INVALID (fact broken / premise absent / unverifiable). Cancellation, uncertainty, and ambiguity inform participant choices rather than being contract-interpreted refund triggers. If neither YES nor NO has a strict majority at the fixed staking deadline, the Vault resolves INVALID.
 
 **Important**: OCP outputs **capital-confidence results**—the maximum commitment capital is willing to bear for an outcome—not an objective “truth” verdict. Under typical conditions the two are highly correlated; in edge cases they may diverge (see §5.1).
 
@@ -60,42 +61,42 @@ Define how a dispute over a **binary proposition** is “moved” OnChain and re
 
 | Element | Action / Output | Definition |
 |---|---|---|
-| **Stake** | `stake(position, amount)` | Capital enters YES, NO, or INVALID and remains locked until settlement |
-| **Lock** | Contract-enforced state | The first stake fixes an address to one side; it may add there but cannot withdraw or switch |
-| **Finalized Consensus** | OnChain readable | The unique irreversible output formed after the fixed deadline |
+| **Stake** | `stake(position, amount)` | Capital enters YES, NO, or INVALID; an open-period full exit forfeits accrued fees and incurs a principal penalty |
+| **Lock** | Contract-enforced state | An active position permits same-side additions only; full exit returns principal less a rounded-up 10% penalty and forfeits accrued fees |
+| **Finalized Consensus** | OnChain readable | The unique irreversible output after the fixed deadline or a qualifying early-settlement request |
 
-### 2.3 Minimum Stake b
+### 2.3 Collateral and Minimum Stake
 
-Only the official Factory `owner` may create propositions. At deployment, that Factory fixes Base native USDC as the sole stake token. The creator sets each Vault's minimum stake b; USDC uses six decimals and b is an absolute USDC-denominated participation threshold.
+The shared factory registers each stock's token, decimals, price snapshot, and route. Anyone may create topics for enabled stocks. Current Core stakes must be positive; the old fixed Base-USDC and creator-set minimum b profile does not apply. In the current Formal market, b denotes LMSR depth.
 
-Fund availability therefore also depends on Circle's USDC contract. Circle's pause, blacklist, and upgrade powers may temporarily prevent staking or withdrawal; OCP cannot bypass issuer controls.
+Fund availability also depends on the collateral issuer and chain state. Pauses, transfer restrictions, and upgrades may affect staking or claims; OCP cannot bypass these external powers. The supplement describes creation-price and USDG-route dependencies.
 
 ### 2.4 One-Side Lock
 
-YES, NO, and INVALID remain open during one public staking period. An address chooses its side with its first stake and may only add to that side. It cannot withdraw or switch, so commitment cannot become a free option to follow the visible leader.
+YES, NO, and INVALID remain open during one public staking period. An address with active principal may add only to its existing side. An open-period full exit forfeits accrued fees and a rounded-up 10% principal penalty; the address may then re-enter on another side without restoring old fee history. Exited principal stops voting; penalties do not vote. Switching therefore has a financial cost.
 
 ### 2.5 Flow and Finality
 
 - One public staking period ends at a deadline $t_0$ fixed at creation.
-- All three sides accept stake until $t_0$.
+- Core opens at graduation. All three sides accept stake until $t_0$; active positions remain single-sided, with costly full exits available while open.
 - No transaction or leadership change can extend the deadline.
-- At $t_0$, staking closes and any address may trigger one-shot finality.
+- At $t_0$, staking and exit close and anyone may finalize. An expired early-request window first freezes affected operations; a matching request can finalize early, as described in the supplement.
 
 | Condition | Result | Settlement |
 |---|---|---|
-| YES principal > 50% of total | YES | YES capital shares the vault pool pro rata |
-| NO principal > 50% of total | NO | NO capital shares the vault pool pro rata |
-| Otherwise, including exactly 50% | INVALID | Every participant recovers funds pro rata |
+| Active YES principal > 50% of all three active sides | YES | YES capital shares the vault pool pro rata |
+| Active NO principal > 50% of all three active sides | NO | NO capital shares the vault pool pro rata |
+| Otherwise, including exactly 50% | INVALID | Remaining active principal shares the principal settlement pool pro rata |
 
 ```
 Creation → public YES / NO / INVALID staking until t₀
-         → one-side lock; same-side additions only
-t₀       → staking closes → anyone may finalize
+         → active positions add to the same side; costly full exit is available while open
+t₀ (or qualifying early request) → affected operations close → anyone may finalize
 ```
 
 ### 2.6 INVALID Settlement
 
-INVALID is both an active position and the fallback when neither binary side has a strict majority. If INVALID wins, every participant receives a pro-rata share based on principal. If YES or NO wins, INVALID principal is part of the losing pool.
+INVALID is both an active position and the fallback when neither binary side has a strict majority. If INVALID wins, remaining active participants share the principal settlement pool pro rata; exited positions do not retain principal claims. Trading-fee eligibility is separate. If YES or NO wins, INVALID principal is part of the losing pool.
 
 ### 2.7 Parent–Child Events and Root Events
 
@@ -126,7 +127,7 @@ OCP is the **goal** (consensus OnChain, programmable finality); **POC** (Proof o
 
 ### 3.1 Loss Rather Than Speech
 
-OCP relies on wrong positions bearing real principal loss. No withdrawal or switching makes each stake a verifiable commitment rather than a revisable statement.
+OCP relies on wrong positions bearing real principal loss. Single-sided active positions, exit penalties, and fee forfeiture make commitment costly and observable rather than permitting free switching.
 
 ### 3.2 Rational Participation
 
@@ -136,7 +137,7 @@ $$
 \mathbb{E}[U_{stake}] = q\left(\frac{x}{W}P-x\right) - (1-q)x-c
 $$
 
-The contract verifies amount, side, and time, but cannot verify whether $q$ comes from independent information.
+This simplified binary expression assumes holding through settlement; it omits INVALID, historical fees, and exit choices. The contract verifies amount, side, and time, but cannot verify whether $q$ comes from independent information.
 
 ### 3.3 Fixed Deadline and One-Side Lock
 
@@ -144,11 +145,11 @@ The fixed deadline prevents indefinite extension. One-side locking prevents cost
 
 ### 3.4 Difference from Ordinary Voting
 
-OCP adds verifiable capital lock-up to voting. More capital expresses stronger commitment and bears greater loss when wrong, but does not solve identity linkage, capital concentration, or correlated information.
+OCP adds verifiable capital at risk to voting. More capital expresses stronger commitment and bears greater loss when wrong, but does not solve identity linkage, capital concentration, or correlated information.
 
 ## 4. Utility Evolution: From Native Apps to AI Alignment
 
-OCP is not merely a gambling tool but a **general-purpose consensus engine**. As adoption grows, its utility evolves along: native applications → infrastructure → value alignment.
+Other than the current prediction market, the governance, infrastructure, and AI directions below are future applications, not current contract capabilities or real-time finality guarantees. OCP is not merely a gambling tool but a **general-purpose consensus engine**. As adoption grows, its utility evolves along: native applications → infrastructure → value alignment.
 
 ### 4.1 Primary Utility: Native Consensus Applications (Prediction & Governance)
 
@@ -179,7 +180,7 @@ ZK-Rollups answer “is the computation correct?”; OCP aims to answer “is th
 
 #### 4.2.2 Economic Pre-finality
 
-To match L2’s millisecond execution, OCP offers a layered finality model:
+For faster L2 execution, OCP explores a layered finality model; current pre-cutoff distributions remain non-final signals:
 
 - **Non-final observation signal**: Applications can read the public capital distribution before the deadline. Changing the leader requires enough capital to alter the strict-majority distribution, but cost is not guaranteed to grow non-linearly.
 - **Finality boundary**: State observed before the fixed deadline is not protocol finality and may still change. Only the finalized outcome is safe for irreversible downstream execution.
@@ -197,7 +198,7 @@ When AI agents begin to manage assets and decisions autonomously, the core quest
 OCP allows subjective disputes over value preferences, safety boundaries, and acceptable behavior to be brought OnChain.
 
 - **From “fact” to “value”**: One can stake not only “who won the match” but “whether this AI’s behavior is ethical.”
-- **Decentralized alignment target**: Global participants express positions with capital commitment; the capital lock makes each position costly and irreversible. The resulting Finalized Consensus becomes a **“alignment target”** that AI systems can read and execute.
+- **Decentralized alignment target**: Global participants express positions with capital commitment; capital risk and exit costs make commitment costly; only finalization is irreversible. The resulting Finalized Consensus becomes a **“alignment target”** that AI systems can read and execute.
 
 #### 4.3.2 Expensive Consensus as an Anchor for Human Will
 
@@ -219,11 +220,11 @@ In such cases the output is “expensive error”—a capital-confidence result,
 
 ### 5.2 Key Parameters
 
-The protocol defines finality rules and the **definition** of b (b = vault minimum deposit). The following are set at vault or application layer:
+The protocol defines finality rules; current market b denotes LMSR depth rather than a minimum deposit. The following are Core or application parameters:
 
 | Parameter | Set by | Too small | Too large |
 |-----------|--------|-----------|-----------|
-| $b$ (minimum stake) | Vault creator | More small transactions and noise | Participation barrier too high |
+| Minimum stake (currently positive amounts only) | Core implementation and deployment | More small transactions and noise | Participation barrier too high |
 | Staking duration | Application layer | Insufficient information aggregation | Longer capital lock-up |
 
 ---
@@ -244,20 +245,20 @@ The OnChain Consensus Protocol (OCP) turns **real-world disputes** into **OnChai
 | **POC (Proof of Commitment)** | Consensus authority is proved by verifiable capital lock-up, not identity or claims |
 | Facts OnChain | Relative to “value OnChain”; the core problem OCP solves: turning external-world disputes into OnChain programmable Finalized Consensus |
 | **Three-outcome game** | Finalized Consensus has three results: YES, NO, INVALID |
-| **b (minimum stake)** | Official Factory owner sets the minimum USDC participation amount |
-| **INVALID** | Fact broken / premise absent / unverifiable; triggers full refund for all |
+| **b (current market parameter)** | Formal LMSR depth fixed by actual graduation capital, not the Core minimum stake |
+| **INVALID** | No strict binary majority; active principal settles pro rata, with trading fees handled separately |
 | **Finalized Consensus** | The protocol’s unique, authoritative output; programmable, irreversible OnChain fact asset |
 | **Fixed deadline** | Set at creation; closes staking and cannot be extended |
-| **One-side lock** | An address may add only to its first side and cannot withdraw or switch |
+| **One-side lock** | Same-side additions while principal remains; costly full exit permits later re-entry |
 | **Participant history** | Vault events can be reconstructed; cross-Vault reputation and weighting are future application-layer work and do not affect current settlement; see §2.8 |
 | Capital confidence | Maximum commitment capital is willing to bear for an outcome |
-| Creator | Official Factory owner; creates the proposition and sets its minimum USDC deposit |
+| Creator | Any address creating a topic for an enabled asset; no unilateral result-setting or termination privilege |
 
 | Document | Content |
 |----------|---------|
 | [OCP Whitepaper](./OCP_WHITEPAPER_EN.md) | This document; narrative framework for consensus OnChain |
-| [POC Whitepaper](./POC_WHITEPAPER_CN.md) | Mechanism details, game theory, stake–lock–finalize–consensus philosophy |
+| [POC Whitepaper](./POC_WHITEPAPER_EN.md) | Mechanism details, game theory, stake–lock–finalize–consensus philosophy |
 
 ---
 
-*Document version: 1.0 | OnChain Consensus Protocol (OCP) Whitepaper | Three-outcome game, b = minimum deposit, future application-layer extensions*
+*Document version: 1.1 · 2026-11-04 | Original narrative retained; see the [current implementation supplement](./CURRENT_MECHANISM_EN.md).*
