@@ -8,7 +8,7 @@ import type {TopicMarketEvent} from './topicMarketDemoModel';
 
 export interface TestnetSimulationProps {
   market:MarketState;stock:StockState;lang:Language;now:number;walletAddress?:string;busy:boolean;
-  onConnect:()=>void;controls:ReactNode;coreActions:ReactNode;status:string;
+  onConnect:()=>void;controls:ReactNode;coreActions:ReactNode;holders?:ReactNode;lpFeesTotal?:bigint;status:string;
   onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void;
   /** Confirmed chain history only. Prices are collateral per gToken. */
   history?:{price:number;at:number;kind:string}[];
@@ -81,7 +81,7 @@ export function buildTestnetRemote(
     chart:props.history??[],onInput,
     // Parent-supplied controls are the sole write surface; the display adapter has no transaction callbacks.
     quote:()=>null,trade:noop,stake:noop,canStake:()=>false,claimMarket:noop,claimCore:noop,redeemPairs:noop,
-    chain:{lpTotalSupply:m.lpSupply===undefined?'—':fixed18(formatUnits(m.lpSupply,18)),outstandingShares:{yes:p?fixed18(formatUnits(p.totalYes-p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.totalNo-p.inventoryNo,18)):'—'},contractAddresses:{market:m.address,core:m.vault},poolBalances:{yes:p?fixed18(formatUnits(p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.inventoryNo,18)):'—',stock:poolFunds===undefined?'—':fixed18(formatUnits(poolFunds,stock.decimals)),totalStock:m.poolStockBalance===undefined?'—':fixed18(formatUnits(m.poolStockBalance,stock.decimals)),lpFees:fixed18(formatUnits(m.lpFees,stock.decimals))},controls:props.controls,coreActions:props.coreActions,status:props.status,stockSymbol:stock.symbol,
+    chain:{lpFeesTotal:props.lpFeesTotal===undefined?undefined:fixed18(formatUnits(props.lpFeesTotal,stock.decimals)),holders:props.holders,lpTotalSupply:m.lpSupply===undefined?'—':fixed18(formatUnits(m.lpSupply,18)),outstandingShares:{yes:p?fixed18(formatUnits(p.totalYes-p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.totalNo-p.inventoryNo,18)):'—'},contractAddresses:{market:m.address,core:m.vault},poolBalances:{yes:p?fixed18(formatUnits(p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.inventoryNo,18)):'—',stock:poolFunds===undefined?'—':fixed18(formatUnits(poolFunds,stock.decimals)),totalStock:m.poolStockBalance===undefined?'—':fixed18(formatUnits(m.poolStockBalance,stock.decimals)),lpFees:fixed18(formatUnits(m.lpFees,stock.decimals))},controls:props.controls,coreActions:props.coreActions,status:props.status,stockSymbol:stock.symbol,
       readOnlyMetrics:true,volumeAvailable:p?.formalVolume!==undefined,onTabChange:props.onTabChange},
   };
 }

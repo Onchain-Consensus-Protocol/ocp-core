@@ -103,3 +103,10 @@ describe('chain data adapter for the shared Simulation view',()=>{
 });
 
 it('keeps exact raw precision for tiny outstanding shares',()=>{const props=fixture();props.market.presentation!.totalYes=props.market.presentation!.inventoryYes+1n;expect(buildTestnetRemote(props).chain?.outstandingShares?.yes).toBe('0.000000000000000001');});
+
+it('keeps total LP metrics visible after settlement and distinguishes pending history',()=>{
+ const props=fixture();props.market.phase=3;props.market.outcome=1;props.market.lpSupply=5n*W;props.market.lpFees=0n;props.lpFeesTotal=12345n;
+ const html=renderToStaticMarkup(<TestnetSimulation {...props}/>);
+ expect(html).toContain('Total LP shares');expect(html).toContain('5.000000000000000000');
+ expect(html).toContain('Total LP fees');expect(html).toContain('0.012345000000000000');expect(html).toContain('Fees are included in LP settlement payouts');
+});

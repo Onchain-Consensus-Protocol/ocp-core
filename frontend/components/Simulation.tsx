@@ -16,7 +16,7 @@ import type {Language} from '../types';
 import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalBuy,topicMarketFormalSell,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalBuy,topicMarketQuoteFormalSell,topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketClaim,topicMarketClaimCore,topicMarketClaimPreview,topicMarketPrices,type TopicMarketState,type TopicMarketTradeQuote,type Side,type Outcome} from './topicMarketDemoModel';
 export interface RemoteSimulation {
  lifecycle?:SimulationCoreLifecycle;
- chain?:{lpTotalSupply?:string;outstandingShares?:{yes:string;no:string};contractAddresses?:{market:string;core:string};poolBalances?:{yes:string;no:string;stock:string;totalStock?:string;lpFees?:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
+ chain?:{holders?:React.ReactNode;lpFeesTotal?:string;lpTotalSupply?:string;outstandingShares?:{yes:string;no:string};contractAddresses?:{market:string;core:string};poolBalances?:{yes:string;no:string;stock:string;totalStock?:string;lpFees?:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
  input:{tab:'MARKET'|'PROTOCOL';mode:'BUY'|'SELL';amount:number;useStable:boolean};state:TopicMarketState;assetSymbol:string;balanceUSD:number;topic:{title:string;YES:string;NO:string;INVALID:string};pending:boolean;
  prices:{genesis:number;probability:[number,number]|null};preview:ReturnType<typeof topicMarketClaimPreview>;
  genesisPnl:number;lpEstimates:{outcome:Outcome;lp:number}[];outstanding:[number,number];
@@ -481,6 +481,18 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
         {activeTab==='MARKET'&&remote?.chain?.poolBalances&&!gen&&<div className="border border-border rounded-xl px-4 py-3 mb-5 text-xs" data-testid="market-pool-balances"><Row label={terminal?t('待领取结算资金','Pending settlement funds'):t('做市资金余额（不含手续费）','Market-making funds (excluding fees)')} value={`${remote.chain.poolBalances.stock} ${asset.symbol}`}/></div>}
 
 
+        {activeTab === "MARKET" && ['FORMAL','WAIT_CORE','SETTLED'].includes(s.phase) && (
+        <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mb-5">
+          <div className="flex justify-between gap-3 mt-1.5">
+            <span>{t("LP 总份额","Total LP shares")}</span>
+            <strong className="text-text">{remote?.chain?remote.chain.lpTotalSupply??'—':num(s.lpSupply)}</strong>
+          </div>
+          <div className="mt-2 border-t border-border pt-2"><Row label={t('LP 手续费总额','Total LP fees')} value={`${remote?.chain?s.phase==='SETTLED'?remote.chain.lpFeesTotal??'—':remote.chain.poolBalances?.lpFees??'—':num(s.lpFeesEarned)} ${asset.symbol}`}/></div>
+          {s.phase==='SETTLED'&&<p className="mt-2 text-text-muted">{t('手续费已计入 LP 结算款。','Fees are included in LP settlement payouts.')}</p>}{terminal&&!remote?.chain?.readOnlyMetrics&&lpValuePanel}
+
+        </div>
+        )}
+
         <div className={` ${gen?"hidden":"grid"} grid-cols-2 gap-4 mb-6`}>
           <div className="border border-border rounded-xl p-4">
             <div className="text-[10px] text-text-muted uppercase mb-2 font-bold font-display tracking-wider">
@@ -516,19 +528,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
           </div>
         </div>
 
-        {activeTab === "MARKET" && (
-        <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto">
-          <div className="flex justify-between gap-3 mt-1.5">
-            <span>{t("LP 总份额","Total LP shares")}</span>
-            <strong className="text-text">{remote?.chain?remote.chain.lpTotalSupply??'—':num(s.lpSupply)}</strong>
-          </div>
-          {['FORMAL','WAIT_CORE'].includes(s.phase)&&<div className="mt-2 border-t border-border pt-2"><Row label={t('LP 手续费总额','Total LP fees')} value={`${remote?.chain?remote.chain.poolBalances?.lpFees??'—':num(s.lpFees)} ${asset.symbol}`}/></div>}
-          {terminal&&!remote?.chain?.readOnlyMetrics&&lpValuePanel}
-
-        </div>
-        )}
         {activeTab !== "MARKET" && userVaultSide && <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto"><div className="flex justify-between gap-3"><span>{t("预计 Core 奖励","Estimated Core reward")}</span><strong className="text-text">{formatAmount(userConditionalFees[finalOutcome ?? provisionalOutcome],4)} {asset.symbol}</strong></div></div>}
-   {remote&&<>{activityPanel}{remote.chain?.contractAddresses&&<ContractAddress key={activeTab==='PROTOCOL'?remote.chain.contractAddresses.core:remote.chain.contractAddresses.market} address={activeTab==='PROTOCOL'?remote.chain.contractAddresses.core:remote.chain.contractAddresses.market} label={activeTab==='PROTOCOL'?t('Core 合约地址','Core contract address'):s.phase==='GENESIS'||s.phase==='FAILED'?t('Genesis 市场合约地址','Genesis market contract address'):t('Formal 市场合约地址','Formal market contract address')} explorer={config.explorer} lang={lang}/>}</>}
+   {remote&&<>{remote.chain?.holders}{activityPanel}{remote.chain?.contractAddresses&&<ContractAddress key={activeTab==='PROTOCOL'?remote.chain.contractAddresses.core:remote.chain.contractAddresses.market} address={activeTab==='PROTOCOL'?remote.chain.contractAddresses.core:remote.chain.contractAddresses.market} label={activeTab==='PROTOCOL'?t('Core 合约地址','Core contract address'):s.phase==='GENESIS'||s.phase==='FAILED'?t('Genesis 市场合约地址','Genesis market contract address'):t('Formal 市场合约地址','Formal market contract address')} explorer={config.explorer} lang={lang}/>}</>}
    {!remote&&<details className={box+' text-xs'} data-testid="demo-details"><summary className="cursor-pointer font-bold">{t('演示场景','Demo scenarios')}</summary><div className="mt-4 space-y-5"><div className="grid grid-cols-3 gap-3 text-center font-mono">{[['Genesis',s.TG],['Formal',s.TF],['Core',s.TC]].map(([label,v])=><div key={String(label)}>{label} {t('截止','closes')}<strong className="block mt-2">{clock(Number(v))}</strong></div>)}</div><p className="text-text-muted">{t('Formal与Core在毕业时同时开启，截止时间固定。','Formal and Core open together at graduation. Deadlines stay fixed.')}</p><details><summary className="cursor-pointer">{t('演示参数','Demo parameters')}</summary><label className="block my-3">{t('ETH固定快照','Fixed ETH snapshot')}<input aria-label="ETH snapshot" type="number" value={snapshot} onChange={e=>setSnapshot(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><label>{t('正式深度','Formal depth')}<input aria-label="Formal depth" type="number" value={depth} onChange={e=>setDepth(Number(e.target.value))} className="border border-border p-2 ml-2 w-28"/></label><p className="text-text-muted mt-2">{t('仅在下次创建生效，非实时价格或生产参数。','Applies at next creation; illustrative parameters only.')}</p></details>{activityPanel}</div></details>}      </div>
     </div>
     </>
