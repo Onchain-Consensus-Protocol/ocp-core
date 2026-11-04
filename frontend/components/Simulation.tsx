@@ -478,7 +478,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
           )}
         </div>
 
-        {activeTab==='MARKET'&&remote?.chain?.poolBalances&&!gen&&<div className="border border-border rounded-xl p-4 mb-5 text-xs" data-testid="market-pool-balances"><h3 className="text-text-muted font-bold mb-2">{t('池内资产','Pool assets')}</h3><p className="text-text-muted mb-2">{t('YES／NO 按成交生成或销毁，已发行数量见上方未结算份额。','YES / NO shares are created or burned on trades. Issued amounts appear under Outstanding shares above.')}</p><Row label={terminal?t('待领取结算资金','Pending settlement funds'):t('做市资金余额','Market-making funds')} value={`${remote.chain.poolBalances.stock} ${asset.symbol}`}/>{!terminal&&<p className="mt-1 text-text-muted">{t('不含手续费；创建者和项目方费用见市场手续费面板。','Excludes fees. Creator and protocol fees appear in Market fees.')}</p>}<details className="mt-3 text-text-muted"><summary className="cursor-pointer">{t('合约余额明细','Contract balance details')}</summary><div className="mt-2 space-y-1"><Row label={t('合约股票总余额','Total contract stock balance')} value={`${remote.chain.poolBalances.totalStock??'—'} ${asset.symbol}`}/>{!terminal&&<Row label={t('累计 LP 手续费','Accrued LP fees')} value={`${remote.chain.poolBalances.lpFees??'—'} ${asset.symbol}`}/>}</div></details></div>}
+        {activeTab==='MARKET'&&remote?.chain?.poolBalances&&!gen&&<div className="border border-border rounded-xl p-4 mb-5 text-xs" data-testid="market-pool-balances"><h3 className="text-text-muted font-bold mb-2">{t('池内资产','Pool assets')}</h3><p className="text-text-muted mb-2">{t('YES／NO 按成交生成或销毁，已发行数量见上方未结算份额。','YES / NO shares are created or burned on trades. Issued amounts appear under Outstanding shares above.')}</p><Row label={terminal?t('待领取结算资金','Pending settlement funds'):t('做市资金余额','Market-making funds')} value={`${remote.chain.poolBalances.stock} ${asset.symbol}`}/>{!terminal&&<p className="mt-1 text-text-muted">{t('不含手续费；创建者和项目方费用见市场手续费面板。','Excludes fees. Creator and protocol fees appear in Market fees.')}</p>}<details className="mt-3 text-text-muted"><summary className="cursor-pointer">{t('合约余额明细','Contract balance details')}</summary><div className="mt-2 space-y-1"><Row label={t('合约股票总余额','Total contract stock balance')} value={`${remote.chain.poolBalances.totalStock??'—'} ${asset.symbol}`}/></div></details></div>}
 
         <div className={` ${gen?"hidden":"grid"} grid-cols-2 gap-4 mb-6`}>
           <div className="border border-border rounded-xl p-4">
@@ -518,9 +518,10 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
         {activeTab === "MARKET" && (
         <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto">
           <div className="flex justify-between gap-3 mt-1.5">
-            <span>LP</span>
+            <span>{t("我的 LP 份额","My LP shares")}</span>
             <strong className="text-text">{remote?.chain&&!isWalletConnected?"—":num(a.lp)}</strong>
           </div>
+          {['FORMAL','WAIT_CORE'].includes(s.phase)&&<div className="mt-2 border-t border-border pt-2"><Row label={t('LP 手续费（全池）','LP fees (pool total)')} value={`${remote?.chain?remote.chain.poolBalances?.lpFees??'—':num(s.lpFees)} ${asset.symbol}`}/></div>}
           {terminal&&!remote?.chain?.readOnlyMetrics&&lpValuePanel}
 
         </div>
