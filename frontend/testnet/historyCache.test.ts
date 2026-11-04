@@ -14,3 +14,10 @@ describe('local IndexedDB history storage',()=>{
  it('continues without caching when browser storage is unavailable',async()=>{vi.stubGlobal('indexedDB',undefined);expect(await loadHistoryCheckpoint(factory,market)).toBeNull();await expect(saveHistoryCheckpoint(item())).resolves.toBeUndefined();});
  it('falls back when browser open never completes',async()=>{vi.useFakeTimers();try{vi.stubGlobal('indexedDB',{open:()=>({})});const pending=loadHistoryCheckpoint(factory,market);await vi.advanceTimersByTimeAsync(1600);expect(await pending).toBeNull();}finally{vi.useRealTimers();}});
 });
+
+it('bounds stalled checkpoint reads so live chart loading can continue',async()=>{
+ vi.useFakeTimers();try{
+  const abort=vi.fn(),close=vi.fn();vi.stubGlobal('indexedDB',{open:()=>{const request:any={};queueMicrotask(()=>{request.result={close,transaction:()=>({abort,objectStore:()=>({get:()=>({})})})};request.onsuccess();});return request;}});
+  const read=loadHistoryCheckpoint(factory,market);await vi.advanceTimersByTimeAsync(1501);expect(await read).toBeNull();expect(abort).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();
+ }finally{vi.useRealTimers();}
+});

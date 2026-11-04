@@ -125,7 +125,7 @@ describe('bounded parallel event reads',()=>{
     expect(peak).toBe(4);const sorted=ranges.sort((a,b)=>a.fromBlock-b.fromBlock);
     expect(sorted[0].fromBlock).toBe(5);expect(sorted.at(-1)?.toBlock).toBe(20005);
     for(let i=0;i<sorted.length;i++){
-      expect(sorted[i].toBlock-sorted[i].fromBlock).toBeLessThan(2000);
+      expect(sorted[i].toBlock-sorted[i].fromBlock).toBeLessThan(5000);
       if(i)expect(sorted[i].fromBlock).toBe(sorted[i-1].toBlock+1);
     }
   });
@@ -158,5 +158,40 @@ describe('checkpoint incremental reads',()=>{
   const {provider}=providerFixture();const first=await readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD);
   expect(replayCheckpoint(first.checkpoint!,FACTORY,MARKET).cacheStatus).toBe('local');
   expect(()=>replayCheckpoint(first.checkpoint!,FACTORY,USER)).toThrow();
+ });
+});
+
+describe('independently cached creation evidence',()=>{
+ it('verifies an origin hint on chain without repeating timestamp discovery',async()=>{
+  const {provider,ranges}=providerFixture();const blocks:(number|string)[]=[];
+  const original=provider.getBlock.bind(provider);provider.getBlock=(async(n:number|'latest')=>{blocks.push(n);return original(n);}) as never;
+  const result=await readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD,null,{origin:stamped(creation())});
+  expect(result.creationBlock).toBe(3);expect(blocks).not.toContain(1);expect(blocks).not.toContain(2);
+  expect(ranges[0]).toMatchObject({address:FACTORY,fromBlock:3,toBlock:3});
+ });
+ it('keeps a verified origin when later history scanning fails, but returns no partial history',async()=>{
+  const {provider}=providerFixture();const query=provider.getLogs.bind(provider),saved:unknown[]=[];
+  provider.getLogs=(async(filter:any)=>{if(filter.address.toLowerCase()===MARKET.toLowerCase())throw Error('node offline');return query(filter);}) as never;
+  // Provider range-limit retries are tested separately; use a terminal single-block failure here.
+  const one=provider.getBlock.bind(provider);provider.getBlock=(async(n:number|'latest')=>one(n==='latest'?3:n)) as never;
+  await expect(readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD,null,{onOrigin:value=>saved.push(value)})).rejects.toThrow('node offline');
+  expect(saved).toHaveLength(1);expect((saved[0] as any).log.blockNumber).toBe(3);
+ });
+ it('falls back to timestamp discovery after a changed origin hash',async()=>{
+  const {provider}=providerFixture();const blocks:(number|string)[]=[];const original=provider.getBlock.bind(provider);
+  provider.getBlock=(async(n:number|'latest')=>{blocks.push(n);return original(n);}) as never;
+  const result=await readChainPriceHistory(provider,FACTORY,MARKET,30n,WAD,null,{origin:{...stamped(creation()),log:{...creation(),blockHash:hash(999)} as Log}});
+  expect(result.creationBlock).toBe(3);expect(blocks).toContain(1);
+ });
+});
+
+describe('active background history promotion',()=>{
+ it('increases chunk concurrency after a detail subscriber arrives without restarting completed ranges',async()=>{
+  let limit=1,active=0,peak=0,calls=0,release!:()=>void;
+  const first=new Promise<void>(resolve=>{release=resolve;});
+  const provider={getLogs:async()=>{calls++;peak=Math.max(peak,++active);if(calls===1)await first;else await Promise.resolve();active--;return [];}} as unknown as Provider;
+  const pending=getLogsInChunks(provider,MARKET,1,40000,undefined,()=>limit);
+  expect(calls).toBe(1);expect(peak).toBe(1);limit=4;release();await pending;
+  expect(calls).toBe(8);expect(peak).toBe(4);
  });
 });

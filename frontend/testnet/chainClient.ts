@@ -1,3 +1,5 @@
+import {createHistoryReadQueue} from './historyReadQueue';
+import {loadHistoryOrigin,saveHistoryOrigin} from './historyOriginCache';
 import {protocolFeeAttribution} from './coreProtocolFees';
 import {loadHistoryCheckpoint,saveHistoryCheckpoint} from './historyCache';
 import { Contract, Interface, concat, getBytes, hexlify, toUtf8Bytes, toUtf8String, toBeHex, zeroPadValue, ZeroAddress, ZeroHash, getAddress, id, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
@@ -101,6 +103,10 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
   const address=nonzeroAddress(factoryAddress);
   const factory=new Contract(address,factoryAbi,provider);
   const reasonReads=new Map<string,Promise<string|undefined>>();
+  const historyQueue=createHistoryReadQueue();
+  const foregroundHistory=new Map<string,number>();
+  const historyMemory=new Map<string,ChainPriceHistory>();
+  const historyMetadata=new Map<string,Promise<{base:MarketSummary;k:bigint}>>();
   async function ready() {
     await assertTestnet(provider);
     if(await provider.getCode(address)==='0x') throw new Error('测试网工厂地址没有合约代码');
@@ -268,13 +274,17 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     return {quotedAt:Date.now(),cash:swap.amountIn,request:{market:state.address,action:RouterAction.ProposeEarly,paymentAsset:route.stable,
       inputAmount:(swap.amountIn*101n+99n)/100n,quantity:0n,minCollateral:bond,businessLimit:bond,minOutput:0n,deadline,side,graduationIntent:0,reasonHash:id(text)} as RouterRequest};
   }
-  async function readPriceHistory(marketAddress:string):Promise<ChainPriceHistory> {
-    await ready();
-    const base=await summary(marketAddress);
-    const market=new Contract(base.address,marketAbi,provider);
-    const k=await market.k();
-    const cached=await loadHistoryCheckpoint(address,base.address);
-    let history=await readChainPriceHistory(provider,address,base.address,base.createdAt,k,cached);
+  async function loadPriceHistory(marketAddress:string,concurrency:number):Promise<ChainPriceHistory> {
+    const key=nonzeroAddress(marketAddress).toLowerCase();
+    await assertTestnet(provider);
+    // 历史元数据不可变，只在本reader内复用；交易报价与签名仍走原实时校验。
+    let metadata=historyMetadata.get(key);
+    if(!metadata){metadata=(async()=>{await ready();const base=await summary(marketAddress);return {base,k:await new Contract(base.address,marketAbi,provider).k() as bigint};})();historyMetadata.set(key,metadata);void metadata.catch(()=>{if(historyMetadata.get(key)===metadata)historyMetadata.delete(key);});}
+    const [info,persisted,origin]=await Promise.all([metadata,loadHistoryCheckpoint(address,marketAddress),loadHistoryOrigin(address,marketAddress)]);
+    const {base,k}=info,market=new Contract(base.address,marketAbi,provider);
+    const cached=historyMemory.get(key)?.checkpoint??persisted;
+    const options={origin,concurrency:()=>foregroundHistory.has(key)?4:concurrency,onOrigin:(value:import('./priceHistory').TimestampedMarketLog)=>{void saveHistoryOrigin(address,base.address,value);}};
+    let history=await readChainPriceHistory(provider,address,base.address,base.createdAt,k,cached,options);
     const supplyMatches=async(value:ChainPriceHistory)=>{
       const blockTag=value.latestBlock,phase=Number(await market.phase({blockTag}));
       const expected=phase===4?await market.failedSupply({blockTag}):await market.S({blockTag});
@@ -282,14 +292,27 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     };
     if(!await supplyMatches(history)){
       if(!cached)throw new Error('Genesis历史与链上供应快照不一致，请重试');
-      history=await readChainPriceHistory(provider,address,base.address,base.createdAt,k);
+      history=await readChainPriceHistory(provider,address,base.address,base.createdAt,k,null,options);
       if(!await supplyMatches(history))throw new Error('Genesis历史与链上供应快照不一致，请重试');
     }
-    if(history.checkpoint)await saveHistoryCheckpoint(history.checkpoint,history.cacheStatus==='updated'?undefined:cached?.latestHash);
+    historyMemory.set(key,history);
+    // 校验完成即可绘图，不让浏览器持久化延迟卡住图表。
+    if(history.checkpoint)void saveHistoryCheckpoint(history.checkpoint,history.cacheStatus==='updated'?undefined:cached?.latestHash);
     return history;
   }
+  function readPriceHistory(marketAddress:string,signal?:AbortSignal):Promise<ChainPriceHistory>{
+    const key=nonzeroAddress(marketAddress).toLowerCase();
+    foregroundHistory.set(key,(foregroundHistory.get(key)??0)+1);
+    return historyQueue.run(key,'foreground',()=>loadPriceHistory(marketAddress,4),signal).finally(()=>{
+      const remaining=(foregroundHistory.get(key)??1)-1;if(remaining>0)foregroundHistory.set(key,remaining);else foregroundHistory.delete(key);
+    });
+  }
+  function readBackgroundPriceHistory(marketAddress:string,signal?:AbortSignal):Promise<ChainPriceHistory>{
+    const key=nonzeroAddress(marketAddress).toLowerCase();
+    return historyQueue.run(key,'background',()=>loadPriceHistory(marketAddress,1),signal);
+  }
   async function readCachedPriceHistory(marketAddress:string){
-    try{const cached=await loadHistoryCheckpoint(address,marketAddress);return cached?replayCheckpoint(cached,address,marketAddress):null;}catch{return null;}
+    try{const memory=historyMemory.get(nonzeroAddress(marketAddress).toLowerCase());if(memory)return {...memory,cacheStatus:'local' as const};const cached=await loadHistoryCheckpoint(address,marketAddress);return cached?replayCheckpoint(cached,address,marketAddress):null;}catch{return null;}
   }
   async function quote(marketAddress:string,method:string,args:unknown[]) {
     await ready();const base=await summary(marketAddress);
@@ -376,7 +399,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       },
     };
   }
-  return {readDirectory,readMarket,readPriceHistory,readCachedPriceHistory,readPaymentRoute,quotePaymentSwap,quoteEarlyProposalStable,withSigner,
+  return {readDirectory,readMarket,readPriceHistory,readBackgroundPriceHistory,readCachedPriceHistory,readPaymentRoute,quotePaymentSwap,quoteEarlyProposalStable,withSigner,
     quoteGenesisBuy:(market:string,paid:bigint):Promise<bigint>=>quote(market,'quoteGenesisBuy',[paid]),
     async quoteGenesisSell(market:string,quantity:bigint,account?:string):Promise<{gross:bigint;seller:bigint}>{const r=await quote(market,'quoteGenesisSell',[quantity]);return {gross:r[0],seller:r[1]};},
     quoteFormalBuy:(market:string,isYes:boolean,quantity:bigint):Promise<bigint>=>quote(market,'quoteFormalBuy',[isYes,quantity]),

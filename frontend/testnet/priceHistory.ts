@@ -1,9 +1,10 @@
+import {findTimestampRange} from './historyBlockSearch';
 import {Interface, getAddress, zeroPadValue, type Log, type Provider} from 'ethers';
 import factoryAbi from './abi/TopicMarketStockFactory.json';
 import marketAbi from './abi/TopicMarket.json';
 
 const WAD=10n**18n;
-const LOG_CHUNK=2000;
+const LOG_CHUNK=5000;
 const factoryInterface=new Interface(factoryAbi);
 const marketInterface=new Interface(marketAbi);
 
@@ -87,7 +88,7 @@ export function replayMarketPriceHistory(
   return {genesis,events,creationBlock:initial.blockNumber,latestBlock,complete:true,formalVolume};
 }
 
-export async function getLogsInChunks(provider:Provider, address:string, from:number, to:number, topics?:string[]) {
+export async function getLogsInChunks(provider:Provider, address:string, from:number, to:number, topics?:string[],concurrency:number|(()=>number)=4) {
   const chunks:Log[][]=[];let next=from;
   async function read(start:number,end:number,attempt=0):Promise<Log[]>{
     try{return await provider.getLogs({address,fromBlock:start,toBlock:end,topics});}
@@ -102,16 +103,28 @@ export async function getLogsInChunks(provider:Provider, address:string, from:nu
       return read(start,end,attempt+1);
     }
   }
-  // 保持单次2000区块上限，最多4路并发；失败不得伪装为空日志。
-  await Promise.all(Array.from({length:Math.min(4,Math.ceil((to-from+1)/LOG_CHUNK))},async()=>{
-    while(next<=to){const start=next;next+=LOG_CHUNK;chunks.push(await read(start,Math.min(to,start+LOG_CHUNK-1)));}
-  }));
+  // 单次最多5000区块，超限自动二分。打开详情后下一批请求即可提高并发，
+  // 不让已开始的后台小图继续以低优先级串行扫描整段历史。
+  const limit=()=>Math.max(1,Math.min(4,typeof concurrency==='function'?concurrency():concurrency));
+  await new Promise<void>((resolve,reject)=>{
+    let active=0,failed=false;
+    const pump=()=>{
+      if(failed)return;
+      while(active<limit()&&next<=to){
+        const start=next;next+=LOG_CHUNK;active++;
+        void read(start,Math.min(to,start+LOG_CHUNK-1)).then(logs=>{chunks.push(logs);active--;pump();},error=>{failed=true;reject(error);});
+      }
+      if(active===0&&next>to)resolve();
+    };
+    pump();
+  });
   return chunks.flat();
 }
 
 /** Locate creation by the factory's timestamp AND indexed event, then read a bounded market-only log range. */
 export async function readChainPriceHistory(
   provider:Provider, factory:string, market:string, createdAt:bigint, k:bigint, checkpoint?:HistoryCheckpoint|null,
+  options:{origin?:TimestampedMarketLog|null;onOrigin?:(origin:TimestampedMarketLog)=>void;concurrency?:number|(()=>number)}={},
 ):Promise<ChainPriceHistory> {
   const latest=await provider.getBlock('latest');
   if(!latest || !latest.hash)throw new Error('无法读取历史区块头');
@@ -138,19 +151,20 @@ export async function readChainPriceHistory(
       if(anchor.hash===checkpoint.latestHash&&start.hash===checkpoint.creation.log.blockHash&&BigInt(start.timestamp)===createdAt){creation=checkpoint.creation.log;creationHeader=start;prefix=checkpoint.logs;scanFrom=checkpoint.latestBlock+1;usedCache=true;}
     }
   }catch{/* 缓存损坏/重组，回退全量；不得将部分日志视为完整结果。 */}}
-  if(!creation){
-  // Binary search block headers, never scan logs from block zero. Multiple blocks may share one timestamp.
-  const lowerBound=async(timestamp:bigint)=>{
-    let low=1,high=latest.number+1;
-    while(low<high){
-      const middle=Math.floor((low+high)/2);
-      if(BigInt((await header(middle)).timestamp)>=timestamp)high=middle;
-      else low=middle+1;
+  // 独立保存的起点只是提示；重新取块头和精确工厂事件，不能据缓存伪造完整历史。
+  if(!creation&&options.origin){try{
+    const hint=options.origin;
+    if(getAddress(hint.log.address)===getAddress(factory)&&hint.log.blockNumber<=latest.number&&BigInt(hint.timestamp)===createdAt){
+      const block=await header(hint.log.blockNumber);
+      if(block.hash===hint.log.blockHash&&BigInt(block.timestamp)===createdAt){
+        const found=await getLogsInChunks(provider,getAddress(factory),block.number,block.number,[factoryInterface.getEvent('MarketCreated')!.topicHash,zeroPadValue(getAddress(market),32)],options.concurrency);
+        const matches=found.filter(log=>{const e=factoryInterface.parseLog(log);return !log.removed&&e?.name==='MarketCreated'&&getAddress(e.args.market)===getAddress(market)&&log.blockHash===block.hash;});
+        if(matches.length===1){creation=matches[0];creationHeader=block;}
+      }
     }
-    return low;
-  };
-  const first=await lowerBound(createdAt);
-  const last=(await lowerBound(createdAt+1n))-1;
+  }catch{/* Origin hints never bypass the full discovery path on failure. */}}
+  if(!creation){
+  const {first,last}=await findTimestampRange(latest,createdAt,header);
   if(first>last)throw new Error('未找到市场创建区块');
   const creationLogs=await getLogsInChunks(provider,getAddress(factory),first,last,[
     factoryInterface.getEvent('MarketCreated')!.topicHash,zeroPadValue(getAddress(market),32),
@@ -168,7 +182,10 @@ export async function readChainPriceHistory(
   }
   }
   if(!creation||!creationHeader)throw Error('Missing origin');
-  const logs=await getLogsInChunks(provider,getAddress(market),scanFrom??creation.blockNumber,latest.number);
+  const plain=(x:TimestampedMarketLog):TimestampedMarketLog=>({timestamp:x.timestamp,log:{address:x.log.address,blockNumber:x.log.blockNumber,blockHash:x.log.blockHash,transactionHash:x.log.transactionHash,transactionIndex:x.log.transactionIndex,index:x.log.index,data:x.log.data,topics:[...x.log.topics],removed:false} as unknown as Log});
+  const origin=plain({log:creation,timestamp:creationHeader.timestamp});
+  options.onOrigin?.(origin);
+  const logs=await getLogsInChunks(provider,getAddress(market),scanFrom??creation.blockNumber,latest.number,undefined,options.concurrency);
   const blocks=[...new Set(logs.map(log=>log.blockNumber))];
   for(let start=0;start<blocks.length;start+=8){await Promise.all(blocks.slice(start,start+8).map(header));}
   const timestamped:TimestampedMarketLog[]=[...prefix];
@@ -179,7 +196,5 @@ export async function readChainPriceHistory(
   }
   const confirmedHead=await provider.getBlock(latest.number);
   if(!confirmedHead || confirmedHead.hash!==latest.hash)throw new Error('读取期间链头已重组，请重试');
-  const plain=(x:TimestampedMarketLog):TimestampedMarketLog=>({timestamp:x.timestamp,log:{address:x.log.address,blockNumber:x.log.blockNumber,blockHash:x.log.blockHash,transactionHash:x.log.transactionHash,transactionIndex:x.log.transactionIndex,index:x.log.index,data:x.log.data,topics:[...x.log.topics],removed:false} as unknown as Log});
-  const origin=plain({log:creation,timestamp:creationHeader.timestamp});
   return {...replayMarketPriceHistory(origin,timestamped,k,latest.number),asOf:latest.timestamp,cacheStatus:usedCache?'updated':undefined,checkpoint:{version:2,factory:getAddress(factory),market:getAddress(market),createdAt:String(createdAt),k:String(k),creation:origin,logs:timestamped.map(plain),latestBlock:latest.number,latestHash:latest.hash}};
 }
