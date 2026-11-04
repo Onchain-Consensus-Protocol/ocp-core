@@ -8,7 +8,7 @@ import {marketStageLabel} from './marketStageLabel';
 import {marketPricePercent} from './marketPricePercent';
 import {totalLPBalance,lpFeeShare} from '../testnet/lpBalance';
 const units=(v:bigint|undefined,d=18)=>{if(v===undefined)return '—';const [a,b='']=formatUnits(v,d).split('.');return a+'.'+b.padEnd(18,'0');};
-export function DegenMarketView({market:m,stock,history,lang,now,tab,onTab,controls,coreActions,details,busy}:{market:MarketState;stock:StockState;history:ChainPriceHistory|null;lang:'zh'|'en';now:number;tab:'MARKET'|'CORE';onTab:(tab:'MARKET'|'CORE')=>void;controls:React.ReactNode;coreActions:React.ReactNode;details:React.ReactNode;busy:boolean}){
+export function DegenMarketView({market:m,stock,history,lang,now,tab,onTab,controls,coreActions,details,busy,onDetailsOpen}:{market:MarketState;stock:StockState;history:ChainPriceHistory|null;lang:'zh'|'en';now:number;tab:'MARKET'|'CORE';onTab:(tab:'MARKET'|'CORE')=>void;controls:React.ReactNode;coreActions:React.ReactNode;details:React.ReactNode;busy:boolean;onDetailsOpen?:()=>void}){
  const t=(zh:string,en:string)=>lang==='zh'?zh:en,genesis=[0,4].includes(m.phase),settled=m.phase===3;
  const phases=['GENESIS','FORMAL','WAIT_CORE','SETTLED','FAILED'];
  const stage=marketStageLabel(phases[m.phase],now,Number(m.genesisCutoff),Number(m.formalCutoff),Number(m.coreCutoff),lang==='zh',!!m.early?.due);
@@ -34,6 +34,6 @@ export function DegenMarketView({market:m,stock,history,lang,now,tab,onTab,contr
    </div>
    <aside className="min-w-0 rounded-2xl border border-border bg-surface p-4 degen-trade">{tab==='CORE'&&genesis?<p className="text-sm text-text-muted">{t('市场未毕业，Core 尚未开启。','Core has not opened because this market has not graduated.')}</p>:<>{controls}{tab==='CORE'&&coreActions}</>}</aside>
   </div>
-  <details className="mt-5 rounded-xl border border-border bg-surface px-4 py-3"><summary className="cursor-pointer text-sm font-bold">{t('详细数据','Detailed data')}</summary><div className="mt-4 space-y-4 text-xs"><details><summary className="cursor-pointer">{t('判定规则','Resolution rules')}</summary><div className="mt-3 space-y-2">{(['YES','NO','INVALID'] as const).map((label,i)=><p key={label} className="whitespace-pre-wrap break-words"><strong>{label}：</strong>{[m.yesRule,m.noRule,m.invalidRule][i]}</p>)}</div></details>{details}</div></details>
+  <details onToggle={event=>{if(event.currentTarget.open)onDetailsOpen?.();}} className="mt-5 rounded-xl border border-border bg-surface px-4 py-3"><summary className="cursor-pointer text-sm font-bold">{t('详细数据','Detailed data')}</summary><div className="mt-4 space-y-4 text-xs"><details><summary className="cursor-pointer">{t('判定规则','Resolution rules')}</summary><div className="mt-3 space-y-2">{(['YES','NO','INVALID'] as const).map((label,i)=><p key={label} className="whitespace-pre-wrap break-words"><strong>{label}：</strong>{[m.yesRule,m.noRule,m.invalidRule][i]}</p>)}</div></details>{details}</div></details>
  </section>;
 }

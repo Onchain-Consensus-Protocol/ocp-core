@@ -52,15 +52,15 @@ describe('testnet transaction boundary',()=>{
     expect(directory.stocks[0].snapshotError).toBeUndefined();
     expect(calls).toContain('collateralForUsd');expect(calls).not.toContain('ethPrice6');
   });
-  it('reads LP and holdings without querying unsupported token contracts',async()=>{
+  it.each([true,false])('reads LP and holdings without querying unsupported token contracts (details=%s)',async(details)=>{
     const abi=new Interface([...factoryAbi,...marketAbi,...vaultAbi].filter(item=>item.type==='function').concat([
       'function interfaceVersion() view returns(uint256)', 'function balanceOf(address) view returns(uint256)',
       'function allowance(address,address) view returns(uint256)',
     ] as never));
-    const seen:string[]=[];
+    const seen:string[]=[],methods:string[]=[];
     const p={...provider(46630n),call:vi.fn(async(tx:{data:string;to:string})=>{
       seen.push(tx.to);if(BigInt(tx.to)===0n)throw new Error('ZERO_TOKEN_CALL');
-      const f=abi.getFunction(tx.data.slice(0,10))!;
+      const f=abi.getFunction(tx.data.slice(0,10))!;methods.push(f.name);
       const results:Record<string,unknown[]>={interfaceVersion:[4n],isMarket:[true],marketCollateral:[market],
         marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
         phase:[0n],outcome:[0n],R:[1n],S:[1n],rTarget:[42n],k:[1n],cash:[0n],lpFees:[0n],
@@ -70,9 +70,28 @@ describe('testnet transaction boundary',()=>{
       if(!results[f.name])throw new Error('optional view absent');
       return abi.encodeFunctionResult(f,results[f.name]);
     })};
-    const state=await createChainClient(p as unknown as Provider,factory).readMarket(market,market);
+    const state=await createChainClient(p as unknown as Provider,factory).readMarket(market,market,details);
     expect(state.position?.lp).toBe(7n);
+    expect(methods.includes('creator')).toBe(details);
     expect(seen.every(to=>BigInt(to)!==0n)).toBe(true);
+  });
+  it('publishes stock metadata before slow market enumeration completes',async()=>{
+    const abi=new Interface([...factoryAbi,'function interfaceVersion() view returns(uint256)','function fixedTestnetGraduation() view returns(bool)']);
+    let release!:(value:string)=>void;
+    const gate=new Promise<string>(resolve=>{release=resolve;});
+    const p={...provider(46630n),getBlock:vi.fn(async()=>({number:42,timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
+      const f=abi.getFunction(tx.data.slice(0,10))!;
+      if(f.name==='markets')return gate;
+      const values:Record<string,unknown[]>={interfaceVersion:[4n],owner:[factory],stockCount:[0n],marketCount:[1n],fixedTestnetGraduation:[false],isMarket:[true],marketCollateral:[market],marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']]};
+      if(!values[f.name])throw Error('optional metric unavailable');
+      return abi.encodeFunctionResult(f,values[f.name]);
+    })};
+    const metadata=vi.fn();let completed=false;
+    const read=createChainClient(p as unknown as Provider,factory).readDirectory(undefined,metadata).then(value=>{completed=true;return value;});
+    await vi.waitFor(()=>expect(metadata).toHaveBeenCalledOnce());
+    expect(metadata.mock.calls[0][0]).toMatchObject({factory,blockNumber:42,markets:[]});expect(completed).toBe(false);
+    release(abi.encodeFunctionResult('markets',[market]));
+    expect((await read).markets).toHaveLength(1);
   });
   it.each([3n,0n])('rejects unsupported factory version %s before any wallet signature',async(version)=>{
     const abi=new Interface(['function interfaceVersion() view returns(uint256)']);

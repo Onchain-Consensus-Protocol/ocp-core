@@ -133,7 +133,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     }
     return result;
   }
-  async function readDirectory(account?:string):Promise<DirectoryState> {
+  async function readDirectory(account?:string,onMetadata?:(value:DirectoryState)=>void):Promise<DirectoryState> {
     await ready();
     if(account) account=nonzeroAddress(account);
     const [owner,ns,nm,block]=await Promise.all([factory.owner(),factory.stockCount(),factory.marketCount(),provider.getBlock('latest')]);
@@ -155,19 +155,26 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       catch {result.snapshotError='价格快照不可用：请检查喂价时效、状态和配置';}
       return result;
     }));
+    onMetadata?.({factory:address,owner,fixedTestTargets,stocks,markets:[],blockNumber:block.number,timestamp:BigInt(block.timestamp)});
     const markets=await Promise.all(Array.from({length:Number(nm)},async(_,i)=>summary(await factory.markets(i),true)));
     return {factory:address,owner,fixedTestTargets,stocks,markets,blockNumber:block.number,timestamp:BigInt(block.timestamp)};
   }
-  async function readMarket(marketAddress:string,account?:string):Promise<MarketState> {
+  async function readMarket(marketAddress:string,account?:string,details=true):Promise<MarketState> {
     await ready();const base=await summary(marketAddress);
     const m=new Contract(base.address,marketAbi,provider);const v=new Contract(base.vault,vaultAbi,provider);
     const keys=['phase','outcome','R','S','rTarget','k','cash','lpFees','lpBudgetRemaining'] as const;
     const values=await Promise.all(keys.map(key=>m[key]()));
     const state={...base,...Object.fromEntries(keys.map((key,i)=>[key,values[i]]))} as MarketState;
     state.phase=Number(state.phase);state.outcome=Number(state.outcome);
-    try{state.lpSupply=await m.liquiditySupply();}catch{/* Keep total LP supply unknown if unavailable. */}
     if(state.phase===3)state.collateralCash=await m.collateralCash();
     if(state.phase===4){[state.failedSupply,state.failedRInitial,state.failedRRemaining]=await Promise.all([m.failedSupply(),m.failedRInitial(),m.failedRRemaining()]);}
+    // 独立读请求同时发出；可选详情不阻塞简洁版的报价、持仓和生命周期。
+    await Promise.all([
+      (async()=>{
+    try{state.lpSupply=await m.liquiditySupply();}catch{/* Keep total LP supply unknown if unavailable. */}
+      })(),
+      (async()=>{
+    if(details){
     try{const [creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient]=await Promise.all([m.creator(),m.protocol(),m.creatorFees(),m.protocolFees(),v.officialMarketFeesClaimable(),v.emptySettlementRecipient()]);state.feeClaims={creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient};}catch{/* 无法读取时不假定手续费为零。 */}
     if(state.feeClaims)try{
       const blockTag=await provider.getBlockNumber(),at={blockTag};
@@ -178,15 +185,26 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       state.feeClaims.coreAccrued=total;state.feeClaims.coreProtocolTotal=protocolFeeAttribution({total,yesDistributed,noDistributed,invalidDistributed,yesStake,noStake,settled,outcome:Number(result)});
       state.feeClaims.coreProtocolFinal=settled;state.feeClaims.coreAmount=pending;
     }catch{/* Unknown attribution stays absent, never confused with zero or paid fees. */}
+    }
+      })(),
+      (async()=>{
+    if(details){
     try{state.poolStockBalance=await new Contract(base.stock,tokenAbi,provider).balanceOf(base.address);}catch{/* 未读到真实余额时保持未知，不用cash或0代替。 */}
+    }
+      })(),
+      (async()=>{
     [state.vaultResolved,state.vaultOutcome,state.vaultSettlementReady,state.totalStakeYes,state.totalStakeNo,state.totalStakeInvalid]=await Promise.all([v.resolved(),v.outcome(),v.settlementReady(),v.totalStakeYes(),v.totalStakeNo(),v.totalStakeInvalid()]);
     state.vaultOutcome=Number(state.vaultOutcome);
+      })(),
+      (async()=>{
     if(account){
       account=nonzeroAddress(account);const token=new Contract(base.stock,tokenAbi,provider);
       const [lp,router]=await Promise.all([m.lpToken(),m.trustedForwarder()]);
       const [balance,genesisShares,yes,no,lpBalance,stake,marketAllowance,vaultAllowance,routerAllowance]=await Promise.all([token.balanceOf(account),m.shares(account),m.yes(account),m.no(account),new Contract(lp,tokenAbi,provider).balanceOf(account),v.stakeOf(account),token.allowance(account,base.address),token.allowance(account,base.vault),token.allowance(account,router)]);
       state.position={balance,genesisShares,yes,no,lp:lpBalance,coreYes:stake[0],coreNo:stake[1],coreInvalid:stake[2],marketAllowance,vaultAllowance,routerAllowance};
     }
+      })(),
+      (async()=>{
     try {
       const [bond, request, due, effectiveCutoff] = await Promise.all([v.earlyTerminationBondRequired(),v.pendingEarlyTermination(),v.earlyTerminationProcessingDue(),v.effectiveResolutionTime()]);
       state.early={bond,proposer:request.proposer,reasonHash:request.reasonHash,requestId:request.id,requestedOutcome:Number(request.requestedOutcome),processAfter:request.processAfter,effectiveCutoff,due};
@@ -198,6 +216,8 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       }catch{/* RPC/pruned history: show only the verified pending hash. */}finally{clearTimeout(timer);}}
       if(account){const [exit,bondRefund]=await Promise.all([v.previewExitStake(account),v.claimableEarlyBond(account)]);state.early.refund=exit[0];state.early.penalty=exit[1];state.early.bondRefund=bondRefund;}
     } catch { /* Leave unavailable RPC metrics absent; never synthesize lifecycle values. */ }
+      })(),
+      (async()=>{
     try {
       const [basisWad,bWad,inventoryYes,inventoryNo,totalYes,totalNo,totalFees]=await Promise.all([
         m.poolBasisWad(),m.bWad(),m.inventoryY(),m.inventoryN(),m.yesSupply(),m.noSupply(),v.totalMarketFeesAccrued(),
@@ -219,6 +239,8 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
         }
       }
     }catch{/* Presentation failure never blocks custody, positions or withdrawal controls. */}
+      })(),
+    ]);
     return state;
   }
   async function readPaymentRoute(marketAddress:string,account?:string):Promise<PaymentRoute>{
