@@ -49,3 +49,30 @@ body {
     opacity: 1;
   }
 }
+/* Independent Degen route. Full-mode styles and layout remain unchanged. */
+.degen-page {
+  --bg: #0d1016;
+  --surface: #121720;
+  --surface-2: #191f29;
+  --border: #282f3c;
+  --text: #edf0f5;
+  --text-muted: #929bad;
+  --accent: #ff9c57;
+  --success: #70d3b0;
+  --danger: #ed9aaa;
+  color: var(--text);
+  background: var(--bg);
+}
+.degen-page .bg-white { background-color: var(--surface); }
+.degen-page .border-slate-200 { border-color: var(--border); }
+.degen-page .bg-slate-100, .degen-page .bg-slate-50 { background-color: var(--surface-2); }
+.degen-page .text-slate-500 { color: var(--text-muted); }
+.degen-page .bg-orange-50 { background-color: rgb(255 156 87 / .08); }
+.degen-page .bg-green-50 { background-color: rgb(112 211 176 / .08); }
+.degen-page .bg-red-50 { background-color: rgb(237 154 170 / .08); }
+.degen-page .text-green-700 { color: var(--success); }
+.degen-page .text-red-700 { color: var(--danger); }
+.degen-page .text-orange-600 { color: var(--accent); }
+.degen-page .font-mono { font-variant-numeric: tabular-nums; }
+.degen-page .degen-trade input, .degen-page .degen-trade select { background-color: var(--bg); }
+.degen-page .degen-trade button { touch-action: manipulation; }

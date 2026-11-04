@@ -19,7 +19,7 @@ export interface ChainGenesisPoint {
 }
 export interface ChainPriceHistory {
   genesis:ChainGenesisPoint[];events:ChainActivity[];creationBlock:number;latestBlock:number;
-  complete:true;formalVolume:bigint;checkpoint?:HistoryCheckpoint;cacheStatus?:'local'|'updated';
+  complete:true;asOf?:number;formalVolume:bigint;checkpoint?:HistoryCheckpoint;cacheStatus?:'local'|'updated';
 }
 export interface HistoryCheckpoint {version:2;factory:string;market:string;createdAt:string;k:string;creation:TimestampedMarketLog;logs:TimestampedMarketLog[];latestBlock:number;latestHash:string}
 export function replayCheckpoint(v:HistoryCheckpoint,factory:string,market:string):ChainPriceHistory {
@@ -181,5 +181,5 @@ export async function readChainPriceHistory(
   if(!confirmedHead || confirmedHead.hash!==latest.hash)throw new Error('读取期间链头已重组，请重试');
   const plain=(x:TimestampedMarketLog):TimestampedMarketLog=>({timestamp:x.timestamp,log:{address:x.log.address,blockNumber:x.log.blockNumber,blockHash:x.log.blockHash,transactionHash:x.log.transactionHash,transactionIndex:x.log.transactionIndex,index:x.log.index,data:x.log.data,topics:[...x.log.topics],removed:false} as unknown as Log});
   const origin=plain({log:creation,timestamp:creationHeader.timestamp});
-  return {...replayMarketPriceHistory(origin,timestamped,k,latest.number),cacheStatus:usedCache?'updated':undefined,checkpoint:{version:2,factory:getAddress(factory),market:getAddress(market),createdAt:String(createdAt),k:String(k),creation:origin,logs:timestamped.map(plain),latestBlock:latest.number,latestHash:latest.hash}};
+  return {...replayMarketPriceHistory(origin,timestamped,k,latest.number),asOf:latest.timestamp,cacheStatus:usedCache?'updated':undefined,checkpoint:{version:2,factory:getAddress(factory),market:getAddress(market),createdAt:String(createdAt),k:String(k),creation:origin,logs:timestamped.map(plain),latestBlock:latest.number,latestHash:latest.hash}};
 }

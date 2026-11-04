@@ -1,0 +1,39 @@
+import React,{useMemo} from 'react';
+import {formatUnits} from 'ethers';
+import type {MarketState,StockState} from '../testnet/chainClient';
+import type {ChainPriceHistory} from '../testnet/priceHistory';
+import {buildFormalPriceHistory} from '../testnet/formalPriceHistory';
+import {TimePriceChart} from './TimePriceChart';
+import {marketStageLabel} from './marketStageLabel';
+import {marketPricePercent} from './marketPricePercent';
+import {totalLPBalance,lpFeeShare} from '../testnet/lpBalance';
+const units=(v:bigint|undefined,d=18)=>{if(v===undefined)return '—';const [a,b='']=formatUnits(v,d).split('.');return a+'.'+b.padEnd(18,'0');};
+export function DegenMarketView({market:m,stock,history,lang,now,tab,onTab,controls,coreActions,details,busy}:{market:MarketState;stock:StockState;history:ChainPriceHistory|null;lang:'zh'|'en';now:number;tab:'MARKET'|'CORE';onTab:(tab:'MARKET'|'CORE')=>void;controls:React.ReactNode;coreActions:React.ReactNode;details:React.ReactNode;busy:boolean}){
+ const t=(zh:string,en:string)=>lang==='zh'?zh:en,genesis=[0,4].includes(m.phase),settled=m.phase===3;
+ const phases=['GENESIS','FORMAL','WAIT_CORE','SETTLED','FAILED'];
+ const stage=marketStageLabel(phases[m.phase],now,Number(m.genesisCutoff),Number(m.formalCutoff),Number(m.coreCutoff),lang==='zh',!!m.early?.due);
+ const deadline=genesis?Number(m.genesisCutoff):tab==='CORE'?Number(m.early?.effectiveCutoff??m.coreCutoff):Number(m.formalCutoff),remaining=[3,4].includes(m.phase)?0:Math.max(0,deadline-now);
+ const formal=useMemo(()=>history?buildFormalPriceHistory(history,stock.decimals):[],[history,stock.decimals]);
+ const points=genesis?history?.genesis.map(p=>({at:p.at,yes:Number(formatUnits(p.price,18))}))??[]:formal;
+ const cutoff=genesis?Number(m.genesisCutoff):Number(m.formalCutoff),asOf=history?.asOf===undefined?undefined:Math.min(history.asOf,cutoff);
+ const rawGenesis=2n*m.k*(m.failedSupply??m.S)/10n**18n;
+ const quote=m.presentation?.priceYes===undefined?undefined:Number(formatUnits(m.presentation.priceYes,18));
+ const total=m.totalStakeYes+m.totalStakeNo+m.totalStakeInvalid;
+ const outcomes=['—','YES','NO','INVALID'];
+ return <section className="degen-view max-w-6xl mx-auto" data-testid="degen-market-view">
+  <header className="mb-5"><div className="flex flex-wrap items-center gap-3 text-xs mb-3"><span className="font-bold text-accent">{stock.symbol}</span><span className="text-text-muted">{stage}</span>{remaining>0&&<span className="font-mono text-text-muted">{t('剩余','Remaining')} {Math.floor(remaining/3600)}:{String(Math.floor(remaining/60)%60).padStart(2,'0')}:{String(remaining%60).padStart(2,'0')}</span>}</div><h1 className="text-xl sm:text-3xl font-display font-bold leading-snug break-words">{m.topic}</h1></header>
+  <div className="flex gap-1 border-b border-border mb-5">{(['MARKET','CORE'] as const).map(value=><button type="button" key={value} disabled={busy} aria-pressed={tab===value} className={'px-5 py-3 text-sm font-bold border-b-2 '+(tab===value?'text-accent border-accent':'text-text-muted border-transparent')} onClick={()=>onTab(value)}>{value==='MARKET'?t('市场','Market'):'Core'}</button>)}</div>
+  <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+   <div className="min-w-0 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+    {tab==='MARKET'?<>
+     {settled?<div className="mb-5"><span className="text-xs text-text-muted">{t('最终结果','Final result')}</span><strong className="block text-2xl text-accent mt-1">{outcomes[m.outcome]}</strong><span className="text-[10px] text-text-muted">{t('下图保留历史成交报价。','The chart retains historical trading prices.')}</span></div>:genesis?<div className="mb-5"><span className="text-xs text-text-muted">{m.phase===4||now>=Number(m.genesisCutoff)?t('gToken 截止时价格','gToken closing price'):t('gToken 价格','gToken price')}</span><strong className="block mt-1 text-2xl sm:text-3xl text-accent font-mono break-all">{Number(formatUnits(rawGenesis,18)).toLocaleString('en-US',{maximumSignificantDigits:8})}<small className="ml-2 text-xs text-text-muted">{stock.symbol} / gToken</small></strong></div>:<div className="flex flex-wrap gap-x-8 gap-y-2 mb-5 font-mono font-bold text-xl sm:text-2xl"><span style={{color:'#ffad66'}}>YES {quote===undefined?'—':marketPricePercent(quote)}</span><span style={{color:'#8664ff'}}>NO {quote===undefined?'—':marketPricePercent(1-quote)}</span></div>}
+     <TimePriceChart key={`${m.address}:${genesis}`} points={points} probability={!genesis} unit={stock.symbol} lang={lang} asOf={asOf}/>
+     {m.phase===0&&<div className="text-xs mt-4"><div className="flex justify-between mb-2"><span className="text-text-muted">{t('毕业进度','Graduation progress')}</span><strong>{m.rTarget>0n?(Number(m.R)*100/Number(m.rTarget)).toFixed(2):'—'}%</strong></div><div className="h-1.5 rounded bg-white/5 overflow-hidden"><div className="h-full bg-accent" style={{width:`${m.rTarget>0n?Math.max(0,Math.min(100,Number(m.R)*100/Number(m.rTarget))):0}%`}}/></div></div>}
+     <div className="mt-5 border-t border-border pt-3 text-xs"><span className="text-text-muted">{t('我的持仓','My holdings')}</span><div className="font-mono mt-2 flex flex-wrap gap-x-5 gap-y-2 break-all">{genesis?<span>gToken {units(m.position?.genesisShares)}</span>:<><span>YES {units(m.position?.yes)}</span><span>NO {units(m.position?.no)}</span>{(totalLPBalance(m.position,m.phase)??0n)>0n&&<span>LP {units(totalLPBalance(m.position,m.phase))}{[1,2].includes(m.phase)&&<small className="block text-text-muted mt-1">{t('我的 LP 手续费（预估）','My LP fees (estimated)')} {units(lpFeeShare(m.position,m.phase,m.lpFees,m.lpSupply),stock.decimals)} {stock.symbol}</small>}</span>}</>}</div></div>
+    </>:<div className="space-y-4"><h2 className="font-bold">{settled?t('结算前质押分布','Stake distribution at settlement'):t('Core 质押分布','Core stake distribution')}</h2>{genesis?<p className="text-sm text-text-muted">{t('毕业后开启 Core。','Core opens after graduation.')}</p>:<>{(['YES','NO','INVALID'] as const).map((side,i)=>{const stake=[m.totalStakeYes,m.totalStakeNo,m.totalStakeInvalid][i],percent=total===0n?0:Number(stake)*100/Number(total);return <div key={side}><div className="flex justify-between gap-3 text-xs mb-2"><strong>{side}</strong><span className="font-mono">{units(stake,stock.decimals)} {stock.symbol}</span></div><div className="h-1.5 bg-white/5 rounded overflow-hidden"><div className={i===0?'h-full bg-success':i===1?'h-full bg-danger':'h-full bg-accent'} style={{width:`${percent}%`}}/></div></div>;})}<div className="border-t border-border pt-3 text-xs"><p className="text-text-muted mb-2">{m.vaultResolved?t('我的质押（结算前）','My stake at settlement'):t('我的质押','My stake')}</p>{(['YES','NO','INVALID'] as const).map((side,i)=><p key={side} className="font-mono break-all">{side} {units(m.position?[m.position.coreYes,m.position.coreNo,m.position.coreInvalid][i]:undefined,stock.decimals)} {stock.symbol}</p>)}</div>{m.vaultResolved&&<p className="text-accent font-bold">{t('Core 结果','Core result')}：{outcomes[m.vaultOutcome]}</p>}</>}</div>}
+   </div>
+   <aside className="min-w-0 rounded-2xl border border-border bg-surface p-4 degen-trade">{tab==='CORE'&&genesis?<p className="text-sm text-text-muted">{t('市场未毕业，Core 尚未开启。','Core has not opened because this market has not graduated.')}</p>:<>{controls}{tab==='CORE'&&coreActions}</>}</aside>
+  </div>
+  <details className="mt-5 rounded-xl border border-border bg-surface px-4 py-3"><summary className="cursor-pointer text-sm font-bold">{t('详细数据','Detailed data')}</summary><div className="mt-4 space-y-4 text-xs"><details><summary className="cursor-pointer">{t('判定规则','Resolution rules')}</summary><div className="mt-3 space-y-2">{(['YES','NO','INVALID'] as const).map((label,i)=><p key={label} className="whitespace-pre-wrap break-words"><strong>{label}：</strong>{[m.yesRule,m.noRule,m.invalidRule][i]}</p>)}</div></details>{details}</div></details>
+ </section>;
+}
