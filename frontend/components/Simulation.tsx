@@ -108,6 +108,11 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
  const withdrawVault=()=>remote?remote.claimCore():act(v=>topicMarketClaimCore(v,id));
  const redeemMarket=()=>remote?remote.claimMarket():act(v=>topicMarketClaim(v,id),t('对应LP已销毁，结算款已到账。','LP burned; payout received.'));
  const userConditionalFees={YES:a.coreRewards[0],NO:a.coreRewards[1],INVALID:a.coreRewards[2]};
+ const orderAmountLabel=(side:Side)=>{
+  const q=quote(gen?'G':side);if(!q)return t('输入数量查看报价','Enter amount for quote');
+  const cash=(mode==='BUY'?q.gross:q.net)*(useStable?asset.price:1);
+  return `${mode==='BUY'?t('预计支付 ≈ ','Pay ≈ '):t('预计到账 ≈ ','Receive ≈ ')}${cash.toPrecision(6)} ${useStable?'dUSDC':asset.symbol}`;
+ };
  const quoteRows=(side:Side)=>{
   const q=quote(gen?'G':side),tokens=q?(gen?genesisTokens(q.quantity):q.quantity):0;
   const fee=q?q.creatorFee+q.protocolFee+q.lpFee+q.coreFee:0;
@@ -316,7 +321,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
                   >
                     <span className={`font-bold text-xs font-display tracking-wider ${sideTextColor(side)}`}>{gen?(mode==="BUY"?t("买入gToken","Buy gToken"):t("卖出gToken","Sell gToken")):side}</span>
                     <span className="text-text-muted text-[10px] font-mono mt-0.5">
-                      {gen?genesisPrice(s.phase==='FAILED'&&!remote?.chain?2*s.k*s.failedSupply:px.genesis):(side === "YES" ? yesPrice : noPrice).toFixed(2)}
+                      {orderAmountLabel(side)}
                     </span>
                   </button>
                 ))}
