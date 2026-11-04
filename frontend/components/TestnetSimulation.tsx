@@ -69,6 +69,7 @@ export function buildTestnetRemote(
   const genesisPrice=m.phase===4&&props.history?.length?props.history[props.history.length-1].price:p?.genesisPrice===undefined
     ?wad(2n*m.k*(m.failedSupply??m.S)/10n**18n) // Same current-state derivative as the contract; no fabricated history.
     :wad(p.genesisPrice);
+  const poolFunds=m.phase===0?m.R:[1,2].includes(m.phase)?m.cash:m.phase===4?m.failedRRemaining:m.collateralCash===undefined?undefined:m.collateralCash+m.lpBudgetRemaining;
   const probability=p?.priceYes===undefined||p.priceNo===undefined?null:[wad(p.priceYes),wad(p.priceNo)] as [number,number];
   return {
     input,state,assetSymbol:stock.symbol,balanceUSD:0,
@@ -80,7 +81,7 @@ export function buildTestnetRemote(
     chart:props.history??[],onInput,
     // Parent-supplied controls are the sole write surface; the display adapter has no transaction callbacks.
     quote:()=>null,trade:noop,stake:noop,canStake:()=>false,claimMarket:noop,claimCore:noop,redeemPairs:noop,
-    chain:{outstandingShares:{yes:p?fixed18(formatUnits(p.totalYes-p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.totalNo-p.inventoryNo,18)):'—'},contractAddresses:{market:m.address,core:m.vault},poolBalances:{yes:p?fixed18(formatUnits(p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.inventoryNo,18)):'—',stock:props.market.poolStockBalance===undefined?'—':fixed18(formatUnits(props.market.poolStockBalance,stock.decimals))},controls:props.controls,coreActions:props.coreActions,status:props.status,stockSymbol:stock.symbol,
+    chain:{outstandingShares:{yes:p?fixed18(formatUnits(p.totalYes-p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.totalNo-p.inventoryNo,18)):'—'},contractAddresses:{market:m.address,core:m.vault},poolBalances:{yes:p?fixed18(formatUnits(p.inventoryYes,18)):'—',no:p?fixed18(formatUnits(p.inventoryNo,18)):'—',stock:poolFunds===undefined?'—':fixed18(formatUnits(poolFunds,stock.decimals)),totalStock:m.poolStockBalance===undefined?'—':fixed18(formatUnits(m.poolStockBalance,stock.decimals)),lpFees:fixed18(formatUnits(m.lpFees,stock.decimals))},controls:props.controls,coreActions:props.coreActions,status:props.status,stockSymbol:stock.symbol,
       readOnlyMetrics:true,volumeAvailable:p?.formalVolume!==undefined,onTabChange:props.onTabChange},
   };
 }
