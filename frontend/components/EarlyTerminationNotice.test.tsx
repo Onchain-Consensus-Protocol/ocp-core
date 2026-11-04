@@ -7,7 +7,7 @@ describe('public early resolution notice',()=>{
   it('shows the requested result and countdown without prematurely offering processing',()=>{
     const html=renderToStaticMarkup(<EarlyTerminationNotice {...base}/>);
     expect(html).toContain('提前结算申请');expect(html).toContain('YES');expect(html).toContain('01:00:00');
-    expect(html).not.toContain('<button');expect(html).toContain('尚未截止');
+    expect(html).not.toContain('<button');expect(html).toContain('确认期内，买卖、质押和解除质押仍可进行。');expect(html).not.toContain('尚未截止');
   });
   it('offers permissionless processing exactly at due and explains conditional reopening',()=>{
     const html=renderToStaticMarkup(<EarlyTerminationNotice {...base} now={4600}/>);
