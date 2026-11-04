@@ -1,3 +1,4 @@
+import {protocolFeeAttribution} from './coreProtocolFees';
 import {loadHistoryCheckpoint,saveHistoryCheckpoint} from './historyCache';
 import { Contract, Interface, concat, getBytes, hexlify, toUtf8Bytes, toUtf8String, toBeHex, zeroPadValue, ZeroAddress, ZeroHash, getAddress, id, type Provider, type Signer, type ContractTransactionResponse } from 'ethers';
 import factoryAbi from './abi/TopicMarketStockFactory.json';
@@ -22,7 +23,7 @@ export interface MarketPresentation {
   formalVolume?:bigint;totalFees:bigint;feeYes?:bigint;feeNo?:bigint;feeInvalid?:bigint;
   corePayout?:bigint;marketPayout?:bigint;genesisPrice:bigint;
 }
-export interface MarketState extends MarketSummary { feeClaims?:{creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string}; poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; failedSupply?:bigint;failedRInitial?:bigint;failedRRemaining?:bigint;collateralCash?:bigint; R:bigint; S:bigint; rTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
+export interface MarketState extends MarketSummary { feeClaims?:{creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string;coreAccrued?:bigint;coreProtocolTotal?:bigint;coreProtocolFinal?:boolean}; poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; failedSupply?:bigint;failedRInitial?:bigint;failedRRemaining?:bigint;collateralCash?:bigint; R:bigint; S:bigint; rTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
 export interface DirectoryState { factory:string; owner:string; fixedTestTargets?:boolean; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
 export interface PaymentRoute {router:string;exchange:string;stock:string;stable:string;stableSymbol:string;stableDecimals:number;stableBalance?:bigint;stableAllowance?:bigint}
 export interface CreateMarketInput { stock:string; topic:string; yesRule:string; noRule:string; invalidRule:string; coreEnd:bigint }
@@ -167,6 +168,15 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     if(state.phase===3)state.collateralCash=await m.collateralCash();
     if(state.phase===4){[state.failedSupply,state.failedRInitial,state.failedRRemaining]=await Promise.all([m.failedSupply(),m.failedRInitial(),m.failedRRemaining()]);}
     try{const [creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient]=await Promise.all([m.creator(),m.protocol(),m.creatorFees(),m.protocolFees(),v.officialMarketFeesClaimable(),v.emptySettlementRecipient()]);state.feeClaims={creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient};}catch{/* 无法读取时不假定手续费为零。 */}
+    if(state.feeClaims)try{
+      const blockTag=await provider.getBlockNumber(),at={blockTag};
+      const [total,yesDistributed,noDistributed,invalidDistributed,yesStake,noStake,settled,result,pending]=await Promise.all([
+        v.totalMarketFeesAccrued(at),v.distributedYesMarketFees(at),v.distributedNoMarketFees(at),v.distributedInvalidMarketFees(at),
+        v.totalStakeYes(at),v.totalStakeNo(at),v.settlementReady(at),v.outcome(at),v.officialMarketFeesClaimable(at),
+      ]);
+      state.feeClaims.coreAccrued=total;state.feeClaims.coreProtocolTotal=protocolFeeAttribution({total,yesDistributed,noDistributed,invalidDistributed,yesStake,noStake,settled,outcome:Number(result)});
+      state.feeClaims.coreProtocolFinal=settled;state.feeClaims.coreAmount=pending;
+    }catch{/* Unknown attribution stays absent, never confused with zero or paid fees. */}
     try{state.poolStockBalance=await new Contract(base.stock,tokenAbi,provider).balanceOf(base.address);}catch{/* 未读到真实余额时保持未知，不用cash或0代替。 */}
     [state.vaultResolved,state.vaultOutcome,state.vaultSettlementReady,state.totalStakeYes,state.totalStakeNo,state.totalStakeInvalid]=await Promise.all([v.resolved(),v.outcome(),v.settlementReady(),v.totalStakeYes(),v.totalStakeNo(),v.totalStakeInvalid()]);
     state.vaultOutcome=Number(state.vaultOutcome);
