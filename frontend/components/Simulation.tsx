@@ -16,7 +16,7 @@ import type {Language} from '../types';
 import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell,topicMarketFormalBuyBudget,topicMarketFormalBuy,topicMarketFormalSell,topicMarketQuoteBuy,topicMarketQuoteSell,topicMarketQuoteFormalBuyBudget,topicMarketQuoteFormalBuy,topicMarketQuoteFormalSell,topicMarketCoreStake,topicMarketAdvanceTime,topicMarketFinalize,topicMarketClaim,topicMarketClaimCore,topicMarketClaimPreview,topicMarketPrices,type TopicMarketState,type TopicMarketTradeQuote,type Side,type Outcome} from './topicMarketDemoModel';
 export interface RemoteSimulation {
  lifecycle?:SimulationCoreLifecycle;
- chain?:{outstandingShares?:{yes:string;no:string};contractAddresses?:{market:string;core:string};poolBalances?:{yes:string;no:string;stock:string;totalStock?:string;lpFees?:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
+ chain?:{lpTotalSupply?:string;outstandingShares?:{yes:string;no:string};contractAddresses?:{market:string;core:string};poolBalances?:{yes:string;no:string;stock:string;totalStock?:string;lpFees?:string};controls:React.ReactNode;coreActions:React.ReactNode;status:string;stockSymbol:string;readOnlyMetrics?:boolean;volumeAvailable?:boolean;onTabChange?:(tab:'MARKET'|'PROTOCOL')=>void};
  input:{tab:'MARKET'|'PROTOCOL';mode:'BUY'|'SELL';amount:number;useStable:boolean};state:TopicMarketState;assetSymbol:string;balanceUSD:number;topic:{title:string;YES:string;NO:string;INVALID:string};pending:boolean;
  prices:{genesis:number;probability:[number,number]|null};preview:ReturnType<typeof topicMarketClaimPreview>;
  genesisPnl:number;lpEstimates:{outcome:Outcome;lp:number}[];outstanding:[number,number];
@@ -324,7 +324,7 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
               <div className="space-y-1 text-[10px] text-text-muted mb-3 font-mono" data-testid="my-trade-holdings">
                 <div className="flex justify-between gap-2"><span>{t("可用余额","Available balance")}</span><strong className="text-text">{num(useStable?stableWallets[id]:balance)} {useStable?'dUSDC':asset.symbol}</strong></div>
                 <div className="flex justify-between gap-2"><span>{gen?t("我的gToken","My gToken"):t("我的份额","My shares")}</span><strong className="text-text">{gen?num(genesisTokens(a.g)):<>YES {formatAmount(userShares.YES)} · NO {formatAmount(userShares.NO)}</>}</strong></div>
-                {!gen&&<><div className="flex justify-between gap-2"><span>{t("我的LP份额","My LP shares")}</span><strong className="text-text">{num(a.lp)}</strong></div>{lpValuePanel}</>}
+                {!gen&&<><div className="flex justify-between gap-2"><span>{t("我的LP份额","My LP shares")}</span><strong className="text-text">{num(a.lp)}</strong></div>{['FORMAL','WAIT_CORE'].includes(s.phase)&&<Row label={t('我的 LP 手续费（预估）','My LP fees (estimated)')} value={`${num(s.lpSupply>0?s.lpFees*a.lp/s.lpSupply:0)} ${asset.symbol}`}/>}{lpValuePanel}</>}
                 {gen&&<div className="flex justify-between gap-2" title={t("gToken当前全部卖出净额减剩余持仓成本；不含已实现盈亏。","Net sale value less remaining cost; excludes realized P/L.")}><span>{t("盈亏","P/L")}</span><strong className={genesisPnl>=0?"text-success":"text-danger"}>{genesisPnl>0?"+":""}{num(genesisPnl)} {asset.symbol}</strong></div>}
               </div>
               <div className="text-[10px] text-text-muted my-2 px-1 font-mono">
@@ -478,7 +478,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
           )}
         </div>
 
-        {activeTab==='MARKET'&&remote?.chain?.poolBalances&&!gen&&<div className="border border-border rounded-xl p-4 mb-5 text-xs" data-testid="market-pool-balances"><h3 className="text-text-muted font-bold mb-2">{t('池内资产','Pool assets')}</h3><p className="text-text-muted mb-2">{t('YES／NO 按成交生成或销毁，已发行数量见上方未结算份额。','YES / NO shares are created or burned on trades. Issued amounts appear under Outstanding shares above.')}</p><Row label={terminal?t('待领取结算资金','Pending settlement funds'):t('做市资金余额','Market-making funds')} value={`${remote.chain.poolBalances.stock} ${asset.symbol}`}/>{!terminal&&<p className="mt-1 text-text-muted">{t('不含手续费；创建者和项目方费用见市场手续费面板。','Excludes fees. Creator and protocol fees appear in Market fees.')}</p>}<details className="mt-3 text-text-muted"><summary className="cursor-pointer">{t('合约余额明细','Contract balance details')}</summary><div className="mt-2 space-y-1"><Row label={t('合约股票总余额','Total contract stock balance')} value={`${remote.chain.poolBalances.totalStock??'—'} ${asset.symbol}`}/></div></details></div>}
+        {activeTab==='MARKET'&&remote?.chain?.poolBalances&&!gen&&<div className="border border-border rounded-xl px-4 py-3 mb-5 text-xs" data-testid="market-pool-balances"><Row label={terminal?t('待领取结算资金','Pending settlement funds'):t('做市资金余额（不含手续费）','Market-making funds (excluding fees)')} value={`${remote.chain.poolBalances.stock} ${asset.symbol}`}/></div>}
+
 
         <div className={` ${gen?"hidden":"grid"} grid-cols-2 gap-4 mb-6`}>
           <div className="border border-border rounded-xl p-4">
@@ -518,10 +519,10 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
         {activeTab === "MARKET" && (
         <div className="border border-border rounded-xl p-4 text-[10px] text-text-muted font-mono mt-auto">
           <div className="flex justify-between gap-3 mt-1.5">
-            <span>{t("我的 LP 份额","My LP shares")}</span>
-            <strong className="text-text">{remote?.chain&&!isWalletConnected?"—":num(a.lp)}</strong>
+            <span>{t("LP 总份额","Total LP shares")}</span>
+            <strong className="text-text">{remote?.chain?remote.chain.lpTotalSupply??'—':num(s.lpSupply)}</strong>
           </div>
-          {['FORMAL','WAIT_CORE'].includes(s.phase)&&<div className="mt-2 border-t border-border pt-2"><Row label={t('LP 手续费（全池）','LP fees (pool total)')} value={`${remote?.chain?remote.chain.poolBalances?.lpFees??'—':num(s.lpFees)} ${asset.symbol}`}/></div>}
+          {['FORMAL','WAIT_CORE'].includes(s.phase)&&<div className="mt-2 border-t border-border pt-2"><Row label={t('LP 手续费总额','Total LP fees')} value={`${remote?.chain?remote.chain.poolBalances?.lpFees??'—':num(s.lpFees)} ${asset.symbol}`}/></div>}
           {terminal&&!remote?.chain?.readOnlyMetrics&&lpValuePanel}
 
         </div>

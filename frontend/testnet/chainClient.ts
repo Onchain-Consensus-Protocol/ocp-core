@@ -23,7 +23,7 @@ export interface MarketPresentation {
   formalVolume?:bigint;totalFees:bigint;feeYes?:bigint;feeNo?:bigint;feeInvalid?:bigint;
   corePayout?:bigint;marketPayout?:bigint;genesisPrice:bigint;
 }
-export interface MarketState extends MarketSummary { feeClaims?:{creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string;coreAccrued?:bigint;coreProtocolTotal?:bigint;coreProtocolFinal?:boolean}; poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; failedSupply?:bigint;failedRInitial?:bigint;failedRRemaining?:bigint;collateralCash?:bigint; R:bigint; S:bigint; rTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
+export interface MarketState extends MarketSummary { feeClaims?:{creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string;coreAccrued?:bigint;coreProtocolTotal?:bigint;coreProtocolFinal?:boolean}; poolStockBalance?:bigint;lpSupply?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; failedSupply?:bigint;failedRInitial?:bigint;failedRRemaining?:bigint;collateralCash?:bigint; R:bigint; S:bigint; rTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
 export interface DirectoryState { factory:string; owner:string; fixedTestTargets?:boolean; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
 export interface PaymentRoute {router:string;exchange:string;stock:string;stable:string;stableSymbol:string;stableDecimals:number;stableBalance?:bigint;stableAllowance?:bigint}
 export interface CreateMarketInput { stock:string; topic:string; yesRule:string; noRule:string; invalidRule:string; coreEnd:bigint }
@@ -165,6 +165,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const values=await Promise.all(keys.map(key=>m[key]()));
     const state={...base,...Object.fromEntries(keys.map((key,i)=>[key,values[i]]))} as MarketState;
     state.phase=Number(state.phase);state.outcome=Number(state.outcome);
+    try{state.lpSupply=await m.liquiditySupply();}catch{/* Keep total LP supply unknown if unavailable. */}
     if(state.phase===3)state.collateralCash=await m.collateralCash();
     if(state.phase===4){[state.failedSupply,state.failedRInitial,state.failedRRemaining]=await Promise.all([m.failedSupply(),m.failedRInitial(),m.failedRRemaining()]);}
     try{const [creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient]=await Promise.all([m.creator(),m.protocol(),m.creatorFees(),m.protocolFees(),v.officialMarketFeesClaimable(),v.emptySettlementRecipient()]);state.feeClaims={creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient};}catch{/* 无法读取时不假定手续费为零。 */}
