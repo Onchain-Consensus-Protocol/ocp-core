@@ -1,3 +1,4 @@
+import {marketPricePercent} from './marketPricePercent';
 import {marketStageLabel} from './marketStageLabel';
 import {SimulationCoreActions,SimulationEarlyNotice,buildLocalCoreLifecycle,type SimulationCoreLifecycle} from './SimulationCoreActions';
 import {ContractAddress} from './ContractAddress';
@@ -450,8 +451,8 @@ export const Simulation:React.FC<Props>=({lang,setBalance,isWalletConnected,conn
                   <div className="h-full bg-danger transition-all" style={{ width: `${noPrice * 100}%` }} />
                 </div>
                 <div className="flex justify-between text-xs font-bold font-mono mt-1">
-                  <span className="text-success">YES {(yesPrice * 100).toFixed(0)}%</span>
-                  <span className="text-danger">NO {(noPrice * 100).toFixed(0)}%</span>
+                  <span className="text-success">YES {marketPricePercent(yesPrice)}</span>
+                  <span className="text-danger">NO {marketPricePercent(noPrice)}</span>
                 </div>
               </div>
               <div>
