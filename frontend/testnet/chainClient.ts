@@ -22,7 +22,7 @@ export interface MarketPresentation {
   formalVolume?:bigint;totalFees:bigint;feeYes?:bigint;feeNo?:bigint;feeInvalid?:bigint;
   corePayout?:bigint;marketPayout?:bigint;genesisPrice:bigint;
 }
-export interface MarketState extends MarketSummary { feeClaims?:{creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string}; poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; R:bigint; S:bigint; rTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
+export interface MarketState extends MarketSummary { feeClaims?:{creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string}; poolStockBalance?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; failedSupply?:bigint;failedRInitial?:bigint; R:bigint; S:bigint; rTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
 export interface DirectoryState { factory:string; owner:string; fixedTestTargets?:boolean; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
 export interface PaymentRoute {router:string;exchange:string;stock:string;stable:string;stableSymbol:string;stableDecimals:number;stableBalance?:bigint;stableAllowance?:bigint}
 export interface CreateMarketInput { stock:string; topic:string; yesRule:string; noRule:string; invalidRule:string; coreEnd:bigint }
@@ -164,6 +164,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const values=await Promise.all(keys.map(key=>m[key]()));
     const state={...base,...Object.fromEntries(keys.map((key,i)=>[key,values[i]]))} as MarketState;
     state.phase=Number(state.phase);state.outcome=Number(state.outcome);
+    if(state.phase===4){[state.failedSupply,state.failedRInitial]=await Promise.all([m.failedSupply(),m.failedRInitial()]);}
     try{const [creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient]=await Promise.all([m.creator(),m.protocol(),m.creatorFees(),m.protocolFees(),v.officialMarketFeesClaimable(),v.emptySettlementRecipient()]);state.feeClaims={creator,protocol,creatorAmount,protocolAmount,coreAmount,coreRecipient};}catch{/* 无法读取时不假定手续费为零。 */}
     try{state.poolStockBalance=await new Contract(base.stock,tokenAbi,provider).balanceOf(base.address);}catch{/* 未读到真实余额时保持未知，不用cash或0代替。 */}
     [state.vaultResolved,state.vaultOutcome,state.vaultSettlementReady,state.totalStakeYes,state.totalStakeNo,state.totalStakeInvalid]=await Promise.all([v.resolved(),v.outcome(),v.settlementReady(),v.totalStakeYes(),v.totalStakeNo(),v.totalStakeInvalid()]);
@@ -190,7 +191,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
         m.poolBasisWad(),m.bWad(),m.inventoryY(),m.inventoryN(),m.yesSupply(),m.noSupply(),v.totalMarketFeesAccrued(),
       ]);
       state.presentation={basisWad,bWad,inventoryYes,inventoryNo,totalYes,totalNo,totalFees,
-        genesisPrice:2n*state.k*state.S/(10n**18n)};
+        genesisPrice:2n*state.k*(state.failedSupply??state.S)/(10n**18n)};
       if(state.phase===1 || state.phase===2){
         try {const priceYes=await m.priceYes();state.presentation.priceYes=priceYes;
           state.presentation.priceNo=10n**18n-priceYes;}catch{/* No synthetic 50/50 fallback. */}

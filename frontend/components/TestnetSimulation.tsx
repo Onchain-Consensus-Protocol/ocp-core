@@ -51,7 +51,7 @@ export function buildTestnetRemote(
   const state:TopicMarketState={
     phase,now:Math.max(0,props.now-created),TG:relative(m.genesisCutoff),TF:relative(m.formalCutoff),
     TC:relative(m.early?.effectiveCutoff??m.coreCutoff),TT:relative(m.coreCutoff),Q:money(m.snapshot),k:wad(m.k),
-    rTarget:money(m.rTarget),R:money(m.R),S:wad(m.S),
+    rTarget:money(m.rTarget),R:money(m.phase===4?m.failedRInitial:m.R),S:wad(m.S),
     M0:wad(p?.basisWad),redeemedPairs:0,collateral:0,cash:money(m.cash),lpFees:money(m.lpFees),
     lpFeesEarned:0,formalVolume:money(p?.formalVolume),creatorFees:0,protocolFees:0,
     basis:wad(p?.basisWad),b:wad(p?.bWad),lpSupply:0,inventory:[wad(p?.inventoryYes),wad(p?.inventoryNo)],
@@ -62,12 +62,12 @@ export function buildTestnetRemote(
       fees:money(p?.totalFees),feeTotal:money(p?.totalFees),officialRewards:[0,0,0],result:coreResult,
     },
     result,lpBudget:money(m.lpBudgetRemaining),outcomeBudget:0,
-    lpClaimSupply:0,lpBudgetInitial:0,failedSupply:0,failedBudgetInitial:0,
+    lpClaimSupply:0,lpBudgetInitial:0,failedSupply:wad(m.failedSupply),failedBudgetInitial:money(m.failedRInitial),
     failedBudget:0,coreBudget:0,coreOfficialBudget:0,payouts:null,corePayouts:p?.corePayout===undefined?[]:[money(p.corePayout)],
     events:[...(props.activity??[]),...(props.coreActivity??[])],config:{creatorAccount:-1,protocolAccount:-1,depthPolicy:'GRADUATION_CAPITAL'},
   };
   const genesisPrice=m.phase===4&&props.history?.length?props.history[props.history.length-1].price:p?.genesisPrice===undefined
-    ?wad(2n*m.k*m.S/10n**18n) // Same current-state derivative as the contract; no fabricated history.
+    ?wad(2n*m.k*(m.failedSupply??m.S)/10n**18n) // Same current-state derivative as the contract; no fabricated history.
     :wad(p.genesisPrice);
   const probability=p?.priceYes===undefined||p.priceNo===undefined?null:[wad(p.priceYes),wad(p.priceNo)] as [number,number];
   return {

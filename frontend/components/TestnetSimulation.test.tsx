@@ -83,6 +83,20 @@ describe('chain data adapter for the shared Simulation view',()=>{
     expect(html).toContain('Genesis market contract address');
     expect(html).not.toContain('Actual simulated prices');expect(html).not.toContain('3.6 / 0.6 ETH');
   });
+  it('keeps the gToken chart after the Genesis deadline, before failure is processed',()=>{
+    const props=fixture();props.market.phase=0;props.now=Number(props.market.genesisCutoff)+1;
+    props.history=[{price:18,at:1,kind:'GENESIS_BUY'}];
+    const html=renderToStaticMarkup(<TestnetSimulation {...props}/>);
+    expect(html).toContain('genesis-price-chart');expect(html).not.toContain('Reading on-chain odds');
+  });
+  it('preserves failure snapshot price and progress after refunds burn supply',()=>{
+    const props=fixture();props.market.phase=4;props.market.S=0n;props.market.failedSupply=9n*W;props.market.failedRInitial=1200000n;
+    delete props.market.presentation;
+    const remote=buildTestnetRemote(props);
+    expect(remote.prices.genesis).toBe(18);expect(remote.state.failedSupply).toBe(9);expect(remote.state.R).toBe(1.2);
+    const html=renderToStaticMarkup(<TestnetSimulation {...props}/>);
+    expect(html).toContain('genesis-price-chart');expect(html).not.toContain('Reading on-chain odds');
+  });
   it('rejects unsupported phases instead of inventing a CREATE demo',()=>{
     const props=fixture();props.market.phase=99;expect(()=>buildTestnetRemote(props)).toThrow('Unsupported');
   });
