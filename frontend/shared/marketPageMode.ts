@@ -5,5 +5,6 @@ export function isTestnetMarketPage(pathname: string, search = ''): boolean {
 
 export function marketViewHref(degen:boolean,search:string,lang:string){
  const params=new URLSearchParams(search);params.set('lang',lang);
+ if(degen)params.delete('view');else params.set('view','full');
  return `${degen?'/degen.html':'/testnet.html'}?${params}`;
 }

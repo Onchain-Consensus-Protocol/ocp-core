@@ -14,4 +14,4 @@ describe('separate simulation and testnet entries', () => {
   });
 });
 
-it('preserves market selection when switching between independent views',()=>{expect(marketViewHref(true,'?market=0xabc&stock=TSLA&lang=en','zh')).toBe('/degen.html?market=0xabc&stock=TSLA&lang=zh');expect(marketViewHref(false,'?market=0xabc','en')).toBe('/testnet.html?market=0xabc&lang=en');});
+it('preserves market selection when switching between independent views',()=>{expect(marketViewHref(true,'?market=0xabc&stock=TSLA&lang=en','zh')).toBe('/degen.html?market=0xabc&stock=TSLA&lang=zh');expect(marketViewHref(false,'?market=0xabc','en')).toBe('/testnet.html?market=0xabc&lang=en&view=full');});

@@ -37,8 +37,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
-const degenMode=window.location.pathname==='/degen.html';
 const testnetMode=isTestnetMarketPage(window.location.pathname, window.location.search);
+const degenMode=testnetMode && new URLSearchParams(window.location.search).get('view')!=='full';
 const publicKey=(import.meta as ImportMeta & {env:Record<string,string>}).env.VITE_CLERK_PUBLISHABLE_KEY;
 function AuthenticatedMarket({lang}:{lang:"zh"|"en"}) {
  const {isLoaded,isSignedIn,getToken}=useAuth();const clerk=useClerk();
