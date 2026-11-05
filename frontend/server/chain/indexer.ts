@@ -1,7 +1,7 @@
 import {CURRENT_TESTNET_FACTORY,CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK} from '../../shared/testnetDeployment.js';
 import {Contract,Interface,ZeroAddress,getAddress,zeroPadValue,type ContractRunner,type Provider} from 'ethers';
-import factoryAbi from '../../testnet/abi/TopicMarketStockFactory.json';
-import marketAbi from '../../testnet/abi/TopicMarket.json';
+import factoryAbi from '../../testnet/abi/TopicMarketStockFactory.json' with {type:'json'};
+import marketAbi from '../../testnet/abi/TopicMarket.json' with {type:'json'};
 import {findTimestampRange} from '../../testnet/historyBlockSearch.js';
 import {getLogsInChunks,readChainPriceHistory,replayCheckpoint,type TimestampedMarketLog} from '../../testnet/priceHistory.js';
 import type {HistoryStore,IndexedHistoryRow,HistoryKey,HistoryDescriptor,HistoryPatch} from './types.js';

@@ -1,7 +1,7 @@
-import {findTimestampRange} from './historyBlockSearch';
+import {findTimestampRange} from './historyBlockSearch.js';
 import {Interface, getAddress, zeroPadValue, type Log, type Provider} from 'ethers';
-import factoryAbi from './abi/TopicMarketStockFactory.json';
-import marketAbi from './abi/TopicMarket.json';
+import factoryAbi from './abi/TopicMarketStockFactory.json' with {type:'json'};
+import marketAbi from './abi/TopicMarket.json' with {type:'json'};
 
 const WAD=10n**18n;
 const LOG_CHUNK=5000;
