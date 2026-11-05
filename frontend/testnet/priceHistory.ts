@@ -20,7 +20,7 @@ export interface ChainGenesisPoint {
 }
 export interface ChainPriceHistory {
   genesis:ChainGenesisPoint[];events:ChainActivity[];creationBlock:number;latestBlock:number;
-  complete:true;asOf?:number;formalVolume:bigint;checkpoint?:HistoryCheckpoint;cacheStatus?:'local'|'updated';
+  complete:true;asOf?:number;formalVolume:bigint;checkpoint?:HistoryCheckpoint;cacheStatus?:'local'|'updated'|'shared';serverSyncing?:boolean;
 }
 export interface HistoryCheckpoint {version:2;factory:string;market:string;createdAt:string;k:string;creation:TimestampedMarketLog;logs:TimestampedMarketLog[];latestBlock:number;latestHash:string}
 export function replayCheckpoint(v:HistoryCheckpoint,factory:string,market:string):ChainPriceHistory {
@@ -88,7 +88,8 @@ export function replayMarketPriceHistory(
   return {genesis,events,creationBlock:initial.blockNumber,latestBlock,complete:true,formalVolume};
 }
 
-export async function getLogsInChunks(provider:Provider, address:string, from:number, to:number, topics?:string[],concurrency:number|(()=>number)=4) {
+export async function getLogsInChunks(provider:Provider, address:string, from:number, to:number, topics?:string[],concurrency:number|(()=>number)=4,chunkSize=5000) {
+  const size=Math.max(1,Math.min(50000,Number.isFinite(chunkSize)?Math.floor(chunkSize):LOG_CHUNK));
   const chunks:Log[][]=[];let next=from;
   async function read(start:number,end:number,attempt=0):Promise<Log[]>{
     try{return await provider.getLogs({address,fromBlock:start,toBlock:end,topics});}
@@ -111,8 +112,8 @@ export async function getLogsInChunks(provider:Provider, address:string, from:nu
     const pump=()=>{
       if(failed)return;
       while(active<limit()&&next<=to){
-        const start=next;next+=LOG_CHUNK;active++;
-        void read(start,Math.min(to,start+LOG_CHUNK-1)).then(logs=>{chunks.push(logs);active--;pump();},error=>{failed=true;reject(error);});
+        const start=next;next+=size;active++;
+        void read(start,Math.min(to,start+size-1)).then(logs=>{chunks.push(logs);active--;pump();},error=>{failed=true;reject(error);});
       }
       if(active===0&&next>to)resolve();
     };
@@ -124,7 +125,7 @@ export async function getLogsInChunks(provider:Provider, address:string, from:nu
 /** Locate creation by the factory's timestamp AND indexed event, then read a bounded market-only log range. */
 export async function readChainPriceHistory(
   provider:Provider, factory:string, market:string, createdAt:bigint, k:bigint, checkpoint?:HistoryCheckpoint|null,
-  options:{origin?:TimestampedMarketLog|null;onOrigin?:(origin:TimestampedMarketLog)=>void;concurrency?:number|(()=>number)}={},
+  options:{origin?:TimestampedMarketLog|null;onOrigin?:(origin:TimestampedMarketLog)=>void;concurrency?:number|(()=>number);logChunkSize?:number}={},
 ):Promise<ChainPriceHistory> {
   const latest=await provider.getBlock('latest');
   if(!latest || !latest.hash)throw new Error('无法读取历史区块头');
@@ -185,7 +186,7 @@ export async function readChainPriceHistory(
   const plain=(x:TimestampedMarketLog):TimestampedMarketLog=>({timestamp:x.timestamp,log:{address:x.log.address,blockNumber:x.log.blockNumber,blockHash:x.log.blockHash,transactionHash:x.log.transactionHash,transactionIndex:x.log.transactionIndex,index:x.log.index,data:x.log.data,topics:[...x.log.topics],removed:false} as unknown as Log});
   const origin=plain({log:creation,timestamp:creationHeader.timestamp});
   options.onOrigin?.(origin);
-  const logs=await getLogsInChunks(provider,getAddress(market),scanFrom??creation.blockNumber,latest.number,undefined,options.concurrency);
+  const logs=await getLogsInChunks(provider,getAddress(market),scanFrom??creation.blockNumber,latest.number,undefined,options.concurrency,options.logChunkSize);
   const blocks=[...new Set(logs.map(log=>log.blockNumber))];
   for(let start=0;start<blocks.length;start+=8){await Promise.all(blocks.slice(start,start+8).map(header));}
   const timestamped:TimestampedMarketLog[]=[...prefix];

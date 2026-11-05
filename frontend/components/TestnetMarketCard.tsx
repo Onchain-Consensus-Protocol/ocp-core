@@ -9,16 +9,17 @@ import type {PaperMarket} from '../shared/paperTypes';
 export function TestnetMarketCard({market:m,symbol,phaseLabel,lang,now,disabled,onClick,readHistory,readCachedHistory}:{market:MarketSummary;symbol:string;phaseLabel:string;lang:'zh'|'en';now:number;disabled?:boolean;onClick:()=>void;readHistory?:(address:string,signal?:AbortSignal)=>Promise<ChainPriceHistory>;readCachedHistory?:(address:string)=>Promise<ChainPriceHistory|null|undefined>}){
  const [trend,setTrend]=useState<{address:string;prices:number[]}|null>(null);
  const [trendError,setTrendError]=useState(false);
+ const [retry,setRetry]=useState(0);
  const host=useRef<HTMLDivElement>(null),[visible,setVisible]=useState(()=>typeof IntersectionObserver==='undefined');
  useEffect(()=>{if(typeof IntersectionObserver==='undefined'||!host.current)return;const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)),{rootMargin:'80px'});observer.observe(host.current);return()=>observer.disconnect();},[]);
  useEffect(()=>{
   if(![0,4].includes(m.phase??-1)||!readHistory)return;
-  let cancelled=false,fresh=false;const controller=new AbortController();setTrendError(false);
+  let cancelled=false,fresh=false;let timer:ReturnType<typeof setTimeout>|undefined;const controller=new AbortController();setTrendError(false);
   const apply=(history:ChainPriceHistory|null|undefined)=>{if(history&&!cancelled)setTrend({address:m.address,prices:history.genesis.map(p=>Number(p.price)/1e18)});};
   void readCachedHistory?.(m.address).then(value=>{if(!fresh)apply(value);}).catch(()=>{});
-  if(visible)void readHistory(m.address,controller.signal).then(value=>{fresh=true;apply(value);}).catch(()=>{if(!cancelled)setTrendError(true);});
-  return()=>{cancelled=true;controller.abort();};
- },[m.address,m.phase,m.R,readHistory,readCachedHistory,visible]);
+  if(visible)void readHistory(m.address,controller.signal).then(value=>{fresh=true;apply(value);if(value.serverSyncing)timer=setTimeout(()=>{if(!cancelled)setRetry(n=>n+1);},3000);}).catch(()=>{if(!cancelled)setTrendError(true);});
+  return()=>{cancelled=true;clearTimeout(timer);controller.abort();};
+ },[m.address,m.phase,m.R,readHistory,readCachedHistory,visible,retry]);
  const t=(zh:string,en:string)=>lang==='zh'?zh:en;
  const phase=([ 'GENESIS','FORMAL','WAIT_CORE','SETTLED','FAILED'] as PaperMarket['phase'][])[m.phase??-1];
  const incomplete=!phase||(phase==='GENESIS'&&(m.R===undefined||m.rTarget===undefined))||(['FORMAL','WAIT_CORE'].includes(phase)&&m.priceYes===undefined);

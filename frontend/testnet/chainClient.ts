@@ -1,3 +1,4 @@
+import {readSharedHistory} from './sharedHistory';
 import {createHistoryReadQueue} from './historyReadQueue';
 import {loadHistoryOrigin,saveHistoryOrigin} from './historyOriginCache';
 import {protocolFeeAttribution} from './coreProtocolFees';
@@ -276,6 +277,9 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
   }
   async function loadPriceHistory(marketAddress:string,concurrency:number):Promise<ChainPriceHistory> {
     const key=nonzeroAddress(marketAddress).toLowerCase();
+    const shared=await readSharedHistory(address,marketAddress);
+    if(shared){historyMemory.set(key,shared);if(shared.checkpoint)void saveHistoryCheckpoint(shared.checkpoint);return shared;}
+
     await assertTestnet(provider);
     // 历史元数据不可变，只在本reader内复用；交易报价与签名仍走原实时校验。
     let metadata=historyMetadata.get(key);

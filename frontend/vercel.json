@@ -23,6 +23,9 @@
     },
     "api/market-share.ts": {
       "includeFiles": "{server/paper/schema.sql,public/logo.png,public/ocp-wordmark.svg}"
+    },
+    "api/chain-history.ts": {
+      "maxDuration": 60
     }
   }
 }
