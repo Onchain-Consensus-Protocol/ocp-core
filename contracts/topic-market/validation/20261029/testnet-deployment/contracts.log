@@ -1,0 +1,732 @@
+No files changed, compilation skipped
+
+Ran 13 tests for test/TopicMarketAssetRouter.t.sol:TopicMarketAssetRouterTest
+[PASS] testAnotherCallerCannotSpendUsersRights() (gas: 207242)
+[PASS] testBusinessRevertRollsBackSwap() (gas: 183675)
+[PASS] testClaimConvertsToStablecoinAndCannotBeRepeated() (gas: 297161)
+[PASS] testCoreClaimSlippageRestoresClaimRight() (gas: 361062)
+[PASS] testCoreStakeAndClaimRetainRealAccountIdentity() (gas: 318299)
+[PASS] testDirectCollateralAndStableRouteHaveEquivalentRights() (gas: 259972)
+[PASS] testExactShareBuyReturnsUnusedCollateralToUser() (gas: 201256)
+[PASS] testExchangeCannotReenterRouter() (gas: 380167)
+[PASS] testOldDonationsCannotBeSweptByNextUser() (gas: 223357)
+[PASS] testOutputSlippageRollsBackBurnAndFunds() (gas: 252548)
+[PASS] testRejectsLyingExchangeByBalanceDelta() (gas: 147181)
+[PASS] testRejectsUnknownMarketAssetExpiredAndBadCoreSide() (gas: 643253)
+[PASS] testStablecoinBuyCreditsOnlyUserAndClearsApprovals() (gas: 201704)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 1.87ms (1.47ms CPU time)
+
+Ran 2 tests for test/TopicMarketCodeStoreReadback.t.sol:TopicMarketCodeStoreReadbackTest
+[PASS] testCoreCreationCodeStoresRoundTripExactHash() (gas: 7698762)
+[PASS] testCreationCodeReadbackExactLengthStopAndHash() (gas: 6789198)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 2.36ms (1.45ms CPU time)
+
+Ran 9 tests for test/TopicMarketDeadlines.t.sol:TopicMarketDeadlinesTest
+[PASS] testExactlyGenesisCannotGraduateAndSkippedTimeFails() (gas: 102015)
+[PASS] testGenesisTradesAfterOldThreeHourLimit() (gas: 322297)
+[PASS] testLastSecondGraduationOpensBothUntilIndependentCutoffs() (gas: 906504)
+[PASS] testLongerTopicDerivesGenesisFromFinalDeadline() (gas: 6085061)
+[PASS] testMinimumValidFinalDeadlineKeepsOneHourBetweenCutoffs() (gas: 6088339)
+[PASS] testRejectCoreAtOrBeforeCreationPlusFourHours() (gas: 408430)
+[PASS] testSingleFinalDeadlineDerivesAllCutoffs() (gas: 14244)
+[PASS] testSkippingFormalCloseStillAllowsCoreFinalization() (gas: 665504)
+[PASS] testUint64TimeOverflowRejectedAndMaximumCoreAcceptedWithoutWrap() (gas: 6216461)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 3.01ms (2.23ms CPU time)
+
+Ran 9 tests for test/TopicMarketEarlyModule.t.sol:TopicMarketEarlyModuleTest
+[PASS] testAlternateModuleCannotOverrideCoreMajorityWithRequestedNo() (gas: 1077905)
+[PASS] testCoreConfigurationRequiresFactoryCodeCorrectCoreAndBaseBond() (gas: 4576051)
+[PASS] testCoreItselfMayInitializeItsClone() (gas: 100254)
+[PASS] testCoreUsesQuoteCachedBeforeProposeAndRollsBackChangedPolicyQuote() (gas: 1029361)
+[PASS] testImplementationCannotInitializeAndFactoryCloneInitializesOnce() (gas: 122658)
+[PASS] testMarketBindingPermanentlyClosesModuleConfiguration() (gas: 132511)
+[PASS] testNewMarketAlternatePolicyChangesBondAndWindowWithoutChangingCore() (gas: 1350566)
+[PASS] testOnlyCoreCanRecordAndConsumeProposal() (gas: 464255)
+[PASS] testSeparateClonesCannotConsumeOrChangeOtherCoreRequestOrEscrow() (gas: 5672016)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 3.44ms (2.81ms CPU time)
+
+Ran 4 tests for test/TopicMarketEarlyIntegration.t.sol:TopicMarketEarlyIntegrationTest
+[PASS] testDirectCoreResolutionAlsoLocksFormalUntilMarketFinalized() (gas: 904134)
+[PASS] testEarlySuccessFreezesFormalAndSettlesBeforeOriginalCutoff() (gas: 1666245)
+[PASS] testLateExecutorKeepsEarlierLogicalCutoffAcrossModules() (gas: 910062)
+[PASS] testRejectedRequestDoesNotRollbackSlashAndFormalResumes() (gas: 1011072)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 3.80ms (1.30ms CPU time)
+
+Ran 8 tests for test/TopicMarketBoundary.t.sol:TopicMarketBoundaryTest
+[PASS] testBCompensatesNetOfRetainedLPFees() (gas: 997963)
+[PASS] testBFirstThenLPLossWhenReserveExhausted() (gas: 7326621)
+[PASS] testExactCoreCutoffDoesNotMeanOracleFinal() (gas: 706270)
+[PASS] testFeeRecipientMayCoincide() (gas: 6898561)
+[PASS] testGenesisTransferDisabledEvenAtDeadline() (gas: 281558)
+[PASS] testInvalidDoesNotConsumeB() (gas: 962630)
+[PASS] testNoLPClaimsBeforeFinalResult() (gas: 619664)
+[PASS] testOversizedSellDoesNotGraduateAtIntermediatePoint() (gas: 411292)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 1.81ms (1.39ms CPU time)
+
+Ran 3 tests for test/TopicMarketEconomicExamples.t.sol:TopicMarketEconomicExamplesTest
+[PASS] testClaimAllTransferFailureRollsBackAllRightsAndBudgets() (gas: 1035298)
+[PASS] testCreatorSelfTradeRecoversFeesAndBWithNearZeroNetLoss() (gas: 377544)
+[PASS] testFinalPureBuyerPays1000ForAbout522InitialLPPlusB() (gas: 1016789)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 1.73ms (906.29µs CPU time)
+
+Ran 3 tests for test/TopicMarketAdversarial.t.sol:TopicMarketAdversarialTest
+[PASS] testFeeOnTransferIsRejectedWithFullRollback() (gas: 102966)
+[PASS] testReentrantPayoutCannotExitOrClaimTwice() (gas: 420289)
+[PASS] testReentrantReceiveRejectedButOuterBuyValid() (gas: 533136)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 1.05ms (387.04µs CPU time)
+
+Ran 9 tests for test/TopicMarketRightsSecurity.t.sol:TopicMarketRightsSecurityTest
+[PASS] testExhaustedBStillBurnsZeroPayoutRights() (gas: 7400312)
+[PASS] testGenesisFailureBBurnRollbackAndNoLP() (gas: 427382)
+[PASS] testLPApprovalCannotSpendBAndDoesNotGrantClaimForOwner() (gas: 852047)
+[PASS] testMaterializeReplayCannotMintOrStealEscrow() (gas: 763197)
+[PASS] testOnlyMarketCanMintOrBurnEitherRightsToken() (gas: 765497)
+[PASS] testPartialBClaimsKeepFixedDenominatorAndTransferRight() (gas: 806825)
+[PASS] testUSDCFailureRollsBackLPBurnAndBudget() (gas: 824801)
+[PASS] testUnmaterializedRightsCannotInflateFirstLPClaim() (gas: 835902)
+[PASS] testZeroQuantityClaimsRejectedAndBurnNotReusable() (gas: 799874)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 2.70ms (2.26ms CPU time)
+
+Ran 24 tests for test/TopicMarket.t.sol:TopicMarketTest
+[PASS] testBuyGraduationDoesNotCapActualFunds() (gas: 703883)
+[PASS] testBuySplitAndSquareQuote() (gas: 375816)
+[PASS] testCoreOpenFailureRollsBackUSDC() (gas: 724705)
+[PASS] testDonationDoesNotAffectThresholdOrClaimBudget() (gas: 301063)
+[PASS] testFeesWithdrawOnlyAccruedNotReserve() (gas: 938855)
+[PASS] testFormalBuyThenSellFees() (gas: 977763)
+[PASS] testFormalCutoffCoreKeepsOpen() (gas: 721284)
+[PASS] testFormalMaxPriceProtectsWallet() (gas: 722741)
+[PASS] testFormalOversellAndInventoryProtection() (gas: 624185)
+[PASS] testFullRoundtripAndSellerContribution() (gas: 354052)
+[PASS] testGenesisAtExactDeadlineFails() (gas: 88537)
+[PASS] testIntentAndSlippageRollback() (gas: 171328)
+[PASS] testLPTransferPausedDoesNotTransferContribution() (gas: 785068)
+[PASS] testNoGenesisAfterGraduation() (gas: 613721)
+[PASS] testNoPendingCoreCanSettle() (gas: 707980)
+[PASS] testOutcomeTransferDisabledAndOriginalHolderKeepsPayout() (gas: 989609)
+[PASS] testRepeatedClaimsAndFinalizeRejected() (gas: 1007641)
+[PASS] testSellGraduationFromLegalPath() (gas: 747252)
+[PASS] testSettlementInvalid() (gas: 1113481)
+[PASS] testSettlementNo() (gas: 1127655)
+[PASS] testSettlementYes() (gas: 1112155)
+[PASS] testThreeDeadlinesAndCoreOpenOnGraduation() (gas: 711227)
+[PASS] testUnGraduatedCurrentSplitAndTwoSeparateRights() (gas: 599772)
+[PASS] testZeroSupplyFailureNoDivisionByZero() (gas: 417173)
+Suite result: ok. 24 passed; 0 failed; 0 skipped; finished in 11.44ms (10.47ms CPU time)
+
+Ran 7 tests for test/TopicMarketV3Exchange.t.sol:TopicMarketV3ExchangeTest
+[PASS] testBothDirectionsExactDeltaAndApprovalCleared() (gas: 199528)
+[PASS] testDexFailureAtomicAndConstructorRejectsSameAsset() (gas: 182611)
+[PASS] testDonatedDustCannotBeSwept() (gas: 142577)
+[PASS] testLyingOutputAndPartialConsumptionRejected() (gas: 229950)
+[PASS] testMinimumOutputFailureRestoresInput() (gas: 114154)
+[PASS] testReentryFailsWhileSwapSucceeds() (gas: 247866)
+[PASS] testWrongPairExpiredAndSameAssetRejected() (gas: 474301)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 1.77ms (731.67µs CPU time)
+
+Ran 14 tests for test/TopicMarketStockIntegration.t.sol:TopicMarketStockIntegrationTest
+[PASS] testCannotBypassSideLockOrClaimOthersWithSuffix() (gas: 1144388)
+[PASS] testCoreRouterStakeDoesNotInheritOldFeesAndCannotSwitchDirectly() (gas: 1811048)
+[PASS] testCreatedEventUsesDerivedGenesisCutoff() (gas: 12320705)
+[PASS] testFixedFiveHundredUsdBondUsesCreationTokenSnapshot() (gas: 12331990)
+[PASS] testFullFormalCoreAndBurnClaimsThroughStableRoute() (gas: 2340792)
+[PASS] testNativeCollateralCanBuyAndClaimViaRouter() (gas: 497634)
+[PASS] testOutputSwapFailureRollsBackBurnAndAllowsNativeClaim() (gas: 624982)
+[PASS] testOwnerOnlyAndTwoStepTransfer() (gas: 61549)
+[PASS] testRealFactoryRegistrationForwarderAndUnits() (gas: 33135)
+[PASS] testRegistrationRejectsWrongFactoryAndOracleUnits() (gas: 1886133)
+[PASS] testSecondStockDifferentDecimalsHasIndependentRouteAndFunds() (gas: 16326868)
+[PASS] testStableBuysAndSalesKeepRightsOnUserAndPreserveDust() (gas: 542710)
+[PASS] testStockDisableReenablePreservesMarketsAndConfig() (gas: 12342311)
+[PASS] testUnknownStockRejected() (gas: 38027)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 7.81ms (5.35ms CPU time)
+
+Ran 2 tests for test/TopicMarketStockPriceSnapshot.t.sol:TopicMarketStockPriceSnapshotTest
+[PASS] testRejectsBadDataAndSequencerRecovery() (gas: 1332313)
+[PASS] testStockNativeUnitConversionAndImmutableSnapshotInputs() (gas: 8070239)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.37ms (1.27ms CPU time)
+
+Ran 7 tests for test/TopicMarketFeeSafety.t.sol:TopicMarketFeeSafetyTest
+[PASS] testCoreFailureRollsBackNewBFeesAndAllFunds() (gas: 887756)
+[PASS] testCoverUsesNetLPFeesOnceAndOnlyThenSplitsBResidual() (gas: 960850)
+[PASS] testFormalBuyThreeIndependentFeesAndNoBTokenDilution() (gas: 952726)
+[PASS] testFormalSellDeductsGrossExactlyAndAllocatesDistinctFees() (gas: 1008473)
+[PASS] testGenesisBuyCreatorOnePercentProtocolZeroAndDust() (gas: 393925)
+[PASS] testGenesisSellFullGrossReserveAndCreatorFee() (gas: 358526)
+[PASS] testTransferredBReceivesFormalIncomeWithoutCreatorDoubleClaim() (gas: 981542)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 2.81ms (2.05ms CPU time)
+
+Ran 8 tests for test/TopicMarketGraduationDepth.t.sol:TopicMarketDepthDecimalsTest
+[PASS] testDepthUnitsSixEightEighteenAndAllSettlementOutcomes() (gas: 66913893)
+[PASS] testEquivalentWholeTokenCurveAcrossDecimals() (gas: 97646632)
+[PASS] testForwardedOwnershipAndRouterPayout() (gas: 7015631)
+[PASS] testQuoteBoundsAcrossPrecisions() (gas: 87773476)
+[PASS] testStock18FailureAndFullRefundRights() (gas: 7017697)
+[PASS] testStock18GraduationFormalAndSettlement() (gas: 7484941)
+[PASS] testUnsupportedCollateralDecimalsRejected() (gas: 929255)
+[PASS] testUntrustedSuffixCannotImpersonate() (gas: 6988455)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 15.12ms (14.78ms CPU time)
+
+Ran 5 tests for test/TopicMarketGraduationDepth.t.sol:TopicMarketGraduationDepthTest
+[PASS] testBuyGraduationUsesActualOvershootCapital() (gas: 713427)
+[PASS] testInventoryBoundaryRemainsExplicit() (gas: 905341)
+[PASS] testMaximumCapitalTinyAndLargeRoundtripsNoFreeValue() (gas: 1201846)
+[PASS] testPriceImpactAndRoundtripKeepDepthAndFunds() (gas: 950454)
+[PASS] testSellGraduationUsesRemainingRNotBOrThreshold() (gas: 747909)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.86ms (1.35ms CPU time)
+
+Ran 2 tests for test/TopicMarketLiquidityAdd.t.sol:TopicMarketLiquidityAddTest
+[PASS] testAllBottomLiquidityAPIsLockedBeforeAndAfterGraduation() (gas: 727797)
+[PASS] testTransferAllLPDoesNotWithdrawUnderlyingOrEnableRestart() (gas: 702869)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 700.83µs (308.08µs CPU time)
+
+Ran 2 tests for test/TopicMarketNoDonation.t.sol:TopicMarketNoDonationTest
+[PASS] testInvalidSettlementStillAccountsPrincipalAndMarketFeesSeparately() (gas: 1790572)
+[PASS] testRemovedDonationSelectorCannotPullFunds() (gas: 656531)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.25ms (402.63µs CPU time)
+
+Ran 1 test for test/TopicMarketNumeric.t.sol:TopicMarketNumericTest
+[PASS] testHighPrecisionReferenceGrid() (gas: 108546)
+Logs:
+  Maximum absolute WAD cost error (24 samples): 12830099
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 212.75µs (171.58µs CPU time)
+
+Ran 8 tests for test/TopicMarketIntegrationV20.t.sol:TopicMarketIntegrationV20Test
+[PASS] testClaimAllBeforeTerminalOrWithoutRightsReverts() (gas: 869595)
+[PASS] testPreviewAndUnifiedClaimsInvalid() (gas: 1890990)
+[PASS] testPreviewAndUnifiedClaimsNo() (gas: 1999352)
+[PASS] testPreviewAndUnifiedClaimsYes() (gas: 2016444)
+[PASS] testUnifiedFailureClaimBurnsBAndGWithFrozenBudget() (gas: 582328)
+[PASS] testUnifiedFinalizeAfterBothAlreadyFinalized() (gas: 1864151)
+[PASS] testUnifiedFinalizeAfterVaultFirstAndRepeatedCall() (gas: 1835714)
+[PASS] testUnifiedFinalizeBeforeGraduationAndBeforeDeadlineReverts() (gas: 679404)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 5.86ms (8.20ms CPU time)
+
+Ran 2 tests for test/TopicMarketDepthNumeric.t.sol:TopicMarketDepthNumericTest
+[PASS] testFuzzDynamicDepthDomain(uint128,uint128,uint128,uint128) (runs: 256, μ: 22526, ~: 26139)
+[PASS] testHighPrecisionReferencesAtMaximumDynamicDepth() (gas: 40837)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 19.86ms (19.91ms CPU time)
+
+Ran 9 tests for test/TopicMarketPriceSnapshot.t.sol:TopicMarketPriceSnapshotTest
+[PASS] testConvertsUsdToUsdcAndAccountsForDepeg() (gas: 52251)
+[PASS] testHeartbeatBoundaryAndIndependentStaleness() (gas: 63570)
+[PASS] testMixedDecimalsNormalize() (gas: 961120)
+[PASS] testRejectsFutureAndZeroAndInvertedTimes() (gas: 39231)
+[PASS] testRejectsIncompleteRounds() (gas: 34163)
+[PASS] testRejectsMissingCodeDecimalsAndZeroHeartbeat() (gas: 379899)
+[PASS] testRejectsNonpositiveAnswersOnEitherFeed() (gas: 48275)
+[PASS] testRejectsNormalizationOverflow() (gas: 30017)
+[PASS] testRejectsPriceOutsideMarketBounds() (gas: 57286)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 4.59ms (377.08µs CPU time)
+
+Ran 8 tests for test/TopicMarketMath.t.sol:TopicMarketMathTest
+[PASS] testCostOverflowReverts() (gas: 10071)
+[PASS] testExtremeDifferenceAndAbsoluteCoordinates() (gas: 261)
+[PASS] testFuzzCostMonotonicWithinNumericalTolerance(uint96,uint96,uint96,uint96) (runs: 256, μ: 13432, ~: 19581)
+[PASS] testFuzzSymmetryTranslationAndBounds(uint128,uint128,uint128,uint128) (runs: 256, μ: 20642, ~: 20648)
+[PASS] testIntegerSqrtEdges() (gas: 549)
+[PASS] testReferenceCosts() (gas: 17010)
+[PASS] testReferenceProbabilities() (gas: 3893)
+[PASS] testRejectZeroDepth() (gas: 9776)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 20.37ms (34.70ms CPU time)
+
+Ran 8 tests for test/TopicMarketFeesV19.t.sol:TopicMarketFeesV19Test
+[PASS] testCoreFeeFailureRollsBackFormalBAccrualAndLPFee() (gas: 960938)
+[PASS] testFormalBuyExactSplitAndNoNewBToken() (gas: 964443)
+[PASS] testFormalReserveIncreasesActualFirstLossCover() (gas: 7328284)
+[PASS] testFormalSellExactSplitAndNoCreatorOrProtocolRevenue() (gas: 974557)
+[PASS] testFuzzFormalBuySellAllBucketsConserved(uint96) (runs: 256, μ: 1086687, ~: 1086714)
+[PASS] testGenesisCreatorGetsEntireOnePercentOnBuyAndSell() (gas: 359962)
+[PASS] testProtocolNeverAccruesAndCreatorStopsAfterGenesis() (gas: 958906)
+[PASS] testTransferredGenesisBReceivesFormalRevenueWithoutNewWeight() (gas: 1016310)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 149.35ms (150.05ms CPU time)
+
+Ran 14 tests for test/TopicMarketCoreFeeHistoryAudit.t.sol:TopicMarketCoreFeeHistoryAuditTest
+[PASS] testAllSixClaimOrdersKeepNonLastHistoryAndLastSweepsDust() (gas: 3637586)
+[PASS] testFractionalHistorySurvivesRepeatedCheckpoints() (gas: 1130344)
+[PASS] testFuzzPerArrivalReferenceNeverOvercommitsOrBackfills(uint256) (runs: 257, μ: 2712756, ~: 2683598)
+[PASS] testInvalidNoEligibleCapitalFeesGoToOfficial() (gas: 983680)
+[PASS] testInvalidRewardsFollowFeeArrivalNotClaimOrder() (gas: 1087481)
+[PASS] testLastLateZeroHistoryUserReceivesOnlyTheFinalDust() (gas: 1176050)
+[PASS] testLateJoinRoundingFixedInvalid() (gas: 2196237)
+[PASS] testLateJoinRoundingFixedNo() (gas: 1959284)
+[PASS] testLateJoinRoundingFixedYes() (gas: 1954725)
+[PASS] testNoSelectsOneHistoryAndNoParticipantFeesGoToOfficial() (gas: 1147770)
+[PASS] testTopUpRoundingFixedInvalid() (gas: 3443688)
+[PASS] testTopUpRoundingFixedNo() (gas: 3219682)
+[PASS] testTopUpRoundingFixedYes() (gas: 3213100)
+[PASS] testYesSelectsOneHistoryAndNoParticipantFeesGoToOfficial() (gas: 1147364)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 343.94ms (351.90ms CPU time)
+
+Ran 10 tests for test/TopicMarketFactory.t.sol:TopicMarketFactoryTest
+[PASS] testCarrierRuntimeAndCodeStoreSizes() (gas: 57256)
+[PASS] testCarriersOnlyAllowFactory() (gas: 23831)
+[PASS] testCoreCannotStakeUntilGraduationThenOpensAtomically() (gas: 13080198)
+[PASS] testCreatedEventUsesDerivedGenesisCutoff() (gas: 12225092)
+[PASS] testInvalidPriceDoesNotRegisterOrDeployMarket() (gas: 24767)
+[PASS] testMetadataMaximumAccepted() (gas: 12696984)
+[PASS] testRejectInvalidMetadataBeforeDeployment() (gas: 57212)
+[PASS] testRejectMismatchedFactoryCarriers() (gas: 83198)
+[PASS] testSnapshotIsFixedPerMarket() (gas: 24368228)
+[PASS] testZeroPrincipalAtomicCreateAndMetadata() (gas: 12255705)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 810.04ms (6.64ms CPU time)
+
+Ran 8 tests for test/TopicMarketMerge.t.sol:TopicMarketMergeTest
+[PASS] testCoreFeeRejectAtomicallyRollsBackSell() (gas: 1347548)
+[PASS] testFuzzFullHoldingSellCapacityAndCashAfterPair(uint96,uint8) (runs: 256, μ: 1646311, ~: 1646254)
+[PASS] testFuzzTradesLPBTransfersPartialBurnAllClaims(uint256,uint8) (runs: 257, μ: 3046719, ~: 3047593)
+[PASS] testLockedPoolActualBuyThenFullHoldingSellYesAndNo() (gas: 1420302)
+[PASS] testOnlyYesHoldingCanSellWithoutPersonalNo() (gas: 1147586)
+[PASS] testPairWaitCoreAndTerminalRejection() (gas: 1411146)
+[PASS] testPairsRedeemedThenAllRemainingHoldingsSell() (gas: 1425091)
+[PASS] testThreeOutcomeBudgetsAndAllClaimsAfterPairAndSells() (gas: 2274085)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 807.75ms (1.09s CPU time)
+
+Ran 3 tests for test/TopicMarketFullFlow.t.sol:TopicMarketFullFlowTest
+[PASS] testFactoryToClaimInvalid() (gas: 2509206)
+[PASS] testFactoryToClaimNo() (gas: 2501492)
+[PASS] testFactoryToClaimYes() (gas: 2516992)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 811.21ms (2.49ms CPU time)
+
+Ran 5 tests for test/TopicMarketTestnetTargets.t.sol:TopicMarketTestnetTargetsTest
+[PASS] testAlreadyDeployedProfileCannotBeUsedUnderMainnetChainId() (gas: 28712)
+[PASS] testEveryMarketGetsIndependentCloneFromSameSharedImplementation() (gas: 24472210)
+[PASS] testFixedTargetsIgnoreUnavailableEthPriceAndKeepUsdBondSeparate() (gas: 12277980)
+[PASS] testProfileRejectsMainnetEvenWithCorrectBindings() (gas: 14472656)
+[PASS] testSmallFundedOrdersStillRequireBothTargetsAndGraduate() (gas: 12976641)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 822.77ms (9.58ms CPU time)
+
+Ran 7 tests for test/TopicMarketStockCollateral.t.sol:TopicMarketStockCollateralTest
+[PASS] testEquivalentWholeTokenCurveAcrossDecimals() (gas: 97646606)
+[PASS] testForwardedOwnershipAndRouterPayout() (gas: 7015631)
+[PASS] testQuoteBoundsAcrossPrecisions() (gas: 87773476)
+[PASS] testStock18FailureAndFullRefundRights() (gas: 7017699)
+[PASS] testStock18GraduationFormalAndSettlement() (gas: 7484845)
+[PASS] testUnsupportedCollateralDecimalsRejected() (gas: 929237)
+[PASS] testUntrustedSuffixCannotImpersonate() (gas: 6988455)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 817.65ms (13.05ms CPU time)
+
+Ran 12 tests for test/TopicMarketRealCore.t.sol:TopicMarketRealCoreTest
+[PASS] testAdapterCannotBindTwiceOrForgeOutcome() (gas: 24275)
+[PASS] testAdapterFactoryCannotEnableLegacyEarlyTermination() (gas: 1114108)
+[PASS] testDemoParityLockedTokensBurn() (gas: 15835575)
+Logs:
+  PARITY graduated
+  collateral6: 25515000000
+  cash6: 0
+  inventoryYWad: 25515000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 0
+  B6: 1215000000
+  coreFeesSent6: 0
+  coreFeesEscrow6: 0
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500000000000000000
+  account: 0
+  wallet6: 1000000000
+  lpWad: 92222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 38199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 1000000000
+  lpWad: 29311763427984685986
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  PARITY buy_yes_80
+  collateral6: 25515000000
+  cash6: 40031356
+  inventoryYWad: 25435000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 204241
+  B6: 1215204241
+  coreFeesSent6: 408483
+  coreFeesEscrow6: 408483
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500783851993546959
+  account: 0
+  wallet6: 1000000000
+  lpWad: 92222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 38199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 959151677
+  lpWad: 29311763427984685986
+  yesWad: 80000000000000000000
+  noWad: 0
+  zWad: 405000000000000000000
+  PARITY transfer_lp_10
+  collateral6: 25515000000
+  cash6: 40031356
+  inventoryYWad: 25435000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 204241
+  B6: 1215204241
+  coreFeesSent6: 408483
+  coreFeesEscrow6: 408483
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500783851993546959
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 48199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 959151677
+  lpWad: 29311763427984685986
+  yesWad: 80000000000000000000
+  noWad: 0
+  zWad: 405000000000000000000
+  PARITY transfer_b_100
+  collateral6: 25515000000
+  cash6: 40031356
+  inventoryYWad: 25435000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 204241
+  B6: 1215204241
+  coreFeesSent6: 408483
+  coreFeesEscrow6: 408483
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500783851993546959
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 48199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 959151677
+  lpWad: 29311763427984685986
+  yesWad: 80000000000000000000
+  noWad: 0
+  zWad: 505000000000000000000
+  PARITY sell_yes_30
+  collateral6: 25515000000
+  cash6: 25012251
+  inventoryYWad: 25465000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 279336
+  B6: 1215279336
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500489907740538471
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 48199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 973870399
+  lpWad: 29311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 505000000000000000000
+  PARITY finalized
+  collateral6: 50000000
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 900000000
+  lpWad: 48199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 973870399
+  lpWad: 29311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 505000000000000000000
+  PARITY burn_lp_1
+  collateral6: 50000000
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 158734154143689633149
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1059734154
+  lpWad: 47199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 973870399
+  lpWad: 29311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 505000000000000000000
+  PARITY burn_b_50
+  collateral6: 50000000
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 158734154143689633149
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1059734154
+  lpWad: 47199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 1022865087
+  lpWad: 29311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 455000000000000000000
+  PARITY transfer_after_settle
+  collateral6: 50000000
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 158734154143689633149
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1059734154
+  lpWad: 45199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 1022865087
+  lpWad: 31311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 455000000000000000000
+  PARITY all_claimed
+  collateral6: 0
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 0
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 14432618173
+  lpWad: 0
+  yesWad: 0
+  noWad: 0
+  zWad: 0
+  account: 1
+  wallet6: 9046548351
+  lpWad: 0
+  yesWad: 0
+  noWad: 0
+  zWad: 0
+  account: 2
+  wallet6: 6520833468
+  lpWad: 0
+  yesWad: 0
+  noWad: 0
+  zWad: 0
+
+[PASS] testRealCoreAdapterRejectsUnboundFeeCaller() (gas: 651523)
+[PASS] testRealCoreFailureNeverOpensStaking() (gas: 494188)
+[PASS] testRealCoreFeeConditionalHistoricalSnapshotsAndInvalid() (gas: 2387876)
+[PASS] testRealCoreInvalidOutcome() (gas: 1093160)
+[PASS] testRealCoreLockedBeforeGraduationAndOpenAfter() (gas: 991857)
+[PASS] testRealCoreNoOutcome() (gas: 1105904)
+[PASS] testRealCoreNoSideFeeFinalAndNoBackfill() (gas: 1761204)
+[PASS] testRealCoreNoStakeFeeFallsBackWithoutLateBackfill() (gas: 1678318)
+[PASS] testRealCoreOneHourAfterFormalAndYesFinal() (gas: 1598190)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 829.22ms (11.59ms CPU time)
+
+Ran 8 tests for test/TopicMarketTestnetStockPriceSnapshot.t.sol:TopicMarketTestnetStockPriceSnapshotTest
+[PASS] testAlreadyDeployedReaderRejectsCrossChainUse() (gas: 189392)
+[PASS] testCanonicalTokenMustHaveCodeAndEighteenDecimals() (gas: 135171)
+[PASS] testConstructorRejectsOtherChainsBeforeTokenRead() (gas: 70300)
+[PASS] testFixedPriceHasNoImpliedFreshnessDeadline() (gas: 187178)
+[PASS] testFixedTestPriceAndFiveHundredUsdBondAreSeparateFromEth() (gas: 193000)
+[PASS] testFuzzCeilingMatchesIndependentIntegerDivisionWithoutProductOverflow(uint256) (runs: 256, μ: 184390, ~: 184379)
+[PASS] testMaximumUsdWadDoesNotOverflowIntermediateProduct() (gas: 184160)
+[PASS] testZeroAndCeilingAtRawUnitBoundaries() (gas: 188348)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 826.48ms (826.35ms CPU time)
+
+Ran 4 tests for test/TopicMarketExitAtomicity.t.sol:TopicMarketExitAtomicityTest
+[PASS] testEveryoneExitsDuringPendingRequestThenSlashedBondAndEmptyFallbackRemainClaimable() (gas: 1441688)
+[PASS] testFuzzStakeAppendFeeExitReentryRemainSolventAcrossAllThreeResults(uint256) (runs: 256, μ: 4755998, ~: 4778583)
+[PASS] testProposalCanFinalizeWithoutTransferAndRejectedPullRefundPreservesDebt() (gas: 1434277)
+[PASS] testRejectedExitTransferRollsBackAllHistoryWeightsAndPenaltyThenRecovers() (gas: 1090172)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.60s (1.60s CPU time)
+
+Ran 2 tests for test/TopicMarketStatefulInvariant.t.sol:TopicMarketStatefulInvariantTest
+[PASS] invariantMarketSolventAndRightsConserved() (runs: 128, calls: 8192, reverts: 0)
+
+╭----------------------------+-------------+-------+---------+----------╮
+| Contract                   | Selector    | Calls | Reverts | Discards |
++=======================================================================+
+| TopicMarketStatefulHandler | advance     | 1190  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | claims      | 1098  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | formalTrade | 1173  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | genesisBuy  | 1168  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | genesisSell | 1189  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | rights      | 1238  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | stake       | 1136  | 0       | 0        |
+╰----------------------------+-------------+-------+---------+----------╯
+
+[PASS] invariantUSDCNeverCreatedOrLostAcrossEscrows() (runs: 128, calls: 8192, reverts: 0)
+
+╭----------------------------+-------------+-------+---------+----------╮
+| Contract                   | Selector    | Calls | Reverts | Discards |
++=======================================================================+
+| TopicMarketStatefulHandler | advance     | 1190  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | claims      | 1098  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | formalTrade | 1173  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | genesisBuy  | 1168  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | genesisSell | 1189  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | rights      | 1238  | 0       | 0        |
+|----------------------------+-------------+-------+---------+----------|
+| TopicMarketStatefulHandler | stake       | 1136  | 0       | 0        |
+╰----------------------------+-------------+-------+---------+----------╯
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 2.09s (2.66s CPU time)
+
+Ran 16 tests for test/TopicMarketEarlyExit.t.sol:TopicMarketEarlyExitTest
+[PASS] testAllSidesExitRoundsPenaltyUpAndCannotExitTwice() (gas: 1599635)
+[PASS] testChallengeWindowAllowsVotesToChangeAndRequestedResultMustMatchAtExecution() (gas: 756364)
+[PASS] testExpiredPendingBlocksNewStakeExitAndFeeUntilLateExecutorProcesses() (gas: 842400)
+[PASS] testFixedProposalBondIgnoresPrincipalSizeAndEmptyCapitalCannotPropose() (gas: 537753)
+[PASS] testInvalidPenaltyIncludesInvalidCapitalButForfeitedFeesExcludeIt() (gas: 1681844)
+[PASS] testLateExecutorProcessesEarlierDueSuccessAtFixedEffectiveCutoff() (gas: 903179)
+[PASS] testLateFailedRequestSlashesBondThenFinalizesAtOriginalCutoff() (gas: 856395)
+[PASS] testMatchingProposalFreezesThenPullRefundsBondOnce() (gas: 925519)
+[PASS] testNoExitThenYesReentryCannotRecoverOldConditionalFeeHistory() (gas: 1544360)
+[PASS] testNoWinnerGetsExitPenaltyAndSelectedForfeitedFees() (gas: 1404630)
+[PASS] testOneRawUnitExitReturnsZeroAndRetainsOnePenalty() (gas: 677248)
+[PASS] testReentryMayShareRedistributedBonusButDoesNotRestoreOwnHistory() (gas: 939870)
+[PASS] testRejectedProposalSlashesBondResumesAndDoesNotChangeVoteWeight() (gas: 1293721)
+[PASS] testTooLateToOpenFullChallengeWindowAndBadOutcomeRejected() (gas: 314425)
+[PASS] testYesWinnerGetsExitPenaltyAndSelectedForfeitedFees() (gas: 1404400)
+[PASS] testZeroConfiguredBondDisablesProposalWithoutDisablingStakeExit() (gas: 5213505)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 2.09s (5.94ms CPU time)
+
+Ran 35 test suites in 2.09s (12.11s CPU time): 256 tests passed, 0 failed, 0 skipped (256 total tests)

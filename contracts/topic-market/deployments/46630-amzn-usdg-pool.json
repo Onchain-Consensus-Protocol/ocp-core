@@ -1,0 +1,164 @@
+{
+  "chainId": 46630,
+  "addresses": {
+    "wallet": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
+    "amzn": "0x5884aD2f920c162CFBbACc88C9C51AA75eC09E02",
+    "usdg": "0x7E955252E15c84f5768B83c41a71F9eba181802F",
+    "sourceFactory": "0x99D7fcf0153b1CB171F0de432D8aC159Abc63b24",
+    "quoter": "0x7C8772fbdF1A1d9Ded219E51D3147d7C04475921",
+    "sourceRouter": "0x7D428Ea2B371DFB7f97B6541F785c29bb0963A81",
+    "factory": "0xFECCB63CD759d768538458Ea56F47eA8004323c1",
+    "router": "0x1b32F47434a7EF83E97d0675C823E547F9266725",
+    "manager": "0xBc82a9aA33ff24FCd56D36a0fB0a2105B193A327",
+    "referencePool": "0xcEd30770353b503Ca144CB5F92dFdd81266Ac33c"
+  },
+  "transactions": [
+    {
+      "label": "approve 0.1 AMZN swap",
+      "hash": "0x88a1cd7869c4e5d3a40a6087943e7b44421cb5ebd3e176939524d8a2338fbc96",
+      "status": 1,
+      "blockNumber": 144604132,
+      "gasUsed": "60588"
+    },
+    {
+      "label": "swap 0.1 AMZN to official USDG",
+      "hash": "0xd584e9f27e4ca36470c6c786fb4c9f4a0f17351577986c8e7b4a038a14d2f472",
+      "status": 1,
+      "blockNumber": 144604160,
+      "gasUsed": "168479"
+    },
+    {
+      "label": "create and initialize OCP AMZN USDG pool",
+      "hash": "0x5bc2a5c021f36df9119df4b47352b2a3e28756333dd89d136af399f681706c21",
+      "status": 1,
+      "blockNumber": 144604352,
+      "gasUsed": "4613681"
+    },
+    {
+      "label": "approve AMZN liquidity",
+      "hash": "0xfe62ce7913bd5de08a2a8d84577f2ae6b0752e1046e5dc4899476720f04c5321",
+      "status": 1,
+      "blockNumber": 144604419,
+      "gasUsed": "60612"
+    },
+    {
+      "label": "approve USDG liquidity",
+      "hash": "0x45dcac88e16a061093c55b4f1d015e468688d278636833c5664cc2861e0b2b2e",
+      "status": 1,
+      "blockNumber": 144604474,
+      "gasUsed": "57976"
+    },
+    {
+      "label": "mint OCP test liquidity position",
+      "hash": "0x40674e418071d878f7554cad124c315b0502ac935742e562ad6fe22b284160bf",
+      "status": 1,
+      "blockNumber": 144604503,
+      "gasUsed": "641657"
+    },
+    {
+      "label": "clear AMZN liquidity allowance reset",
+      "hash": "0x4fc327a3a4f2ac61b1bc92b403b812296dab8ff9f20ea60da9ed0f4a84f10f19",
+      "status": 1,
+      "blockNumber": 144604568,
+      "gasUsed": "38616"
+    },
+    {
+      "label": "approve 0.1 USDG test buy",
+      "hash": "0xf38e508f87cc3a8ad259194cf7254a328c4b9e3c7925eb9493b3d25ab948177c",
+      "status": 1,
+      "blockNumber": 144604949,
+      "gasUsed": "57976"
+    },
+    {
+      "label": "test pool USDG to AMZN",
+      "hash": "0xfa120c34b0e1092370bd96a36ae4eb63b7791acbf8bc932a66af24ee5e96a950",
+      "status": 1,
+      "blockNumber": 144604981,
+      "gasUsed": "166057"
+    },
+    {
+      "label": "approve test AMZN sell",
+      "hash": "0x1c175ff5f0220411bee6068d1cafacbf9618ee951fe1e54441430aae55f44497",
+      "status": 1,
+      "blockNumber": 144605040,
+      "gasUsed": "60600"
+    },
+    {
+      "label": "test pool AMZN to USDG",
+      "hash": "0x866fc11d6071adaf47b6cb49e23bb79ab97d8705818fd5a6bfca3ac38a710d81",
+      "status": 1,
+      "blockNumber": 144605111,
+      "gasUsed": "168362"
+    }
+  ],
+  "swap": {
+    "amznSpent": "100000000000000000",
+    "usdgReceived": "23973739",
+    "minOutput": "23734001",
+    "amznAfter": "4900000000000000000",
+    "usdgAfter": "23973739"
+  },
+  "plan": {
+    "referenceSqrtPriceX96": "1204247682407841962606032",
+    "desiredAMZN": "86568028056909890",
+    "desiredUSDG": "20000000",
+    "fee": 3000,
+    "tickLower": -887220,
+    "tickUpper": 887220
+  },
+  "pool": "0x16E647693BA565ccf11E25b5E7c69ae73328CB9c",
+  "position": {
+    "tokenId": "837",
+    "owner": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
+    "liquidity": "1315811749886",
+    "amznBalance": "4813431971943093619",
+    "usdgBalance": "3973739"
+  },
+  "testBuy": {
+    "usdgIn": "100000",
+    "amznOut": "429401055601522"
+  },
+  "roundTrip": {
+    "usdgIn": "100000",
+    "amznBoughtAndSold": "429401055601522",
+    "usdgReturned": "99402",
+    "amznBalance": "4813431971943093619",
+    "usdgBalance": "3973141"
+  },
+  "finalChecks": {
+    "AMZN": {
+      "wallet": "4813431971943093619",
+      "pool": "86568028056906381",
+      "allowances": {
+        "0x7D428Ea2B371DFB7f97B6541F785c29bb0963A81": "0",
+        "0x1b32F47434a7EF83E97d0675C823E547F9266725": "0",
+        "0xBc82a9aA33ff24FCd56D36a0fB0a2105B193A327": "0"
+      }
+    },
+    "USDG": {
+      "wallet": "3973141",
+      "pool": "20000598",
+      "allowances": {
+        "0x7D428Ea2B371DFB7f97B6541F785c29bb0963A81": "0",
+        "0x1b32F47434a7EF83E97d0675C823E547F9266725": "0",
+        "0xBc82a9aA33ff24FCd56D36a0fB0a2105B193A327": "0"
+      }
+    },
+    "poolFactory": "0xFECCB63CD759d768538458Ea56F47eA8004323c1",
+    "liquidity": "1315811749886",
+    "positionOwner": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+    "chainId": 46630
+  },
+  "network": "Robinhood Chain Testnet",
+  "scope": "Independent AMZN / official Paxos test USDG V3 pool, created in an existing StonkBrokers-listed V3 factory; no new V3 factory deployed. OCP stock registration and frontend integration are separate and have not been performed.",
+  "sourceVerification": {
+    "status": "submitted; explorer has not yet confirmed verified",
+    "compiler": "v0.7.6+commit.7338295f",
+    "optimizerRuns": 800,
+    "metadataBytecodeHash": "none",
+    "publicSource": "https://github.com/Uniswap/v3-core/tree/ed88be38ab2032d82bf10ac6f8d03aa631889d48",
+    "canonicalCreationBytecodeExactMatch": true
+  },
+  "poolAccess": "V3 pool is permissionless; the wallet owns the liquidity position, not exclusive access to swaps.",
+  "testOnly": true
+}

@@ -1,0 +1,17 @@
+{
+  "chainId": 46630,
+  "factory": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
+  "stockCount": "1",
+  "marketCount": "1",
+  "owner": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+  "market": "0xBe0d01292Df5cef376A40be7433C9b5B0C398857",
+  "core": "0xaf18a2379AD5D5462A8218c07F56546CbcB8A2d0",
+  "module": "0x3d0486e0f4bF82f448916CE3E7C5BeB70F0fdB7D",
+  "cloneBytes": 45,
+  "phase": "1",
+  "bond": "1250000000000000000",
+  "exitPenalty": "100000000000000",
+  "marketInvariant": true,
+  "coreAccounting": true,
+  "ethBalance": "0.00939574657"
+}

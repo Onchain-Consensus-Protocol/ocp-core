@@ -1,0 +1,33 @@
+No files changed, compilation skipped
+
+Ran 2 tests for test/RHProductionOracleFork.t.sol:RHProductionOracleForkTest
+[PASS] testForkOfficialFeedsCreateFiveMarketsWithRealSnapshots() (gas: 80423291)
+Logs:
+  official stock feed: 0x4A1166a659A55625345e9515b32adECea5547C38
+  ETH in native stock units: 5808655143989368617
+  official stock feed: 0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15
+  ETH in native stock units: 10713799012547440867
+  official stock feed: 0x6B22A786bAa607d76728168703a39Ea9C99f2cD0
+  ETH in native stock units: 6768857274449007078
+  official stock feed: 0xF6f373a037c30F0e5010d854385cA89185AE638b
+  ETH in native stock units: 7216679987905667726
+  official stock feed: 0xB265810950ba6c5C0Ff821c9963014a56fD8Bffb
+  ETH in native stock units: 16126200877602458308
+
+[PASS] testForkRealFeedsRejectStaleSnapshots() (gas: 5054550)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 921.34ms (13.58ms CPU time)
+
+Ran 1 test for test/RHSharedFactoryFork.t.sol:RHSharedFactoryForkTest
+[PASS] testForkSharedFactoryFiveConcurrentStockLifecycles() (gas: 108697706)
+Logs:
+  settled stock: 0x322F0929c4625eD5bAd873c95208D54E1c003b2d
+  settled stock: 0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC
+  settled stock: 0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9
+  settled stock: 0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3
+  settled stock: 0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa
+  shared factory stock count: 5
+  concurrent markets settled: 5
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 971.44ms (60.75ms CPU time)
+
+Ran 2 test suites in 974.14ms (1.89s CPU time): 3 tests passed, 0 failed, 0 skipped (3 total tests)

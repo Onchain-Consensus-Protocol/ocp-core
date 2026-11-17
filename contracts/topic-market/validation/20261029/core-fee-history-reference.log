@@ -1,0 +1,11 @@
+PASS: independent Core fee-history reference
+seed=20261029; precision=17 (intentionally low stress precision)
+traces=5000; actions_per_trace=50; accounts=6
+ledgers=YES,NO,INVALID; actions=stake/append,fee,checkpoint
+PASS: conditional views equal independent interval entitlement after every action
+PASS: checkpoint partition preserves earned integer rewards and fractional remainders
+PASS: new/added principal receives no historical index growth
+PASS: every account reward <= exact rational deposit-time entitlement
+PASS: aggregate rewards <= selected distributed fees in every ledger
+PASS: three shuffled claim orders per outcome leave identical nonnegative reward dust
+Scope: mathematical model only; no EVM/RPC run, no principal payout or withdrawal-levy validation

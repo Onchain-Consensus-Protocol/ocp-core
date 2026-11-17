@@ -1,0 +1,12 @@
+Start verifying contract `0xB5C08A89F11D18A62361b87Dc963379281CA6D82` deployed on 46630
+Compiler version: v0.8.20+commit.a1b79de6
+Constructor args: 0000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be70000000000000000000000001556a9a5c01ecc4ef11e751cacc847dd36971be700000000000000000000000019bf21294ffbcaa2a83adbbb84e1b6d6af5eb715000000000000000000000000aac1107e6febdba424a3477dfeee9d8d3a58cbb7
+
+Submitting verification for [src/TopicMarketTestnetStockFactory.sol:TopicMarketTestnetStockFactory] 0xB5C08A89F11D18A62361b87Dc963379281CA6D82.
+Submitted contract for verification:
+	Response: `OK`
+	GUID: `b5c08a89f11d18a62361b87dc963379281ca6d826ae344db`
+	URL: https://explorer.testnet.chain.robinhood.com/address/0xb5c08a89f11d18a62361b87dc963379281ca6d82
+Contract verification status:
+Response: `OK`
+Details: `Unknown UID`

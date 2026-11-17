@@ -1,0 +1,56 @@
+{
+  "TopicMarketCoreDeployer": {
+    "address": "0x19BF21294FFBCaa2A83adBbB84e1b6d6Af5Eb715",
+    "is_verified": false,
+    "name": null,
+    "is_contract": true
+  },
+  "TopicMarketDeployer": {
+    "address": "0xaaC1107E6FebDbA424A3477DfEEe9D8d3A58cBB7",
+    "is_verified": false,
+    "name": null,
+    "is_contract": true
+  },
+  "TopicMarketTestnetStockFactory": {
+    "address": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
+    "is_verified": false,
+    "name": null,
+    "is_contract": true
+  },
+  "TopicMarketTestnetStockPriceSnapshot": {
+    "address": "0x7Dce9f918bcaDB559035449599764D75eb3BaE4B",
+    "is_verified": true,
+    "name": "TopicMarketTestnetStockPriceSnapshot",
+    "is_contract": true
+  },
+  "TopicMarketV3Exchange": {
+    "address": "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300",
+    "is_verified": true,
+    "name": "TopicMarketV3Exchange",
+    "is_contract": true
+  },
+  "TopicMarketAssetRouter": {
+    "address": "0x1DA3854B8138f8fFd99061393d3fD938c05539de",
+    "is_verified": true,
+    "name": "TopicMarketAssetRouter",
+    "is_contract": true
+  },
+  "OCPCore": {
+    "address": "0xaf18a2379AD5D5462A8218c07F56546CbcB8A2d0",
+    "is_verified": true,
+    "name": "OCPCore",
+    "is_contract": true
+  },
+  "TopicMarket": {
+    "address": "0xBe0d01292Df5cef376A40be7433C9b5B0C398857",
+    "is_verified": true,
+    "name": "TopicMarket",
+    "is_contract": true
+  },
+  "EarlyModuleImplementation": {
+    "address": "0x276131C2D7Be736B1Ddd9abb5E63507f7D91774c",
+    "is_verified": true,
+    "name": "TopicMarketEarlyTerminationModule",
+    "is_contract": true
+  }
+}

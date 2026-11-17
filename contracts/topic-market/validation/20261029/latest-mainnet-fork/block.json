@@ -1,0 +1,10 @@
+{
+  "rpc": "https://rpc.mainnet.chain.robinhood.com",
+  "chainId": 4663,
+  "number": 100858540,
+  "hash": "0x54e1f1c3dcea14aca91d001feeebd87ed3b173d5ea1d6847940f6a53811ba763",
+  "timestamp": 1793272317,
+  "executedUTC": "2026-10-29T11:12:00.317838+00:00",
+  "scope": "local fork only; no broadcast",
+  "blockTimeAsiaShanghai": "2026-10-29T19:11:57+08:00"
+}

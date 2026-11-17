@@ -1,0 +1,16 @@
+
+> ocp-浏览器@0.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/chen/Desktop/OCP/ocp-core/frontend
+
+Browserslist: browsers data (caniuse-lite) is 9 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+ Test Files  28 passed (28)
+      Tests  213 passed | 9 skipped (222)
+   Start at  18:36:00
+   Duration  815ms (transform 1.09s, setup 0ms, import 2.22s, tests 1.20s, environment 2ms)
+

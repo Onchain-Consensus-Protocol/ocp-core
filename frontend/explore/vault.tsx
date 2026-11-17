@@ -202,8 +202,6 @@ interface DetailState {
   stakeTokenAddress: string;
   totalPrincipal: string;
   totalPrincipalRaw: string;
-  totalFees: string;
-  totalDonationsRaw: string;
   settlementPoolRaw: string;
   remainingSettlementPoolRaw: string;
   remainingEligibleClaimsRaw: string;
@@ -613,13 +611,6 @@ function VaultPage({
         }
       }
 
-      let totalFees = 0n;
-      try {
-        totalFees = await vault.totalDonations();
-      } catch {
-        // Old vaults without totalFees; fallback to 0
-      }
-
       const token = new Contract(stakeTokenAddr, ERC20_ABI, provider);
       const [decimals, symbol, vaultBalance] = await Promise.all([
         token.decimals(),
@@ -749,8 +740,6 @@ function VaultPage({
         stakeTokenAddress: stakeTokenAddr,
         totalPrincipal: format(totalPrincipal.toString()),
         totalPrincipalRaw: totalPrincipal.toString(),
-        totalFees: format(totalFees.toString()),
-        totalDonationsRaw: totalFees.toString(),
         settlementPoolRaw: settlementPool.toString(),
         remainingSettlementPoolRaw: remainingSettlementPool.toString(),
         remainingEligibleClaimsRaw: remainingEligibleClaims.toString(),

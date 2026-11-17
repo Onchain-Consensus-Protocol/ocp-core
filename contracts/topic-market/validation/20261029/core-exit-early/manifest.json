@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-29",
+  "status": "local implementation verified; no deployment/publication",
+  "bond": "500 USD converted to collateral native amount at creation; immutable",
+  "windowSeconds": 3600,
+  "exitPenalty": "ceil(principal/10)",
+  "contractTests": {
+    "passed": 234,
+    "failed": 0,
+    "skipped": 0,
+    "networkForks": "not run in this validation"
+  },
+  "frontendTests": {
+    "passed": 212,
+    "skipped": 9
+  },
+  "types": "passed",
+  "build": "passed",
+  "runtimeBytes": {
+    "OCPVault": 19037,
+    "VaultCoreAdapter": 5743,
+    "TopicMarketCoreDeployer": 1698,
+    "TopicMarket": 24416,
+    "TopicMarketStockFactory": 8371
+  },
+  "sha256": {
+    "contracts/topic-market/lib/ocp-snapshot/src/core/OCPVault.sol": "fce81b2cbefe1be48e12be18cd1fade3b41d18347179b1dc34c52b302f395ada",
+    "contracts/topic-market/lib/ocp-snapshot/src/interfaces/IOCPVault.sol": "a42b78a4913885868d1d3799d23d1ed20cb3f078fdbf36e9c5d62d7294cc4784",
+    "contracts/topic-market/src/TopicMarket.sol": "c0a2677d447ffe8fbdda1abbf7a7b6f44068075f15162ef3a8e8daeb12462204",
+    "contracts/topic-market/src/VaultCoreAdapter.sol": "f8d9c82c0728d2301da24b781031b7264da29da5ad70f04598096d8ba3929de9",
+    "contracts/topic-market/src/TopicMarketFactory.sol": "9219a880da0c8e5b1f1b7f96952261690ce06563a829f132e179b44d5535fdf7",
+    "contracts/topic-market/src/TopicMarketStockFactory.sol": "282422ea545aafcc0be0fde2657ccabe53d712a0dadeec3eefc79d0badd977c0",
+    "contracts/topic-market/src/TopicMarketStockPriceSnapshot.sol": "6c8981b961e09fbd2acaa7fa04809314007f6b027023485e6d4c2823df9ed4c7",
+    "contracts/topic-market/src/TopicMarketPriceSnapshot.sol": "627252f384540bd8b30c976b76d1a941698328e8a8679094a44888bc5d26656d",
+    "frontend/testnet/chainClient.ts": "1a0cf16b5264f58c3c96e40e0f8f382b2d58bcced90992cac65a6c9f07bcf96d",
+    "frontend/components/TestnetMarketApp.tsx": "74adf08115a61e7af09755e67aaedc490f238ddf7701c3ff2fb2f08c536c969e"
+  }
+}

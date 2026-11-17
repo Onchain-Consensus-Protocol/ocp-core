@@ -1,0 +1,394 @@
+Compiling 8 files with Solc 0.8.20
+Solc 0.8.20 finished in 67.32s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/TopicMarket.sol:704:13:
+    |
+704 |             uint256 carry = withdrawalFeeRemainder[account];
+    |             ^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/TopicMarket.sol:715:9:
+    |
+715 |         uint256 carry = withdrawalFeeRemainder[account];
+    |         ^^^^^^^^^^^^^
+
+
+Ran 2 tests for test/TopicMarketNoDonation.t.sol:TopicMarketNoDonationTest
+[PASS] testInvalidSettlementStillAccountsPrincipalAndMarketFeesSeparately() (gas: 1801792)
+[PASS] testRemovedDonationSelectorCannotPullFunds() (gas: 654111)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 8.81ms (500.75µs CPU time)
+
+Ran 12 tests for test/TopicMarketRealCore.t.sol:TopicMarketRealCoreTest
+[PASS] testAdapterCannotBindTwiceOrForgeOutcome() (gas: 24273)
+[PASS] testAdapterFactoryCannotEnableLegacyEarlyTermination() (gas: 1103820)
+[PASS] testDemoParityLockedTokensBurn() (gas: 14022399)
+Logs:
+  PARITY graduated
+  collateral6: 25515000000
+  cash6: 0
+  inventoryYWad: 25515000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 0
+  B6: 1215000000
+  coreFeesSent6: 0
+  coreFeesEscrow6: 0
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500000000000000000
+  account: 0
+  wallet6: 1000000000
+  lpWad: 92222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 38199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 1000000000
+  lpWad: 29311763427984685986
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  PARITY buy_yes_80
+  collateral6: 25515000000
+  cash6: 40031356
+  inventoryYWad: 25435000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 204241
+  B6: 1215204241
+  coreFeesSent6: 408483
+  coreFeesEscrow6: 408483
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500783851993546959
+  account: 0
+  wallet6: 1000000000
+  lpWad: 92222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 38199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 959151677
+  lpWad: 29311763427984685986
+  yesWad: 80000000000000000000
+  noWad: 0
+  zWad: 405000000000000000000
+  PARITY transfer_lp_10
+  collateral6: 25515000000
+  cash6: 40031356
+  inventoryYWad: 25435000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 204241
+  B6: 1215204241
+  coreFeesSent6: 408483
+  coreFeesEscrow6: 408483
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500783851993546959
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 48199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 959151677
+  lpWad: 29311763427984685986
+  yesWad: 80000000000000000000
+  noWad: 0
+  zWad: 405000000000000000000
+  PARITY transfer_b_100
+  collateral6: 25515000000
+  cash6: 40031356
+  inventoryYWad: 25435000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 204241
+  B6: 1215204241
+  coreFeesSent6: 408483
+  coreFeesEscrow6: 408483
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500783851993546959
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 48199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 959151677
+  lpWad: 29311763427984685986
+  yesWad: 80000000000000000000
+  noWad: 0
+  zWad: 505000000000000000000
+  PARITY sell_yes_30
+  collateral6: 25515000000
+  cash6: 25012251
+  inventoryYWad: 25465000000000000000000
+  inventoryNWad: 25515000000000000000000
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 279336
+  B6: 1215279336
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  priceYesWad: 500489907740538471
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1000000000
+  lpWad: 48199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 973870399
+  lpWad: 29311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 505000000000000000000
+  PARITY finalized
+  collateral6: 50000000
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 159734154143689633149
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 900000000
+  lpWad: 48199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 973870399
+  lpWad: 29311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 505000000000000000000
+  PARITY burn_lp_1
+  collateral6: 50000000
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 158734154143689633149
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1058136813
+  lpWad: 47199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 975467740
+  lpWad: 29311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 505000000000000000000
+  PARITY burn_b_50
+  collateral6: 50000000
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 158734154143689633149
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1058136813
+  lpWad: 47199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 1024462428
+  lpWad: 29311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 455000000000000000000
+  PARITY transfer_after_settle
+  collateral6: 50000000
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 158734154143689633149
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 1000000000
+  lpWad: 82222556893636385448
+  yesWad: 0
+  noWad: 0
+  zWad: 305000000000000000000
+  account: 1
+  wallet6: 1058136813
+  lpWad: 45199833822068561715
+  yesWad: 0
+  noWad: 0
+  zWad: 405000000000000000000
+  account: 2
+  wallet6: 1024462428
+  lpWad: 31311763427984685986
+  yesWad: 50000000000000000000
+  noWad: 0
+  zWad: 455000000000000000000
+  PARITY all_claimed
+  collateral6: 0
+  cash6: 0
+  inventoryYWad: 0
+  inventoryNWad: 0
+  basisWad: 25515000000000000000000
+  bWad: 25515000000000000000000
+  liquiditySupplyWad: 0
+  lpFees6: 0
+  B6: 0
+  coreFeesSent6: 558674
+  coreFeesEscrow6: 558674
+  merged6: 0
+  redeemed6: 0
+  account: 0
+  wallet6: 14298291992
+  lpWad: 0
+  yesWad: 0
+  noWad: 0
+  zWad: 0
+  account: 1
+  wallet6: 8965082868
+  lpWad: 0
+  yesWad: 0
+  noWad: 0
+  zWad: 0
+  account: 2
+  wallet6: 6736625132
+  lpWad: 0
+  yesWad: 0
+  noWad: 0
+  zWad: 0
+
+[PASS] testRealCoreAdapterRejectsUnboundFeeCaller() (gas: 649419)
+[PASS] testRealCoreFailureNeverOpensStaking() (gas: 505638)
+[PASS] testRealCoreFeeConditionalHistoricalSnapshotsAndInvalid() (gas: 2415629)
+[PASS] testRealCoreInvalidOutcome() (gas: 1083384)
+[PASS] testRealCoreLockedBeforeGraduationAndOpenAfter() (gas: 948165)
+[PASS] testRealCoreNoOutcome() (gas: 1096145)
+[PASS] testRealCoreNoSideFeeFinalAndNoBackfill() (gas: 1762852)
+[PASS] testRealCoreNoStakeFeeFallsBackWithoutLateBackfill() (gas: 1589449)
+[PASS] testRealCoreOneHourAfterFormalAndYesFinal() (gas: 1599024)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 12.52ms (7.91ms CPU time)
+
+Ran 11 tests for test/TopicMarketCoreWithdrawalFee.t.sol:TopicMarketCoreWithdrawalFeeTest
+[PASS] testForwardedWithdrawalUsesUserCarryAndSendsOnlyNetToForwarder() (gas: 3659156)
+[PASS] testFuzzPreviewWithCarryIsOverflowSafeAndReadOnly(uint256) (runs: 256, μ: 685511, ~: 685511)
+[PASS] testOfficialEmptyAndSurplusExitsAreNotTaxedAgain() (gas: 314639)
+[PASS] testPrincipalAndRewardConsumeGrossButPayNet() (gas: 691122)
+[PASS] testRejectProjectAsForwarder() (gas: 3176870)
+[PASS] testRejectedNetTransferRollsBackAlreadySentProjectFee() (gas: 565303)
+[PASS] testRejectedProjectTransferRollsBackPrincipalRewardAndCarry() (gas: 888192)
+[PASS] testRejectedThirdPartyRewardTransferPreservesRightAndCarry() (gas: 918026)
+[PASS] testStandaloneRewardReturnsNetAndKeepsGrossEvent() (gas: 718702)
+[PASS] testThirdPartyRewardThenPrincipalSharesCarryWithCombinedClaim() (gas: 4409576)
+[PASS] testYesNoAndInvalidGrossPoolsRemainCovered() (gas: 7863963)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 35.89ms (37.06ms CPU time)
+
+Ran 14 tests for test/TopicMarketCoreFeeHistoryAudit.t.sol:TopicMarketCoreFeeHistoryAuditTest
+[PASS] testAllSixClaimOrdersKeepNonLastHistoryAndLastSweepsDust() (gas: 3949168)
+[PASS] testFractionalHistorySurvivesRepeatedCheckpoints() (gas: 1130428)
+[PASS] testFuzzPerArrivalReferenceNeverOvercommitsOrBackfills(uint256) (runs: 257, μ: 2720521, ~: 2686272)
+[PASS] testInvalidNoEligibleCapitalFeesGoToOfficial() (gas: 993381)
+[PASS] testInvalidRewardsFollowFeeArrivalNotClaimOrder() (gas: 1094567)
+[PASS] testLastLateZeroHistoryUserReceivesOnlyTheFinalDust() (gas: 1222776)
+[PASS] testLateJoinRoundingFixedInvalid() (gas: 2317547)
+[PASS] testLateJoinRoundingFixedNo() (gas: 2056571)
+[PASS] testLateJoinRoundingFixedYes() (gas: 2052009)
+[PASS] testNoSelectsOneHistoryAndNoParticipantFeesGoToOfficial() (gas: 1131269)
+[PASS] testTopUpRoundingFixedInvalid() (gas: 3572006)
+[PASS] testTopUpRoundingFixedNo() (gas: 3328782)
+[PASS] testTopUpRoundingFixedYes() (gas: 3322197)
+[PASS] testYesSelectsOneHistoryAndNoParticipantFeesGoToOfficial() (gas: 1130860)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 293.65ms (309.22ms CPU time)
+
+Ran 4 test suites in 302.85ms (350.87ms CPU time): 39 tests passed, 0 failed, 0 skipped (39 total tests)

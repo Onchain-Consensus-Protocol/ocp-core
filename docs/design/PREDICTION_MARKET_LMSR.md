@@ -116,7 +116,7 @@ UNFUNDED
 
 ## 工厂约束
 
-- 唯一生产入口是 `OCPVaultFactory.createMarket`；
+- 唯一生产入口是 `OCPCoreFactory.createMarket`；
 - Factory 通过两个轻量部署器在同一笔交易部署并一对一登记 Vault 与 Prediction Market，
   避免 Factory runtime 嵌入两份 creation bytecode 而超过 EIP-170；
 - 允许 Vault 在零本金状态与 Prediction Market 同步冷启动；

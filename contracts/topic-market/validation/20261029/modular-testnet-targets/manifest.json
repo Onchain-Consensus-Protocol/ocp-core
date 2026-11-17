@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-29",
+  "status": "local verified, no deployment or publication",
+  "earlyModule": "shared implementation, immutable independent clone per market; Core retains escrow and outcome",
+  "defaultWindowSeconds": 3600,
+  "bond": "500 USD converted at creation",
+  "testnet": {
+    "chainId": 46630,
+    "stock": "TSLA",
+    "r": "0.0036 TSLA",
+    "b": "0.0006 TSLA",
+    "ethSnapshot": "not used; explicit zero marker"
+  },
+  "contractTests": {
+    "passed": 248,
+    "failed": 0,
+    "skipped": 0,
+    "suites": 34,
+    "networkForks": "not run"
+  },
+  "frontendTests": {
+    "passed": 213,
+    "skipped": 9
+  },
+  "types": "passed",
+  "build": "passed",
+  "runtimeBytes": {
+    "TopicMarketStockPriceSnapshot": 2462,
+    "TopicMarketV3Router02Exchange": 3532,
+    "TopicMarketCoreDeployer": 1782,
+    "TopicMarketStockFactory": 8390,
+    "TopicMarketRightsToken": 2204,
+    "TopicMarket": 24416,
+    "TopicMarketEarlyTerminationModule": 2711,
+    "TopicMarketV3Exchange": 3533,
+    "TopicMarketTestnetStockFactory": 8477,
+    "TopicMarketAssetRouter": 6455,
+    "TopicMarketPriceSnapshot": 1982,
+    "TopicMarketDeployer": 1363,
+    "TopicMarketFactory": 5346,
+    "VaultCoreAdapter": 5743,
+    "OCPVault": 20741
+  },
+  "sha256": {
+    "contracts/topic-market/src/TopicMarketPriceSnapshot.sol": "627252f384540bd8b30c976b76d1a941698328e8a8679094a44888bc5d26656d",
+    "contracts/topic-market/src/TopicMarketTestnetStockFactory.sol": "8db400ecf85b45fc0d80fdb55bf092506e1377989629a8c72fd079b95d37178e",
+    "contracts/topic-market/src/TopicMarketRightsToken.sol": "e24bdb0ea524aa22c32ba4f520a69f83d6fc284e4600d368294391df487a7838",
+    "contracts/topic-market/src/TopicMarket.sol": "17f60fc579b247342dbd66824219532b3835d99b09ca7fcde011a293113aae20",
+    "contracts/topic-market/src/TopicMarketFactory.sol": "064e199782f9a2af27d79b08b608fb06ec767d01f965ee626aaeeeb57335337c",
+    "contracts/topic-market/src/TopicMarketEarlyTerminationModule.sol": "1b5c6a17f0a3815189fe3c5d52d928e0887634d7be1bd9777cb798c8a1059c79",
+    "contracts/topic-market/src/TopicMarketStockFactory.sol": "bd35508d128d782006724780306db1bac66cc40830c9bb73525b2c97db1f23aa",
+    "contracts/topic-market/src/VaultCoreAdapter.sol": "cc9554859df830a7c0ae22566cee947ed55ea805b9eae7e073ffd0fd904c31ba",
+    "contracts/topic-market/src/TopicMarketStockPriceSnapshot.sol": "fd0b0ce4306f9914e31fdf71a4a3ee58c812e79ef28c734749bdc98246851b47",
+    "contracts/topic-market/src/TopicMarketMath.sol": "fb91c608d3dfb64bd4008c8dbd617694d2b28ebc1414d7066285c433f0e60c9d",
+    "contracts/topic-market/src/TopicMarketV3Exchange.sol": "c036be65a7ad6adee414d3ad265682a5ed8fa865521379557235902ecad3d492",
+    "contracts/topic-market/src/TopicMarketV3Router02Exchange.sol": "3803ff2fab717958400c3ba3976251e4fdedd2653c76d2d1f3ba6679e03d7c18",
+    "contracts/topic-market/src/TopicMarketAssetRouter.sol": "1bf5117a0f206ca7fd49e6b0645f57bd06e357c62f4ab714e5dc5741142396da",
+    "contracts/topic-market/lib/ocp-snapshot/src/core/OCPVault.sol": "93494535fe8a0cac00da796705a1d472faf80a33d255d7e5b62997710963bb02",
+    "contracts/topic-market/lib/ocp-snapshot/src/interfaces/IOCPVault.sol": "b78f53c07397fdad2936a61310eb03c594783e60f7ca68a3140f084af6f0dd26",
+    "contracts/topic-market/lib/ocp-snapshot/src/interfaces/IEarlyTerminationModule.sol": "c77134cab6dd2b41dc80e9f14a3150237d7eb824d06bcd651c8bf6fd6e668710",
+    "contracts/topic-market/lib/ocp-snapshot/src/interfaces/ITopicMarket.sol": "7327e61463d4bb690c792c159fb1f440d8f4109753a0288bcbfe86ebc60c115e",
+    "contracts/topic-market/test/TopicMarketEarlyModule.t.sol": "62856477a1b95bb890ea7ef2564d2fd7d1717c25e0b53e1533f54ff7cf602d09",
+    "contracts/topic-market/test/TopicMarketEarlyIntegration.t.sol": "26376ffd65a3d0d394862eb471fae1942cb1a9aa5e2b1b88b5d53c00468dd32b",
+    "contracts/topic-market/test/TopicMarketEarlyExit.t.sol": "43f10beb118c60ac1f111aa1e4b8fda0545d4d8eba90aaa7f11cbf37663b584c",
+    "contracts/topic-market/test/TopicMarketTestnetTargets.t.sol": "f1273d387881042eae8b73520525df11f9063f2882260b78f9fd80c8cdd18303",
+    "frontend/testnet/chainClient.ts": "e4f3f923dd93965c86d707aa28c230f368d1815460f663a6a791d4c2ec8dc185",
+    "frontend/testnet/chainClient.test.ts": "69439ba65f87a6bd4c0a5aaa3678822d5702b32e590cbbbebb850cdc64c74863",
+    "frontend/components/TestnetMarketApp.tsx": "465bcf4f952bd456f0c945b297ada7b65686e572d3046d0d71c3b0ac06ba7c96"
+  }
+}

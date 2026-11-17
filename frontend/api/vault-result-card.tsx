@@ -60,24 +60,24 @@ function ResultCard({ snapshot, logoUrl }: { snapshot: VaultSnapshot; logoUrl: s
         {snapshot.title}
       </div>
 
-      <div style={{ display: "flex", flex: 1, gap: 22 }}>
-        <div style={{ display: "flex", flex: 1.35, flexDirection: "column", justifyContent: "center", padding: "22px 30px", border: `1px solid ${outcome.color}55`, borderRadius: 18, background: outcome.soft }}>
+      <div style={{ display: "flex", width: 1080, height: 270, flexShrink: 0, gap: 22 }}>
+        <div style={{ display: "flex", width: 620, height: 270, flexShrink: 0, flexDirection: "column", justifyContent: "center", padding: "22px 30px", border: `1px solid ${outcome.color}55`, borderRadius: 18, background: outcome.soft }}>
           <span style={{ display: "flex", color: "#94a3b8", fontSize: 13, fontWeight: 800, letterSpacing: 2.2 }}>FINAL OUTCOME</span>
           <span style={{ display: "flex", color: outcome.color, fontSize: outcome.label.length > 3 ? 66 : 88, lineHeight: 1, fontWeight: 950, marginTop: 8 }}>{outcome.label}</span>
           <span style={{ display: "flex", color: "#cbd5e1", fontSize: 19, fontWeight: 700, marginTop: 10 }}>{snapshot.outcome === 3 ? winningPct : `${winningPct} consensus weight`}</span>
         </div>
 
-        <div style={{ display: "flex", flex: 1, flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", padding: "12px 20px", border: "1px solid #1e293b", borderRadius: 14, background: "#0f1b27" }}>
+        <div style={{ display: "flex", width: 438, height: 270, flexShrink: 0, flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", width: 438, height: 125, flexShrink: 0, flexDirection: "column", justifyContent: "center", padding: "12px 20px", border: "1px solid #1e293b", borderRadius: 14, background: "#0f1b27" }}>
             <span style={{ display: "flex", color: "#94a3b8", fontSize: 12, fontWeight: 800, letterSpacing: 1.6 }}>SETTLEMENT POOL</span>
             <span style={{ display: "flex", color: "#f8fafc", fontSize: 28, fontWeight: 900, marginTop: 4 }}>{formatPreciseToken(snapshot.settlementPoolRaw, snapshot.tokenDecimals)} {snapshot.tokenSymbol}</span>
           </div>
-          <div style={{ display: "flex", flex: 1, gap: 10 }}>
-            <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", padding: "12px 18px", border: "1px solid #1e293b", borderRadius: 14, background: "#0f1b27" }}>
+          <div style={{ display: "flex", width: 438, height: 135, flexShrink: 0, gap: 10 }}>
+            <div style={{ display: "flex", width: 214, height: 135, flexShrink: 0, flexDirection: "column", justifyContent: "center", padding: "12px 18px", border: "1px solid #1e293b", borderRadius: 14, background: "#0f1b27" }}>
               <span style={{ display: "flex", color: "#94a3b8", fontSize: 11, fontWeight: 800, letterSpacing: 1.4 }}>{stakeMetricLabel}</span>
               <span style={{ display: "flex", color: "#e2e8f0", fontSize: 20, fontWeight: 850, marginTop: 5 }}>{formatPreciseToken(winningRaw, snapshot.tokenDecimals)}</span>
             </div>
-            <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", padding: "12px 18px", border: "1px solid #1e293b", borderRadius: 14, background: "#0f1b27" }}>
+            <div style={{ display: "flex", width: 214, height: 135, flexShrink: 0, flexDirection: "column", justifyContent: "center", padding: "12px 18px", border: "1px solid #1e293b", borderRadius: 14, background: "#0f1b27" }}>
               <span style={{ display: "flex", color: "#94a3b8", fontSize: 11, fontWeight: 800, letterSpacing: 1.4 }}>PAYOUT MULTIPLIER</span>
               <span style={{ display: "flex", color: outcome.color, fontSize: 24, fontWeight: 900, marginTop: 4 }}>{formatMultiplier(snapshot.settlementPoolRaw, winningRaw)}</span>
             </div>

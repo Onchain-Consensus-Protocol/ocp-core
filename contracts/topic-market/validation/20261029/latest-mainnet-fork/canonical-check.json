@@ -1,0 +1,6 @@
+{
+  "block": 100858540,
+  "expectedHash": "0x54e1f1c3dcea14aca91d001feeebd87ed3b173d5ea1d6847940f6a53811ba763",
+  "observedHash": "0x54e1f1c3dcea14aca91d001feeebd87ed3b173d5ea1d6847940f6a53811ba763",
+  "canonicalHashMatches": true
+}
