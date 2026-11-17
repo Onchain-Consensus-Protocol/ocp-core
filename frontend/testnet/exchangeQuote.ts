@@ -1,8 +1,8 @@
 import {Contract, ZeroAddress, getAddress, type Provider} from 'ethers';
 
-/** Existing QuoterV2, independently verified on chain 46630; its factory is checked on every quote. */
-export const TESTNET_V3_QUOTER='0x126f1c1F29A0f49c5D33e0139a5Da1FE25590dB1';
-const CHAIN_ID=46630n;
+/** Existing QuoterV2, independently verified on chain 4663; its factory is checked on every quote. */
+export const MAINNET_V3_QUOTER='0x33e885eD0Ec9bF04EcfB19341582aADCb4c8A9E7';
+const CHAIN_ID=4663n;
 const MAX_AMOUNT=(1n<<255n)-1n;
 const MIN_SQRT_RATIO=4295128739n;
 const MAX_SQRT_RATIO=1461446703485210103287273052203988822378723970342n;
@@ -76,7 +76,7 @@ export async function readExchangeAssets(provider:Provider,exchangeAddress:strin
   const stock=address(stockRaw),stable=address(stableRaw),dexRouter=address(routerRaw);
   const fee=Number(feeRaw);
   if(stock===stable || !Number.isInteger(fee) || fee<=0 || fee>=1_000_000)throw new Error('EXCHANGE_PAIR');
-  const quoter=address(TESTNET_V3_QUOTER);
+  const quoter=address(MAINNET_V3_QUOTER);
   await Promise.all([stock,stable,dexRouter,quoter].map(value=>code(provider,value,blockTag)));
   const router=new Contract(dexRouter,ROUTER_ABI,provider);
   let factoryRaw:string;

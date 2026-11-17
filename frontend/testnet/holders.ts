@@ -16,7 +16,7 @@ export function currentHolders(rows:Holder[],kind:HolderKind){
 }
 /** Event history discovers addresses; fixed-block contract balances determine current ownership. */
 export async function readHolders(provider:Provider,market:MarketSummary,history:ChainPriceHistory,coreHistory:CoreHistory|undefined,kind:HolderKind):Promise<HolderSnapshot>{
- if((await provider.getNetwork()).chainId!==46630n)throw Error('Wrong holder network');
+ if((await provider.getNetwork()).chainId!==4663n)throw Error('Wrong holder network');
  if(kind==='CORE'&&!coreHistory)throw Error('Core history unavailable');
  const block=kind==='CORE'?coreHistory!.latestBlock:history.latestBlock;
  const head=await provider.getBlock(block);if(!head?.hash)throw Error('Holder snapshot unavailable');

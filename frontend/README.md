@@ -1,3 +1,7 @@
+# 当前市场入口
+
+链上市场 `/market.html` 和 `/degen.html` 固定使用 Robinhood 主网（4663）与工厂 `0x05f0fEE5b8460a773872f8e4e9D23aE109BB3592`。模拟市场保留在 `/` 和 `/explore.html`。下方测试网部署说明为历史记录。
+
 ## 2026-10-29 模拟默认入口与独立测试网入口
 
 主市场 `/`（market域名）及 `/explore.html` 默认保留原有邮箱登录、数据库模拟市场和Simulation完整交互；不由VITE_MARKET_MODE切成链上模式。独立入口 `/testnet.html` 接入46630测试网，两页导航互相链接。已有模拟数据和交易逻辑不变。下方先前的默认testnet入口描述由本节取代。

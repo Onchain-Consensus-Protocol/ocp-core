@@ -1,8 +1,8 @@
 import {describe,it,expect,vi} from 'vitest';
 import type {Pool} from 'pg';
 import {ChainHistoryStore} from './store';
-const key={chainId:46630,factory:'0xABCDEFabcdefABCDEFabcdefABCDEFabcdefABCD',market:'0x0000000000000000000000000000000000000000'},token='12345678-1234-1234-1234-123456789abc';
-const row=()=>({chain_id:'46630',factory:key.factory.toLowerCase(),market:key.market,checkpoint:null,origin:null,descriptor:null,target_block:'88',through_timestamp:'123',updated_at:new Date(1000),lease_until:new Date(5000),last_error:null});
+const key={chainId:4663,factory:'0xABCDEFabcdefABCDEFabcdefABCDEFabcdefABCD',market:'0x0000000000000000000000000000000000000000'},token='12345678-1234-1234-1234-123456789abc';
+const row=()=>({chain_id:'4663',factory:key.factory.toLowerCase(),market:key.market,checkpoint:null,origin:null,descriptor:null,target_block:'88',through_timestamp:'123',updated_at:new Date(1000),lease_until:new Date(5000),last_error:null});
 function fixture(){
  const client={query:vi.fn(async(_sql:string)=>({rows:[],rowCount:0})),release:vi.fn()};
  const pool={connect:vi.fn(async()=>client),query:vi.fn(async(_sql:string,_args?:unknown[])=>({rows:[] as Record<string,unknown>[],rowCount:0})),end:vi.fn(async()=>{}),on:vi.fn()};
@@ -17,13 +17,13 @@ describe('shared chain history Postgres store',()=>{
   const {store,client}=fixture();client.query.mockRejectedValueOnce(Error('failed'));await expect(store.get(key)).rejects.toThrow('failed');expect(client.query).toHaveBeenCalledWith('ROLLBACK');await expect(store.get(key)).resolves.toBeNull();expect(client.release).toHaveBeenCalledTimes(2);
  });
  it('normalizes scope and decodes null fields, numbers, timestamps',async()=>{
-  const {store,pool}=fixture();pool.query.mockResolvedValueOnce({rows:[row()],rowCount:1});expect(await store.get(key)).toEqual({...key,factory:key.factory.toLowerCase(),checkpoint:null,origin:null,descriptor:null,targetBlock:88,throughTimestamp:123,updatedAt:1000,leaseUntil:5000,lastError:null});expect(pool.query.mock.calls[0][1]).toEqual([46630,key.factory.toLowerCase(),key.market]);expect(pool.query.mock.calls[0][0]).toMatch(/^SELECT/);
+  const {store,pool}=fixture();pool.query.mockResolvedValueOnce({rows:[row()],rowCount:1});expect(await store.get(key)).toEqual({...key,factory:key.factory.toLowerCase(),checkpoint:null,origin:null,descriptor:null,targetBlock:88,throughTimestamp:123,updatedAt:1000,leaseUntil:5000,lastError:null});expect(pool.query.mock.calls[0][1]).toEqual([4663,key.factory.toLowerCase(),key.market]);expect(pool.query.mock.calls[0][0]).toMatch(/^SELECT/);
  });
  it('claims atomically with DB-time lease/cooldown checks, allowing cooldown zero',async()=>{
   const {store,pool}=fixture();pool.query.mockResolvedValueOnce({rows:[row()],rowCount:1});expect((await store.claim(key,0,45000))?.token).toMatch(/^[0-9a-f-]{36}$/);const [sql,args]=pool.query.mock.calls[0];expect(sql).toContain('ON CONFLICT');expect(sql).toContain('h.lease_until<=clock_timestamp()');expect(sql).toContain('h.next_sync<=clock_timestamp()');expect(args?.slice(4)).toEqual([45000,0]);expect(await store.claim(key)).toBeNull();
  });
  it('uses unexpired token CAS; undefined preserves fields, null clears',async()=>{
-  const {store,pool}=fixture();pool.query.mockResolvedValueOnce({rows:[{chain_id:'46630'}],rowCount:1});expect(await store.save(key,token,{checkpoint:undefined,origin:null,targetBlock:99})).toBe(true);
+  const {store,pool}=fixture();pool.query.mockResolvedValueOnce({rows:[{chain_id:'4663'}],rowCount:1});expect(await store.save(key,token,{checkpoint:undefined,origin:null,targetBlock:99})).toBe(true);
   const [sql,args]=pool.query.mock.calls[0];expect(sql).toContain('origin=$5::jsonb');expect(sql).toContain('target_block=$6');expect(sql).not.toContain('checkpoint=');expect(sql).toContain('lease_token=$4 AND lease_until>clock_timestamp()');expect(args?.slice(3)).toEqual([token,null,99]);expect(await store.save(key,token,{targetBlock:100})).toBe(false);
  });
  it('serializes descriptor JSON with exact string quantities',async()=>{

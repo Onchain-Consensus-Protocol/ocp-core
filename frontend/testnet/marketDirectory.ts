@@ -1,7 +1,7 @@
 import type {StockState, MarketSummary} from './chainClient';
 const referenceStocks = ['TSLA', 'NVDA', 'AAPL', 'SPCX', 'GOOGL'];
-const referenceSymbols: Record<string, string> = {TSLA:'TSLA', NVDA:'NVDA', AAPL:'AAPL', SPCX:'SPACEX', GOOGL:'GOOGL'};
-// Reference categories do not register assets or grant trading permissions on the testnet.
+const referenceSymbols: Record<string, string> = {TSLA:'TSLA', NVDA:'NVDA', AAPL:'AAPL', SPCX:'SPACEX', GOOGL:'GOOGL', MSFT:'MSFT', AMZN:'AMZN', TSM:'TSM', META:'META'};
+// Reference categories do not register assets or grant trading permissions on mainnet.
 export function stockCategories(stocks: Pick<StockState, 'symbol'>[]): string[] {
   return [...new Set([...referenceStocks, ...stocks.map(stock => stock.symbol)])];
 }

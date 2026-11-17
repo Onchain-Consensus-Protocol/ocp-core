@@ -7,7 +7,7 @@ interface Options {fetcher?:typeof fetch;signal?:AbortSignal;requestTimeoutMs?:n
 export async function readSharedHistory(factory:string,market:string,options:Options={}):Promise<ChainPriceHistory|null>{
  if(typeof window==='undefined'&&!options.fetcher)return null;
  const fetcher=options.fetcher??fetch,f=getAddress(factory),m=getAddress(market),started=Date.now();
- const url=`/api/chain-history?market=${m}&factory=${f}&chainId=46630`;
+ const url=`/api/chain-history?market=${m}&factory=${f}&chainId=4663`;
  do{
   if(options.signal?.aborted)throw new DOMException('Cancelled','AbortError');
   const controller=new AbortController(),abort=()=>controller.abort();options.signal?.addEventListener('abort',abort,{once:true});
@@ -17,7 +17,7 @@ export async function readSharedHistory(factory:string,market:string,options:Opt
    const res=await fetcher(url,{method:'GET',headers:{Accept:'application/json'},signal:controller.signal});
    if(res.status!==200&&res.status!==202)return null;
    const value=await res.json() as SharedHistoryResponse;
-   if(value.version!==1||value.chainId!==46630||getAddress(value.factory)!==f||getAddress(value.market)!==m)return null;
+   if(value.version!==1||value.chainId!==4663||getAddress(value.factory)!==f||getAddress(value.market)!==m)return null;
    if(value.checkpoint){
     if(!Number.isSafeInteger(value.throughTimestamp)||value.throughTimestamp!<Number(value.checkpoint.createdAt)||!Number.isSafeInteger(value.targetBlock)||value.targetBlock!<value.checkpoint.latestBlock)return null;
     const history=replayCheckpoint(value.checkpoint,f,m);

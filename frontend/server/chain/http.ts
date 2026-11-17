@@ -1,12 +1,12 @@
 import type {IncomingMessage,ServerResponse} from 'node:http';
 import {JsonRpcProvider,FetchRequest,getAddress,ZeroAddress} from 'ethers';
 import {waitUntil} from '@vercel/functions';
-import {CURRENT_TESTNET_FACTORY} from '../../shared/testnetDeployment.js';
+import {CURRENT_MAINNET_FACTORY} from '../../shared/mainnetDeployment.js';
 import {replayCheckpoint} from '../../testnet/priceHistory.js';
 import {ChainHistoryStore} from './store.js';
 import {syncIndexedMarket} from './indexer.js';
 import type {HistoryStore,HistoryKey,SharedHistoryResponse,IndexedHistoryRow} from './types.js';
-const RPC='https://rpc.testnet.chain.robinhood.com';
+const RPC='https://rpc.mainnet.chain.robinhood.com';
 let store:ChainHistoryStore|undefined,provider:JsonRpcProvider|undefined;
 const scheduled=new Map<string,Promise<unknown>>();
 function chainProvider(){if(!provider){const request=new FetchRequest(RPC);request.timeout=8000;provider=new JsonRpcProvider(request,undefined,{cacheTimeout:-1,batchMaxCount:40});}return provider;}
@@ -23,7 +23,7 @@ const send=(res:ServerResponse,status:number,body:unknown,cache='no-store')=>{
 export function createChainHistoryHandler(deps:ChainHistoryHttpDependencies={}){
  return async(req:IncomingMessage,res:ServerResponse)=>{
   if(req.method!=='GET'){res.setHeader('Allow','GET');send(res,405,{error:'METHOD_NOT_ALLOWED'});return;}
-  const factory=getAddress(deps.factory??CURRENT_TESTNET_FACTORY),now=deps.now??Date.now;
+  const factory=getAddress(deps.factory??CURRENT_MAINNET_FACTORY),now=deps.now??Date.now;
   let market:string;
   try{
    const url=new URL(req.url??'','https://market.ocp-protocol.org');
@@ -31,10 +31,10 @@ export function createChainHistoryHandler(deps:ChainHistoryHttpDependencies={}){
    if(raw.length!==1||raw[0].length!==42)throw Error('market');market=getAddress(raw[0]);if(market===ZeroAddress)throw Error('market');
    const requestedFactory=url.searchParams.get('factory'),chain=url.searchParams.get('chainId');
    if(requestedFactory&&getAddress(requestedFactory)!==factory)throw Error('factory');
-   if(chain&&chain!=='46630')throw Error('chain');
+   if(chain&&chain!=='4663')throw Error('chain');
    if([...url.searchParams.keys()].some(key=>!['market','factory','chainId'].includes(key)))throw Error('query');
   }catch{send(res,400,{error:'INVALID_HISTORY_SCOPE'});return;}
-  const key:HistoryKey={chainId:46630,factory,market};
+  const key:HistoryKey={chainId:4663,factory,market};
   try{
    const database=deps.store??(store??=new ChainHistoryStore());
    const row=await database.get(key);
@@ -48,7 +48,7 @@ export function createChainHistoryHandler(deps:ChainHistoryHttpDependencies={}){
      scheduled.set(scope,work);(deps.defer??waitUntil)(work);
     }
    }
-   const response:SharedHistoryResponse={version:1,chainId:46630,factory,market,checkpoint,
+   const response:SharedHistoryResponse={version:1,chainId:4663,factory,market,checkpoint,
     throughTimestamp:checkpoint?row!.throughTimestamp:null,targetBlock:row?.targetBlock??null,
     syncing:!checkpoint||!!row?.leaseUntil&&row.leaseUntil>now()||!!checkpoint&&checkpoint.latestBlock<(row?.targetBlock??checkpoint.latestBlock),updatedAt:row?.updatedAt??0};
    const body=JSON.stringify(response);

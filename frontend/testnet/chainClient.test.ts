@@ -16,21 +16,21 @@ function provider(chainId:bigint,code='0x01') {
 }
 function transactionFixture(){
   const abi=new Interface([...factoryAbi,...marketAbi,...routerAbi].filter(item=>item.type==='function').concat(['function interfaceVersion() view returns(uint256)'] as never));
-  const p={...provider(46630n),getBlock:vi.fn(async()=>({timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
+  const p={...provider(4663n),getBlock:vi.fn(async()=>({timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
     const fragment=abi.getFunction(tx.data.slice(0,10))!;
     const results:Record<string,unknown[]>={interfaceVersion:[4n],isMarket:[true],marketCollateral:[market],
       marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
       stocks:[market,market,1n,18,true],trustedForwarder:[market],factory:[factory],stablecoin:[true]};
     return abi.encodeFunctionResult(fragment,results[fragment.name]);
   })};
-  const wallet=provider(46630n);const sendTransaction=vi.fn(async(tx:unknown)=>({hash:'0x01',request:tx}));
+  const wallet=provider(4663n);const sendTransaction=vi.fn(async(tx:unknown)=>({hash:'0x01',request:tx}));
   const writer=createChainClient(p as unknown as Provider,factory).withSigner({provider:wallet,sendTransaction,estimateGas:vi.fn(async()=>200000n)} as unknown as Signer);
   return {writer,wallet,sendTransaction,readerProvider:p};
 }
 describe('testnet transaction boundary',()=>{
   it('uses the current router action numbering',()=>{expect(RouterAction.ClaimFailed).toBe(8);expect(RouterAction.ClaimCore).toBe(9);expect(RouterAction.RedeemPairs).toBe(10);});
-  it('reads fixed TSLA targets without an ETH feed',async()=>{
-    const stock='0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E';
+  it('reads the real ETH-to-stock snapshot for mainnet market creation',async()=>{
+    const stock='0x322F0929c4625eD5bAd873c95208D54E1c003b2d';
     const abi=new Interface([...factoryAbi,
       'function fixedTestnetGraduation() view returns(bool)',
       'function interfaceVersion() view returns(uint256)',
@@ -38,19 +38,17 @@ describe('testnet transaction boundary',()=>{
       'function collateralForUsd(uint256) view returns(uint256)',
       'function ethPrice6() view returns(uint256)']);
     const calls:string[]=[];
-    const p={...provider(46630n),getBlock:vi.fn(async()=>({number:42,timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
+    const p={...provider(4663n),getBlock:vi.fn(async()=>({number:42,timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
       const fragment=abi.getFunction(tx.data.slice(0,10))!;calls.push(fragment.name);
-      if(fragment.name==='ethPrice6')throw new Error('ETH feed unavailable');
       const results:Record<string,unknown[]>={owner:[factory],stockCount:[1n],marketCount:[0n],
         fixedTestnetGraduation:[true],interfaceVersion:[4n],stockTokens:[stock],stocks:[market,market,1n,18,true],
-        symbol:['TSLA'],decimals:[18],collateralForUsd:[2n*10n**18n]};
+        symbol:['TSLA'],decimals:[18],ethPrice6:[5n*10n**18n]};
       return abi.encodeFunctionResult(fragment,results[fragment.name]);
     })};
     const directory=await createChainClient(p as unknown as Provider,factory).readDirectory();
-    expect(directory.fixedTestTargets).toBe(true);
-    expect(directory.stocks[0]).toMatchObject({fixedRTarget:4200000000000000n});
+    expect(directory.stocks[0]).toMatchObject({snapshot:5n*10n**18n});
     expect(directory.stocks[0].snapshotError).toBeUndefined();
-    expect(calls).toContain('collateralForUsd');expect(calls).not.toContain('ethPrice6');
+    expect(calls).toContain('ethPrice6');expect(calls).not.toContain('fixedTestnetGraduation');
   });
   it.each([true,false])('reads LP and holdings without querying unsupported token contracts (details=%s)',async(details)=>{
     const abi=new Interface([...factoryAbi,...marketAbi,...vaultAbi].filter(item=>item.type==='function').concat([
@@ -58,7 +56,7 @@ describe('testnet transaction boundary',()=>{
       'function allowance(address,address) view returns(uint256)',
     ] as never));
     const seen:string[]=[],methods:string[]=[];
-    const p={...provider(46630n),call:vi.fn(async(tx:{data:string;to:string})=>{
+    const p={...provider(4663n),call:vi.fn(async(tx:{data:string;to:string})=>{
       seen.push(tx.to);if(BigInt(tx.to)===0n)throw new Error('ZERO_TOKEN_CALL');
       const f=abi.getFunction(tx.data.slice(0,10))!;methods.push(f.name);
       const results:Record<string,unknown[]>={interfaceVersion:[4n],isMarket:[true],marketCollateral:[market],
@@ -79,7 +77,7 @@ describe('testnet transaction boundary',()=>{
     const abi=new Interface([...factoryAbi,'function interfaceVersion() view returns(uint256)','function fixedTestnetGraduation() view returns(bool)']);
     let release!:(value:string)=>void;
     const gate=new Promise<string>(resolve=>{release=resolve;});
-    const p={...provider(46630n),getBlock:vi.fn(async()=>({number:42,timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
+    const p={...provider(4663n),getBlock:vi.fn(async()=>({number:42,timestamp:1000})),call:vi.fn(async(tx:{data:string})=>{
       const f=abi.getFunction(tx.data.slice(0,10))!;
       if(f.name==='markets')return gate;
       const values:Record<string,unknown[]>={interfaceVersion:[4n],owner:[factory],stockCount:[0n],marketCount:[1n],fixedTestnetGraduation:[false],isMarket:[true],marketCollateral:[market],marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']]};
@@ -95,7 +93,7 @@ describe('testnet transaction boundary',()=>{
   });
   it.each([3n,0n])('rejects unsupported factory version %s before any wallet signature',async(version)=>{
     const abi=new Interface(['function interfaceVersion() view returns(uint256)']);
-    const p={...provider(46630n),call:vi.fn(async()=>abi.encodeFunctionResult('interfaceVersion',[version]))};
+    const p={...provider(4663n),call:vi.fn(async()=>abi.encodeFunctionResult('interfaceVersion',[version]))};
     const sendTransaction=vi.fn();const client=createChainClient(p as unknown as Provider,factory);
     await expect(client.readDirectory()).rejects.toThrow('interfaceVersion 4');
     await expect(client.withSigner({provider:p,sendTransaction} as unknown as Signer).claimMarket(market)).rejects.toThrow('interfaceVersion 4');
@@ -107,7 +105,7 @@ describe('testnet transaction boundary',()=>{
       'function interfaceVersion() view returns(uint256)','function stock() view returns(address)','function stable() view returns(address)',
       'function symbol() view returns(string)','function decimals() view returns(uint8)',
     ] as never));
-    const p={...provider(46630n),call:vi.fn(async(tx:{data:string})=>{
+    const p={...provider(4663n),call:vi.fn(async(tx:{data:string})=>{
       const f=abi.getFunction(tx.data.slice(0,10))!;
       const results:Record<string,unknown[]>={interfaceVersion:[4n],isMarket:[true],marketCollateral:[market],
         marketRecord:[[market,market,market,1n,20000n,23600n,23600n,1n,'topic','yes','no','invalid']],
@@ -131,7 +129,7 @@ describe('testnet transaction boundary',()=>{
     await writer.executeRouter({...request,action:RouterAction.ClaimEarlyBond,inputAmount:0n,minCollateral:0n,businessLimit:0n,minOutput:98n,reasonHash:ZeroHash});
     const abi=new Interface(routerAbi);
     const first=sendTransaction.mock.calls[0][0] as {data:string;chainId:bigint},second=sendTransaction.mock.calls[1][0] as {data:string;chainId:bigint};
-    expect(first.chainId).toBe(46630n);expect(second.chainId).toBe(46630n);
+    expect(first.chainId).toBe(4663n);expect(second.chainId).toBe(4663n);
     const a=abi.decodeFunctionData('execute',first.data)[0];expect(a.action).toBe(11n);expect(a.reasonHash).toBe(id('reason'));expect(a.minCollateral).toBe(99n);
     const b=abi.decodeFunctionData('execute',second.data)[0];expect(b.action).toBe(12n);expect(b.minOutput).toBe(98n);expect(b.reasonHash).toBe(ZeroHash);
   });
@@ -141,7 +139,7 @@ describe('testnet transaction boundary',()=>{
     const reason='所有人可读取的原因',hash=id(reason);
     await writer.proposeEarlyTermination(market,1,reason);
     await writer.executeRouter({market,action:RouterAction.ProposeEarly,paymentAsset:market,inputAmount:100n,quantity:0n,minCollateral:99n,businessLimit:99n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0,reasonHash:hash},reason);
-    for(let i=0;i<2;i++){const estimated=estimateGas.mock.calls[i][0] as {data:string};const sent=sendTransaction.mock.calls[i][0] as {data:string;chainId:bigint};expect(sent.data).toBe(estimated.data);expect(decodeEarlyReason(sent.data,hash)).toBe(reason);expect(sent.chainId).toBe(46630n);}
+    for(let i=0;i<2;i++){const estimated=estimateGas.mock.calls[i][0] as {data:string};const sent=sendTransaction.mock.calls[i][0] as {data:string;chainId:bigint};expect(sent.data).toBe(estimated.data);expect(decodeEarlyReason(sent.data,hash)).toBe(reason);expect(sent.chainId).toBe(4663n);}
     await expect(writer.executeRouter({market,action:RouterAction.ProposeEarly,paymentAsset:market,inputAmount:1n,quantity:0n,minCollateral:1n,businessLimit:1n,minOutput:0n,deadline:2000n,side:0,graduationIntent:0,reasonHash:hash},'wrong')).rejects.toThrow('哈希');
     expect(sendTransaction).toHaveBeenCalledTimes(2);
   });
@@ -150,23 +148,23 @@ describe('testnet transaction boundary',()=>{
     expect(()=>createChainClient({} as Provider,'')).toThrow();
   });
   it('blocks reads and approvals on mainnet before touching contract state',async()=>{
-    const p=provider(4663n);const client=createChainClient(p as unknown as Provider,factory);
-    await expect(client.readDirectory()).rejects.toThrow('46630');
-    await expect(client.withSigner({provider:p} as unknown as Signer).approveStock(market,'market',1n)).rejects.toThrow('46630');
+    const p=provider(46630n);const client=createChainClient(p as unknown as Provider,factory);
+    await expect(client.readDirectory()).rejects.toThrow('4663');
+    await expect(client.withSigner({provider:p} as unknown as Signer).approveStock(market,'market',1n)).rejects.toThrow('4663');
     expect(p.getCode).not.toHaveBeenCalled();
   });
   it('blocks a wrong-chain wallet even with a valid testnet read provider',async()=>{
-    const p=provider(46630n);const wallet=provider(4663n);
+    const p=provider(4663n);const wallet=provider(46630n);
     const writer=createChainClient(p as unknown as Provider,factory).withSigner({provider:wallet} as unknown as Signer);
-    await expect(writer.claimMarket(market)).rejects.toThrow('46630');
-    await expect(writer.createMarket({stock:market,topic:'t',yesRule:'y',noRule:'n',invalidRule:'i',coreEnd:9999999999n})).rejects.toThrow('46630');
+    await expect(writer.claimMarket(market)).rejects.toThrow('4663');
+    await expect(writer.createMarket({stock:market,topic:'t',yesRule:'y',noRule:'n',invalidRule:'i',coreEnd:9999999999n})).rejects.toThrow('4663');
     expect(wallet.getCode).not.toHaveBeenCalled();
   });
   it('rejects an address without factory bytecode',async()=>{
-    const p=provider(46630n,'0x');const client=createChainClient(p as unknown as Provider,factory);
+    const p=provider(4663n,'0x');const client=createChainClient(p as unknown as Provider,factory);
     await expect(client.readMarket(market)).rejects.toThrow('没有合约代码');
   });
-  it('pins every transaction path to chain 46630 in the actual signer request',async()=>{
+  it('pins every transaction path to chain 4663 in the actual signer request',async()=>{
     const {writer,sendTransaction}=transactionFixture();
     await writer.genesisBuy(market,1n,0n,2000n);
     await writer.formalBuy(market,true,1n,2n,2000n);
@@ -186,7 +184,7 @@ describe('testnet transaction boundary',()=>{
     await writer.claimProtocolFees(market);
     await writer.closeExpired(market);
     expect(sendTransaction).toHaveBeenCalledTimes(17);
-    for(const [request] of sendTransaction.mock.calls) expect(request).toMatchObject({chainId:46630n});
+    for(const [request] of sendTransaction.mock.calls) expect(request).toMatchObject({chainId:4663n});
     expect(sendTransaction.mock.calls[3][0]).toMatchObject({gasLimit:800000n});
     expect(sendTransaction.mock.calls[8][0]).toMatchObject({gasLimit:800000n});
     for(const index of [14,15,16])expect(sendTransaction.mock.calls[index][0]).toMatchObject({gasLimit:800000n});
@@ -205,7 +203,7 @@ describe('testnet transaction boundary',()=>{
       {provider:wallet,sendTransaction,getAddress:async()=>account} as unknown as Signer);
     await client.materializeLP(market);
     const [request]=sendTransaction.mock.calls[0] as [{to:string;data:string;chainId:bigint}];
-    expect(request).toMatchObject({to:market,chainId:46630n});
+    expect(request).toMatchObject({to:market,chainId:4663n});
     expect(new Interface(marketAbi).decodeFunctionData('materializeLP',request.data)[0]).toBe(account);
   });
   it('requires a reason before preparing an early proposal signature',async()=>{
@@ -215,8 +213,8 @@ describe('testnet transaction boundary',()=>{
   });
   it('catches a wallet chain switch after asynchronous factory reads',async()=>{
     const {writer,wallet,sendTransaction}=transactionFixture();
-    wallet.getNetwork.mockResolvedValueOnce({chainId:46630n}).mockResolvedValue({chainId:4663n});
-    await expect(writer.claimMarket(market)).rejects.toThrow('46630');
+    wallet.getNetwork.mockResolvedValueOnce({chainId:4663n}).mockResolvedValue({chainId:46630n});
+    await expect(writer.claimMarket(market)).rejects.toThrow('4663');
     expect(sendTransaction).not.toHaveBeenCalled();
   });
 });

@@ -12,7 +12,7 @@ async function raw(change:(value:string|undefined)=>string|undefined,key=viewCac
 beforeEach(()=>vi.stubGlobal('indexedDB',new IDBFactory()));afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 describe('display-only chain view snapshots',()=>{
  it('scopes schema/network/factory/account/market and normalizes address case',()=>{
-  expect(viewCacheKey(f)).toBe(`46630:1:${f}:public:directory`);
+  expect(viewCacheKey(f)).toBe(`4663:1:${f}:public:directory`);
   expect(viewCacheKey(f,a.toUpperCase().replace('0X','0x'),m)).toBe(viewCacheKey(f,a,m));
   expect(viewCacheKey(f,a,m)).not.toBe(viewCacheKey(f,undefined,m));expect(viewCacheKey(f,a,m)).not.toBe(viewCacheKey(m,a,f));
  });

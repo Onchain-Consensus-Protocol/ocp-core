@@ -44,7 +44,7 @@ export function replayCoreHistory(logs:TimestampedMarketLog[],core:string):Chain
  * The caller supplies the factory-verified market origin, never a guessed deployment block.
  */
 export async function readCoreHistory(provider:Provider,core:string,origin:HistoryCheckpoint):Promise<CoreHistory>{
-  if(Number((await provider.getNetwork()).chainId)!==46630)throw Error('Wrong history chain');
+  if(Number((await provider.getNetwork()).chainId)!==4663)throw Error('Wrong history chain');
   replayCheckpoint(origin,origin.factory,origin.market);
   core=getAddress(core);
   const head=await provider.getBlock('latest');if(!head?.hash)throw Error('Core history head unavailable');

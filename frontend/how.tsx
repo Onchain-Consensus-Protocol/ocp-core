@@ -342,7 +342,7 @@ function HowPage() {
             <h2 className="font-display text-xl font-bold">{t.cta}</h2><p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-orange-100">{t.ctaDesc}</p>
             <div className="mt-6 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center gap-3">
               <a href={`https://market.ocp-protocol.org/?lang=${lang}`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-xs font-bold text-accent transition-transform hover:scale-[1.02]">{lang==='zh'?'进入模拟市场':'Enter Simulation'}<ArrowRight className="h-4 w-4" /></a>
-              <a href={`https://market.ocp-protocol.org/testnet.html?lang=${lang}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/70 px-5 py-3 text-xs font-bold text-white hover:bg-white/10 transition-transform hover:scale-[1.02]">{lang==='zh'?'进入测试网市场':'Enter Testnet Market'}<ArrowRight className="h-4 w-4" /></a>
+              <a href={`https://market.ocp-protocol.org/market.html?lang=${lang}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/70 px-5 py-3 text-xs font-bold text-white hover:bg-white/10 transition-transform hover:scale-[1.02]">{lang==='zh'?'进入主网市场':'Enter Mainnet Market'}<ArrowRight className="h-4 w-4" /></a>
             </div>
           </div>
         </section>

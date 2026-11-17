@@ -1,22 +1,20 @@
-import {resolveTestnetFactory} from "./shared/testnetDeployment";
-import {isTestnetMarketPage} from "./shared/marketPageMode";
-/** 当前合约测试网入口仅在显式testnet模式启用，避免激活历史链上入口。 */
-const env=(import.meta as ImportMeta & {env:Record<string,string|undefined>}).env;
-const testnetMode=typeof window !== "undefined" && isTestnetMarketPage(window.location.pathname, window.location.search);
-const testnetFactory=testnetMode ? resolveTestnetFactory(env.VITE_TOPIC_MARKET_FACTORY ?? "") : "";
+import {CURRENT_MAINNET_FACTORY} from "./shared/mainnetDeployment";
+import {isMainnetMarketPage} from "./shared/marketPageMode";
+const mainnetMode=typeof window !== "undefined" && isMainnetMarketPage(window.location.pathname, window.location.search);
+const mainnetFactory=mainnetMode ? CURRENT_MAINNET_FACTORY : "";
 export const config = {
   apiBase: "",
   factoryAddress: "",
   depositTokenAddress: "",
-  marketFactoryAddress: testnetFactory,
-  chainId: testnetMode ? 46630 : 0,
-  rpcUrl: testnetMode ? "https://rpc.testnet.chain.robinhood.com" : "",
-  explorer: testnetMode ? "https://explorer.testnet.chain.robinhood.com" : "",
-  marketEnabled: testnetMode && /^0x[0-9a-fA-F]{40}$/.test(testnetFactory) && !/^0x0{40}$/.test(testnetFactory),
+  marketFactoryAddress: mainnetFactory,
+  chainId: mainnetMode ? 4663 : 0,
+  rpcUrl: mainnetMode ? "https://rpc.mainnet.chain.robinhood.com" : "",
+  explorer: mainnetMode ? "https://robinhoodchain.blockscout.com" : "",
+  marketEnabled: mainnetMode && /^0x[0-9a-fA-F]{40}$/.test(mainnetFactory) && !/^0x0{40}$/.test(mainnetFactory),
   isLocalDev: false,
-  chainName: testnetMode ? "Robinhood Chain Testnet" : "",
-  nativeCurrencyName: testnetMode ? "Ether" : "",
-  nativeCurrencySymbol: testnetMode ? "ETH" : "",
+  chainName: mainnetMode ? "Robinhood Chain" : "",
+  nativeCurrencyName: mainnetMode ? "Ether" : "",
+  nativeCurrencySymbol: mainnetMode ? "ETH" : "",
 };
 
 export const VAULT_ABI = [

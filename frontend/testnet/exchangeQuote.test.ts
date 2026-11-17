@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {Interface,ZeroAddress,getAddress,type Provider} from 'ethers';
-import {exchangePriceImpactBps,quoteExchange,readExchangeAssets,TESTNET_V3_QUOTER} from './exchangeQuote';
+import {exchangePriceImpactBps,quoteExchange,readExchangeAssets,MAINNET_V3_QUOTER} from './exchangeQuote';
 
 const EXCHANGE='0x1111111111111111111111111111111111111111';
 const STOCK='0x2222222222222222222222222222222222222222';
@@ -34,7 +34,7 @@ function fixture(options:Options={}){
   const codeBlocks:unknown[]=[];
   let quoted=false;
   const provider={
-    async getNetwork(){return {chainId:options.chain??46630n};},
+    async getNetwork(){return {chainId:options.chain??4663n};},
     async getBlock(){return {number:100,hash:quoted&&options.reorgAfterQuote?`0x${'bb'.repeat(32)}`:BLOCK_HASH,timestamp:2000};},
     async getCode(_address:string,blockTag:unknown){codeBlocks.push(blockTag);return '0x01';},
     async call(tx:{to:string;data:string;blockTag:unknown}){
@@ -60,7 +60,7 @@ function fixture(options:Options={}){
         else values=[Q96,0,0,1,1,0,!options.locked];
       }else if(to===getAddress(STOCK)||to===getAddress(STABLE)){
         values=name==='balanceOf'?[options.outputBalance??((1n<<255n)-1n)]:name==='decimals'?[to===getAddress(STOCK)?18:6]:[to===getAddress(STOCK)?'TSLA':'USDG'];
-      }else if(to===getAddress(TESTNET_V3_QUOTER)){
+      }else if(to===getAddress(MAINNET_V3_QUOTER)){
         if(name==='factory')values=[options.wrongQuoter?OTHER:FACTORY];
         else {
           quoted=true;
@@ -130,7 +130,7 @@ describe('read-only QuoterV2 exact input/output',()=>{
     expect((await quoteExchange(provider,EXCHANGE,STABLE,STOCK,100n,'input')).amountOut).toBe(300n);
   });
   it('rejects wrong chain, invalid amounts and unsupported assets',async()=>{
-    await expect(quoteExchange(fixture({chain:4663n}).provider,EXCHANGE,STABLE,STOCK,1n,'input')).rejects.toThrow('WRONG_CHAIN');
+    await expect(quoteExchange(fixture({chain:46630n}).provider,EXCHANGE,STABLE,STOCK,1n,'input')).rejects.toThrow('WRONG_CHAIN');
     for(const amount of [0n,-1n,1n<<255n]){
       await expect(quoteExchange(fixture().provider,EXCHANGE,STABLE,STOCK,amount,'input')).rejects.toThrow('EXCHANGE_AMOUNT');
     }

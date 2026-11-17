@@ -1,7 +1,7 @@
 import {getAddress} from 'ethers';
 import type {TimestampedMarketLog} from './priceHistory';
 const DB='ocp-history-origins-v1',STORE='origins',TIMEOUT=1500;
-export const originKey=(factory:string,market:string)=>`46630:1:${getAddress(factory).toLowerCase()}:${getAddress(market).toLowerCase()}`;
+export const originKey=(factory:string,market:string)=>`4663:1:${getAddress(factory).toLowerCase()}:${getAddress(market).toLowerCase()}`;
 function open():Promise<IDBDatabase>{return new Promise((resolve,reject)=>{
  let done=false;const timer=setTimeout(fail,TIMEOUT);
  function fail(){if(!done){done=true;clearTimeout(timer);reject(Error('Origin cache unavailable'));}}

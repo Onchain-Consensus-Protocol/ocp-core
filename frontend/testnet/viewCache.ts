@@ -5,7 +5,7 @@ const TTL=24*60*60*1000,MAX_BYTES=1024*1024,TIMEOUT=1500;
 type Snapshot=DirectoryState|MarketState;
 const address=(v:unknown):v is string=>typeof v==='string'&&/^0x[0-9a-fA-F]{40}$/.test(v);
 const scope=(v:string)=>{if(!address(v))throw Error('Invalid cache scope');return v.toLowerCase();};
-export const viewCacheKey=(factory:string,account?:string,market?:string)=>`46630:1:${scope(factory)}:${account?scope(account):'public'}:${market?scope(market):'directory'}`;
+export const viewCacheKey=(factory:string,account?:string,market?:string)=>`4663:1:${scope(factory)}:${account?scope(account):'public'}:${market?scope(market):'directory'}`;
 const record=(v:unknown):v is Record<string,unknown>=>typeof v==='object'&&v!==null&&!Array.isArray(v);
 const big=(v:unknown)=>typeof v==='bigint'&&v>=0n;
 const bigFields=(v:Record<string,unknown>,fields:string[])=>fields.every(k=>big(v[k]));
@@ -63,7 +63,7 @@ export async function loadViewSnapshot(factory:string,account?:string,market?:st
   const key=viewCacheKey(factory,account,market);db=await open();const raw=await transaction(db,key);
   if(typeof raw!=='string'||new TextEncoder().encode(raw).byteLength>MAX_BYTES)return null;
   const row=parse(raw),now=Date.now();
-  if(!record(row)||row.version!==1||row.chainId!==46630||row.key!==key||row.factory!==scope(factory)||!Number.isSafeInteger(row.savedAt)||Number(row.savedAt)>now||now-Number(row.savedAt)>TTL)return null;
+  if(!record(row)||row.version!==1||row.chainId!==4663||row.key!==key||row.factory!==scope(factory)||!Number.isSafeInteger(row.savedAt)||Number(row.savedAt)>now||now-Number(row.savedAt)>TTL)return null;
   return valid(row.value,factory,market)?row.value:null;
  }catch{return null;}finally{db?.close();}
 }
@@ -72,7 +72,7 @@ export async function saveViewSnapshot(factory:string,value:Snapshot,account?:st
  let db:IDBDatabase|undefined;
  try{
   const key=viewCacheKey(factory,account,market);if(!valid(value,factory,market))return;
-  const payload=stringify({version:1,chainId:46630,key,factory:scope(factory),savedAt:Date.now(),value});
+  const payload=stringify({version:1,chainId:4663,key,factory:scope(factory),savedAt:Date.now(),value});
   if(new TextEncoder().encode(payload).byteLength>MAX_BYTES)return;
   db=await open();await transaction(db,key,payload);
  }catch{/* Cache is optional; never replace a failed read with invented values. */}finally{db?.close();}

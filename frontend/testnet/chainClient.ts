@@ -13,9 +13,9 @@ import oracleAbi from './abi/TopicMarketStockPriceSnapshot.json';
 import {quoteExchange as quoteV3Exchange} from './exchangeQuote';
 import {getLogsInChunks, readChainPriceHistory, replayCheckpoint, type ChainPriceHistory} from './priceHistory';
 
-export const TESTNET_CHAIN_ID = 46630n;
+export const MAINNET_CHAIN_ID = 4663n;
 const tokenAbi = ['function symbol() view returns(string)', 'function decimals() view returns(uint8)', 'function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'];
-export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; fixedRTarget?:bigint; }
+export interface StockState { address:string; symbol:string; decimals:number; enabled:boolean; oracle:string; router:string; k:bigint; snapshot?:bigint; snapshotError?:string; balance?:bigint; }
 export interface MarketSummary { address:string; stock:string; creator:string; adapter:string; vault:string; topic:string; yesRule:string; noRule:string; invalidRule:string; createdAt:bigint; genesisCutoff:bigint; formalCutoff:bigint; coreCutoff:bigint; snapshot:bigint;earlyRequest?:Pick<CoreLifecycle,'requestId'|'requestedOutcome'|'processAfter'>;phase?:number;outcome?:number;priceYes?:bigint;R?:bigint;rTarget?:bigint; }
 export interface AccountPosition { balance:bigint; genesisShares:bigint; yes:bigint; no:bigint; lp:bigint; coreYes:bigint; coreNo:bigint; coreInvalid:bigint; marketAllowance:bigint; vaultAllowance:bigint; routerAllowance:bigint }
 export interface CoreLifecycle {proposer?:string;reasonHash?:string;reasonText?:string;bond:bigint; requestId:bigint; requestedOutcome:number; processAfter:bigint; effectiveCutoff:bigint; due:boolean; refund?:bigint; penalty?:bigint; bondRefund?:bigint}
@@ -27,7 +27,7 @@ export interface MarketPresentation {
   corePayout?:bigint;marketPayout?:bigint;genesisPrice:bigint;
 }
 export interface MarketState extends MarketSummary { feeClaims?:{creator:string;protocol:string;creatorAmount:bigint;protocolAmount:bigint;coreAmount:bigint;coreRecipient:string;coreAccrued?:bigint;coreProtocolTotal?:bigint;coreProtocolFinal?:boolean}; poolStockBalance?:bigint;lpSupply?:bigint; presentation?:MarketPresentation;early?:CoreLifecycle; phase:number; outcome:number; failedSupply?:bigint;failedRInitial?:bigint;failedRRemaining?:bigint;collateralCash?:bigint; R:bigint; S:bigint; rTarget:bigint; k:bigint; cash:bigint; lpFees:bigint; lpBudgetRemaining:bigint; vaultResolved:boolean; vaultOutcome:number; vaultSettlementReady:boolean; totalStakeYes:bigint; totalStakeNo:bigint; totalStakeInvalid:bigint; position?:AccountPosition }
-export interface DirectoryState { factory:string; owner:string; fixedTestTargets?:boolean; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
+export interface DirectoryState { factory:string; owner:string; stocks:StockState[]; markets:MarketSummary[]; blockNumber:number; timestamp:bigint }
 export interface PaymentRoute {router:string;exchange:string;stock:string;stable:string;stableSymbol:string;stableDecimals:number;stableBalance?:bigint;stableAllowance?:bigint}
 export interface CreateMarketInput { stock:string; topic:string; yesRule:string; noRule:string; invalidRule:string; coreEnd:bigint }
 export enum RouterAction { GenesisBuy, FormalBuy, CoreStake, GenesisSell, FormalSell, ClaimMarket, ClaimOutcome, ClaimLP, ClaimFailed, ClaimCore, RedeemPairs, ProposeEarly, ClaimEarlyBond }
@@ -95,8 +95,8 @@ export function nonzeroAddress(value:string):string {
   if(address===ZeroAddress) throw new Error('未配置合约地址');
   return address;
 }
-export async function assertTestnet(provider:Provider):Promise<void> {
-  if((await provider.getNetwork()).chainId!==TESTNET_CHAIN_ID) throw new Error('请切换到 Robinhood Chain Testnet（46630）');
+export async function assertMainnet(provider:Provider):Promise<void> {
+  if((await provider.getNetwork()).chainId!==MAINNET_CHAIN_ID) throw new Error('请切换到 Robinhood Chain（4663）');
 }
 
 /** Raw amounts use collateral decimals; outcome/LP quantities use 18 decimals. No write runs on construction/read. */
@@ -109,10 +109,10 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
   const historyMemory=new Map<string,ChainPriceHistory>();
   const historyMetadata=new Map<string,Promise<{base:MarketSummary;k:bigint}>>();
   async function ready() {
-    await assertTestnet(provider);
-    if(await provider.getCode(address)==='0x') throw new Error('测试网工厂地址没有合约代码');
+    await assertMainnet(provider);
+    if(await provider.getCode(address)==='0x') throw new Error('主网工厂地址没有合约代码');
     const version=await new Contract(address,['function interfaceVersion() view returns(uint256)'],provider).interfaceVersion().catch(()=>0n);
-    if(version!==4n)throw new Error('测试网合约版本不支持：需要 interfaceVersion 4，请更新部署配置');
+    if(version!==4n)throw new Error('主网合约版本不支持：需要 interfaceVersion 4，请更新部署配置');
   }
   async function summary(marketAddress:string,includePresentation=false):Promise<MarketSummary> {
     const market=nonzeroAddress(marketAddress);
@@ -145,7 +145,6 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     if(account) account=nonzeroAddress(account);
     const [owner,ns,nm,block]=await Promise.all([factory.owner(),factory.stockCount(),factory.marketCount(),provider.getBlock('latest')]);
     if(!block) throw new Error('无法读取最新区块');
-    const fixedTestTargets=await new Contract(address,['function fixedTestnetGraduation() view returns(bool)'],provider).fixedTestnetGraduation().catch(()=>false);
     const stocks=await Promise.all(Array.from({length:Number(ns)},async(_,i):Promise<StockState>=>{
       const stock=await factory.stockTokens(i);const token=new Contract(stock,tokenAbi,provider);
       const config=await factory.stocks(stock);
@@ -153,18 +152,14 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
       const result:StockState={address:stock,symbol,decimals:Number(decimals),enabled:config.enabled,oracle:config.priceOracle,router:config.trustedForwarder,k:config.k,balance};
       try {
         const oracle=new Contract(result.oracle,oracleAbi,provider);
-        if(fixedTestTargets){
-          if(getAddress(stock)!==getAddress('0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E') || result.decimals!==18) throw new Error('TESTNET_TSLA_ONLY');
-          await oracle.collateralForUsd(500n*10n**18n); // Bond still needs a valid USD conversion.
-          result.fixedRTarget=4200000000000000n;
-        } else result.snapshot=await oracle.ethPrice6();
+        result.snapshot=await oracle.ethPrice6();
       }
       catch {result.snapshotError='价格快照不可用：请检查喂价时效、状态和配置';}
       return result;
     }));
-    onMetadata?.({factory:address,owner,fixedTestTargets,stocks,markets:[],blockNumber:block.number,timestamp:BigInt(block.timestamp)});
+    onMetadata?.({factory:address,owner,stocks,markets:[],blockNumber:block.number,timestamp:BigInt(block.timestamp)});
     const markets=await Promise.all(Array.from({length:Number(nm)},async(_,i)=>summary(await factory.markets(i),true)));
-    return {factory:address,owner,fixedTestTargets,stocks,markets,blockNumber:block.number,timestamp:BigInt(block.timestamp)};
+    return {factory:address,owner,stocks,markets,blockNumber:block.number,timestamp:BigInt(block.timestamp)};
   }
   async function readMarket(marketAddress:string,account?:string,details=true):Promise<MarketState> {
     await ready();const base=await summary(marketAddress);
@@ -280,7 +275,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     const shared=await readSharedHistory(address,marketAddress);
     if(shared){historyMemory.set(key,shared);if(shared.checkpoint)void saveHistoryCheckpoint(shared.checkpoint);return shared;}
 
-    await assertTestnet(provider);
+    await assertMainnet(provider);
     // 历史元数据不可变，只在本reader内复用；交易报价与签名仍走原实时校验。
     let metadata=historyMetadata.get(key);
     if(!metadata){metadata=(async()=>{await ready();const base=await summary(marketAddress);return {base,k:await new Contract(base.address,marketAbi,provider).k() as bigint};})();historyMetadata.set(key,metadata);void metadata.catch(()=>{if(historyMetadata.get(key)===metadata)historyMetadata.delete(key);});}
@@ -323,23 +318,23 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
     return new Contract(base.address,marketAbi,provider)[method](...args);
   }
   function withSigner(signer:Signer,validateSession?:()=>void) {
-    async function writeReady(){if(!signer.provider) throw new Error('钱包未连接');await assertTestnet(signer.provider);await ready();}
+    async function writeReady(){if(!signer.provider) throw new Error('钱包未连接');await assertMainnet(signer.provider);await ready();}
     async function submit(contract:Contract,method:string,args:unknown[],paymentGas=0n,reasonText?:string):Promise<ContractTransactionResponse>{
       if(!signer.provider) throw new Error('钱包未连接');
       if(reasonText!==undefined){
-        const tx=await contract[method].populateTransaction(...args,{chainId:TESTNET_CHAIN_ID});
+        const tx=await contract[method].populateTransaction(...args,{chainId:MAINNET_CHAIN_ID});
         const data=appendEarlyReason(tx.data!,reasonText);
-        const gasLimit=await signer.estimateGas({...tx,data,chainId:TESTNET_CHAIN_ID})+paymentGas;
-        await assertTestnet(signer.provider);validateSession?.();
-        return signer.sendTransaction({...tx,data,gasLimit,chainId:TESTNET_CHAIN_ID}) as Promise<ContractTransactionResponse>;
+        const gasLimit=await signer.estimateGas({...tx,data,chainId:MAINNET_CHAIN_ID})+paymentGas;
+        await assertMainnet(signer.provider);validateSession?.();
+        return signer.sendTransaction({...tx,data,gasLimit,chainId:MAINNET_CHAIN_ID}) as Promise<ContractTransactionResponse>;
       }
       // 在估算值上另加发费预算；避免估算绕过发费后钱包只提供冻结结算的gas。
-      const gasLimit=paymentGas>0n?await contract[method].estimateGas(...args,{chainId:TESTNET_CHAIN_ID})+paymentGas:undefined;
+      const gasLimit=paymentGas>0n?await contract[method].estimateGas(...args,{chainId:MAINNET_CHAIN_ID})+paymentGas:undefined;
       // 读取登记或授权配置期间用户可能切链；发送前再核验，并把链ID写入交易，
       // 让钱包即使在此后切链也只能拒绝，不能在其他链发送同地址交易。
-      await assertTestnet(signer.provider);
+      await assertMainnet(signer.provider);
       validateSession?.();
-      return contract[method](...args,{chainId:TESTNET_CHAIN_ID,...(gasLimit===undefined?{}:{gasLimit})});
+      return contract[method](...args,{chainId:MAINNET_CHAIN_ID,...(gasLimit===undefined?{}:{gasLimit})});
     }
     async function send(marketAddress:string,target:'market'|'vault'|'adapter',method:string,args:unknown[],reasonText?:string):Promise<ContractTransactionResponse>{
       await writeReady();const base=await summary(marketAddress);
@@ -393,7 +388,7 @@ export function createChainClient(provider:Provider, factoryAddress:string) {
         const asset=nonzeroAddress(request.paymentAsset);
         if(asset!==getAddress(route.stock)&&asset!==getAddress(route.stable))throw new Error('支付资产未登记');
         validateSession?.();
-        return new Contract(route.router,routerAbi,signer).execute.staticCall(request,{chainId:TESTNET_CHAIN_ID});
+        return new Contract(route.router,routerAbi,signer).execute.staticCall(request,{chainId:MAINNET_CHAIN_ID});
       },
       async approveRouterAsset(marketAddress:string,paymentAsset:string,amount:bigint):Promise<ContractTransactionResponse>{
         await writeReady();const base=await summary(marketAddress);const router=nonzeroAddress(await new Contract(base.address,marketAbi,provider).trustedForwarder());

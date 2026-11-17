@@ -1,7 +1,7 @@
 import {getAddress} from 'ethers';
 import type {CoreHistoryCheckpoint as HistoryCheckpoint} from './coreHistory';
 const DB='ocp-core-history-v2',STORE='histories';
-export const historyCacheKey=(f:string,m:string,c:string)=>`46630:core:2:${getAddress(f).toLowerCase()}:${getAddress(m).toLowerCase()}:${getAddress(c).toLowerCase()}`;
+export const historyCacheKey=(f:string,m:string,c:string)=>`4663:core:2:${getAddress(f).toLowerCase()}:${getAddress(m).toLowerCase()}:${getAddress(c).toLowerCase()}`;
 const digest=async(s:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(v=>v.toString(16).padStart(2,'0')).join('');
 function open():Promise<IDBDatabase>{return new Promise((resolve,reject)=>{
  if(typeof indexedDB==='undefined'){reject(Error('Unavailable'));return;}

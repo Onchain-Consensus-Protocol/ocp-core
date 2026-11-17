@@ -76,10 +76,10 @@ describe('chain data adapter for the shared Simulation view',()=>{
     expect(html.indexOf('Trade history')).toBeLessThan(html.indexOf('Formal market contract address'));
     expect(html).not.toContain('Advance time');expect(html).not.toContain('Reset simulation');
   });
-  it('shows an honest loading state for missing Genesis history and testnet targets',()=>{
+  it('shows an honest loading state for missing Genesis history and the mainnet target',()=>{
     const props=fixture();props.market.phase=0;
     const html=renderToStaticMarkup(<TestnetSimulation {...props}/>);
-    expect(html).toContain('On-chain price history has not loaded');expect(html).toContain('Fixed testnet targets');
+    expect(html).toContain('On-chain price history has not loaded');expect(html).toContain('4.2 ETH');
     expect(html).toContain('Genesis market contract address');
     expect(html).not.toContain('Actual simulated prices');expect(html).not.toContain('3.6 / 0.6 ETH');
   });

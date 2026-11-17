@@ -6,7 +6,7 @@ import factoryAbi from '../../testnet/abi/TopicMarketStockFactory.json';
 const f='0x1111111111111111111111111111111111111111',m='0x2222222222222222222222222222222222222222',hash='0x'+'a'.repeat(64);
 const i=new Interface(factoryAbi),event=i.encodeEventLog(i.getEvent('MarketCreated')!,[m,f,f,f,30,100,200,300,300,1]);
 const cp:any={version:2,factory:f,market:m,createdAt:'30',k:'1',creation:{timestamp:30,log:{address:f,blockNumber:3,blockHash:hash,transactionHash:hash,transactionIndex:0,index:0,...event}},logs:[],latestBlock:4,latestHash:hash};
-function row():IndexedHistoryRow{return {chainId:46630,factory:f,market:m,checkpoint:cp,origin:cp.creation,descriptor:null,targetBlock:4,throughTimestamp:40,updatedAt:100000,leaseUntil:null,lastError:null};}
+function row():IndexedHistoryRow{return {chainId:4663,factory:f,market:m,checkpoint:cp,origin:cp.creation,descriptor:null,targetBlock:4,throughTimestamp:40,updatedAt:100000,leaseUntil:null,lastError:null};}
 async function request(value:IndexedHistoryRow|null,url='/?market='+m,method='GET',options:any={}){
  const headers:Record<string,string>={},res:any={setHeader:(k:string,v:string)=>{headers[k]=v;},end:(body:string)=>{res.body=JSON.parse(body);}},sync=vi.fn(async()=>{}),defer=vi.fn();
  const store={get:vi.fn(async()=>value)} as unknown as HistoryStore;

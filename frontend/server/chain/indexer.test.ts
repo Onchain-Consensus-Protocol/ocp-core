@@ -2,11 +2,11 @@ import {describe,it,expect,vi} from 'vitest';
 import {Interface,ZeroAddress,type Provider,type Log} from 'ethers';
 import factoryAbi from '../../testnet/abi/TopicMarketStockFactory.json';
 import marketAbi from '../../testnet/abi/TopicMarket.json';
-import {CURRENT_TESTNET_FACTORY,CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK} from '../../shared/testnetDeployment.js';
+import {CURRENT_MAINNET_FACTORY,CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK} from '../../shared/mainnetDeployment.js';
 import {syncIndexedMarket} from './indexer.js';
 import type {HistoryStore,HistoryKey,HistoryPatch,IndexedHistoryRow} from './types.js';
 const factory='0x0000000000000000000000000000000000001234',market='0x0000000000000000000000000000000000005678';
-const key:HistoryKey={chainId:46630,factory,market};
+const key:HistoryKey={chainId:4663,factory,market};
 const fi=new Interface(factoryAbi),mi=new Interface(marketAbi);
 const hash=(n:number,revision=0)=>'0x'+BigInt(n+revision*1000000).toString(16).padStart(64,'0');
 class MemoryStore implements HistoryStore {
@@ -26,7 +26,7 @@ function fixture(options:{factory?:string;creation?:number;head?:number;rangeLim
  const log=(address:string,blockNumber:number,data:{topics:string[];data:string},index=0)=>({address,blockNumber,blockHash:header(blockNumber).hash,transactionHash:hash(blockNumber+100),transactionIndex:0,index,removed:false,...data}) as unknown as Log;
  const origin=()=>{const value=log(factory,creation,fi.encodeEventLog(fi.getEvent('MarketCreated')!,[options.wrongIndexedMarket?'0x0000000000000000000000000000000000009999':market,market,market,market,createdAt,coreCutoff-7200,coreCutoff-3600,coreCutoff,coreCutoff,0]));return options.badOriginHash?{...value,blockHash:hash(creation,99)} as unknown as Log:value;};
  const trade=()=>log(market,creation+1,mi.encodeEventLog(mi.getEvent('GenesisTrade')!,[market,true,100,100]));
- const provider={getNetwork:vi.fn(async()=>({chainId:wrongChain?1n:46630n})),getBlock:vi.fn(async(n:number|'latest')=>{if(headerFailure&&n===19)throw Error('temporary RPC outage');return header(n==='latest'?head:n);}),
+ const provider={getNetwork:vi.fn(async()=>({chainId:wrongChain?1n:4663n})),getBlock:vi.fn(async(n:number|'latest')=>{if(headerFailure&&n===19)throw Error('temporary RPC outage');return header(n==='latest'?head:n);}),
   getLogs:vi.fn(async(f:{address:string;fromBlock:number;toBlock:number})=>{ranges.push({address:f.address,from:Number(f.fromBlock),to:Number(f.toBlock)});if(options.rangeLimit&&Number(f.toBlock)-Number(f.fromBlock)+1>options.rangeLimit)throw Error('block range too large');return (f.address===factory?[origin()]:[trade()]).filter(l=>l.blockNumber>=Number(f.fromBlock)&&l.blockNumber<=Number(f.toBlock));}),
   call:vi.fn(async(tx:{data:string;blockTag?:number})=>{
    const iface=tx.data.slice(0,10)===fi.getFunction('isMarket')!.selector||tx.data.slice(0,10)===fi.getFunction('marketRecord')!.selector||tx.data.slice(0,10)===fi.getFunction('marketCollateral')!.selector?fi:mi;
@@ -76,39 +76,39 @@ describe('shared history indexer',()=>{
   const f=fixture();let t=0;const result=await syncIndexedMarket({provider:f.provider,factory,market,store:f.store,budgetMs:1,now:()=>t++});expect(result.status).toBe('failed');expect(f.provider.getNetwork).not.toHaveBeenCalled();expect(f.store.tokens.size).toBe(0);
  });
  it('uses the known production deployment bound with an indexed origin query and no timestamp search',async()=>{
-  const creation=CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+100,head=CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+2_200_000;
-  const f=fixture({factory:CURRENT_TESTNET_FACTORY,creation,head});
-  const result=await syncIndexedMarket({provider:f.provider,factory:CURRENT_TESTNET_FACTORY,market,store:f.store});
+  const creation=CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+100,head=CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+2_200_000;
+  const f=fixture({factory:CURRENT_MAINNET_FACTORY,creation,head});
+  const result=await syncIndexedMarket({provider:f.provider,factory:CURRENT_MAINNET_FACTORY,market,store:f.store});
   expect(result.status).toBe('updated');expect(result.row?.origin?.log.blockNumber).toBe(creation);
   expect(result.row?.checkpoint?.latestBlock).toBe(creation+249999);expect(result.row?.targetBlock).toBe(head);expect(result.row?.throughTimestamp).toBe(1000+creation+249999);
   const filters=(f.provider.getLogs as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]);
-  expect(filters[0]).toMatchObject({address:CURRENT_TESTNET_FACTORY,fromBlock:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK,toBlock:head,topics:[fi.getEvent('MarketCreated')!.topicHash,'0x'+market.slice(2).padStart(64,'0')]});
-  const blocks=(f.provider.getBlock as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]);expect(blocks).not.toContain(1);expect(blocks.filter(n=>typeof n==='number').every(n=>n>=CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK)).toBe(true);
+  expect(filters[0]).toMatchObject({address:CURRENT_MAINNET_FACTORY,fromBlock:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK,toBlock:head,topics:[fi.getEvent('MarketCreated')!.topicHash,'0x'+market.slice(2).padStart(64,'0')]});
+  const blocks=(f.provider.getBlock as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]);expect(blocks).not.toContain(1);expect(blocks.filter(n=>typeof n==='number').every(n=>n>=CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK)).toBe(true);
   const scans=f.ranges.filter(r=>r.address===market).sort((a,b)=>a.from-b.from);expect(scans).toHaveLength(5);
   expect(scans[0].from).toBe(creation);expect(scans.at(-1)?.to).toBe(creation+249999);expect(scans.every(r=>r.to-r.from+1===50000)).toBe(true);
   for(let i=1;i<scans.length;i++)expect(scans[i].from).toBe(scans[i-1].to+1);
  });
  it('keeps the production origin shortcut behind factory registration',async()=>{
-  const f=fixture({factory:CURRENT_TESTNET_FACTORY,creation:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+100,head:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+1000});f.unregister();
+  const f=fixture({factory:CURRENT_MAINNET_FACTORY,creation:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+100,head:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+1000});f.unregister();
   expect((await f.run()).status).toBe('not-market');expect(f.provider.getLogs).not.toHaveBeenCalled();expect(f.provider.getBlock).not.toHaveBeenCalled();
   expect(f.store.claims.filter(c=>c.key.market===market)).toHaveLength(0);
  });
  it('rejects a production indexed origin whose canonical header hash disagrees',async()=>{
-  const f=fixture({factory:CURRENT_TESTNET_FACTORY,creation:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+100,head:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+1000,badOriginHash:true});
+  const f=fixture({factory:CURRENT_MAINNET_FACTORY,creation:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+100,head:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+1000,badOriginHash:true});
   const result=await f.run();expect(result.status).toBe('failed');expect(result.row?.checkpoint).toBeNull();expect(result.row?.origin).toBeNull();expect(f.ranges.filter(r=>r.address===market)).toHaveLength(0);
   expect(f.store.releases.find(r=>r.key.market===market)?.error).toBe('ORIGIN_REORG');
  });
  it('validates the indexed event market instead of trusting a production RPC response',async()=>{
-  const f=fixture({factory:CURRENT_TESTNET_FACTORY,creation:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+100,head:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+1000,wrongIndexedMarket:true});
+  const f=fixture({factory:CURRENT_MAINNET_FACTORY,creation:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+100,head:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+1000,wrongIndexedMarket:true});
   const result=await f.run();expect(result.status).toBe('failed');expect(result.row?.checkpoint).toBeNull();expect(f.ranges.filter(r=>r.address===market)).toHaveLength(0);
   expect(f.store.releases.find(r=>r.key.market===market)?.error).toBe('ORIGIN_NOT_UNIQUE');
  });
  it('falls back to bounded production factory subscans when the broad indexed query is rejected',async()=>{
-  const creation=CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+100,head=CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+120000;
-  const f=fixture({factory:CURRENT_TESTNET_FACTORY,creation,head,rangeLimit:50000});const result=await f.run();expect(result.status).toBe('updated');
-  const factoryRanges=f.ranges.filter(r=>r.address===CURRENT_TESTNET_FACTORY);expect(factoryRanges[0]).toEqual({address:CURRENT_TESTNET_FACTORY,from:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK,to:head});
+  const creation=CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+100,head=CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+120000;
+  const f=fixture({factory:CURRENT_MAINNET_FACTORY,creation,head,rangeLimit:50000});const result=await f.run();expect(result.status).toBe('updated');
+  const factoryRanges=f.ranges.filter(r=>r.address===CURRENT_MAINNET_FACTORY);expect(factoryRanges[0]).toEqual({address:CURRENT_MAINNET_FACTORY,from:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK,to:head});
   expect(factoryRanges.slice(1).every(r=>r.to-r.from+1<=50000)).toBe(true);
-  expect(factoryRanges.slice(1,4).map(r=>[r.from,r.to])).toEqual([[CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK,CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+49999],[CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+50000,CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+99999],[CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK+100000,head]]);
+  expect(factoryRanges.slice(1,4).map(r=>[r.from,r.to])).toEqual([[CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK,CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+49999],[CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+50000,CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+99999],[CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK+100000,head]]);
   expect((f.provider.getBlock as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0])).not.toContain(1);
  });
 

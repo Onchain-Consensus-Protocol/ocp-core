@@ -7,7 +7,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import { Shield, AlertTriangle } from "lucide-react";
 import { useSiteTheme } from "./components/ThemeToggle";
-import { isTestnetMarketPage } from "./shared/marketPageMode";
+import { isMainnetMarketPage } from "./shared/marketPageMode";
 import { TestnetMarketApp } from "./components/TestnetMarketApp";
 import { PaperMarketApp } from "./components/paper/PaperMarketApp";
 import {ClerkProvider,useAuth,useClerk} from "@clerk/react";
@@ -37,8 +37,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
-const testnetMode=isTestnetMarketPage(window.location.pathname, window.location.search);
-const degenMode=testnetMode && new URLSearchParams(window.location.search).get('view')!=='full';
+const mainnetMode=isMainnetMarketPage(window.location.pathname, window.location.search);
+const degenMode=mainnetMode && new URLSearchParams(window.location.search).get('view')!=='full';
 const publicKey=(import.meta as ImportMeta & {env:Record<string,string>}).env.VITE_CLERK_PUBLISHABLE_KEY;
 function AuthenticatedMarket({lang}:{lang:"zh"|"en"}) {
  const {isLoaded,isSignedIn,getToken}=useAuth();const clerk=useClerk();
@@ -57,16 +57,16 @@ function ExploreStandalone() {
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 sm:flex sm:justify-between sm:h-16 sm:py-0">
             <OCPMenu lang={lang} suffix="MARKET" />
             <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-              <a className="hidden sm:inline whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent" href={`${testnetMode ? '/' : '/testnet.html'}?lang=${lang}`}>{testnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '测试网入口' : 'Testnet')}</a>
+              <a className="hidden sm:inline whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent" href={`${mainnetMode ? '/' : '/market.html'}?lang=${lang}`}>{mainnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '主网入口' : 'Mainnet')}</a>
               <LanguageToggle lang={lang} setLang={setLang} />
             </div>
-            <a className="col-span-2 justify-self-end whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent sm:hidden" href={`${testnetMode ? '/' : '/testnet.html'}?lang=${lang}`}>{testnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '测试网入口' : 'Testnet')}</a>
+            <a className="col-span-2 justify-self-end whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent sm:hidden" href={`${mainnetMode ? '/' : '/market.html'}?lang=${lang}`}>{mainnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '主网入口' : 'Mainnet')}</a>
           </div>
         </div>
       </nav>
       <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          {testnetMode?<TestnetMarketApp lang={lang} degen={degenMode}/>:publicKey?<ClerkProvider publishableKey={publicKey} appearance={{variables:{colorBackground:theme === 'dark' ? '#15181d' : '#ffffff',colorForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorMutedForeground:theme === 'dark' ? '#9ba3b1' : '#64748b',colorInput:theme === 'dark' ? '#1b1f26' : '#ffffff',colorInputForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorPrimary:theme === 'dark' ? '#ff9454' : '#ea580c'},elements:{socialButtonsBlock:{display:"none"},socialButtons:{display:"none"},dividerRow:{display:"none"}}}}><AuthenticatedMarket lang={lang}/></ClerkProvider>:<PaperMarketApp lang={lang} authLoaded signedIn={false} getToken={noToken} onLogin={()=>{}} onLogout={()=>{}} authAvailable={false}/>}
+          {mainnetMode?<TestnetMarketApp lang={lang} degen={degenMode}/>:publicKey?<ClerkProvider publishableKey={publicKey} appearance={{variables:{colorBackground:theme === 'dark' ? '#15181d' : '#ffffff',colorForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorMutedForeground:theme === 'dark' ? '#9ba3b1' : '#64748b',colorInput:theme === 'dark' ? '#1b1f26' : '#ffffff',colorInputForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorPrimary:theme === 'dark' ? '#ff9454' : '#ea580c'},elements:{socialButtonsBlock:{display:"none"},socialButtons:{display:"none"},dividerRow:{display:"none"}}}}><AuthenticatedMarket lang={lang}/></ClerkProvider>:<PaperMarketApp lang={lang} authLoaded signedIn={false} getToken={noToken} onLogin={()=>{}} onLogout={()=>{}} authAvailable={false}/>}
         </div>
       </main>
       <footer className="py-6 border-t border-border bg-surface">
@@ -79,7 +79,7 @@ function ExploreStandalone() {
             <a href="/about.html" className="underline hover:text-accent">{lang === "zh" ? "应用介绍" : "About OCP Market"}</a>
             <a href="/privacy.html" className="underline hover:text-accent">{lang === "zh" ? "隐私政策" : "Privacy policy"}</a>
           </div>
-          <span className="text-text-muted text-xs font-mono">{testnetMode?(lang === "zh" ? "Robinhood 测试网 · 测试资产" : "Robinhood Testnet · Test assets"):(lang === "zh" ? "多人模拟 · 仅使用虚拟资金" : "Multiplayer simulation · Virtual funds only.")}</span>
+          <span className="text-text-muted text-xs font-mono">{mainnetMode?(lang === "zh" ? "Robinhood 主网" : "Robinhood Mainnet"):(lang === "zh" ? "多人模拟 · 仅使用虚拟资金" : "Multiplayer simulation · Virtual funds only.")}</span>
         </div>
       </footer>
     </div>

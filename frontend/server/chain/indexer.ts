@@ -1,4 +1,4 @@
-import {CURRENT_TESTNET_FACTORY,CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK} from '../../shared/testnetDeployment.js';
+import {CURRENT_MAINNET_FACTORY,CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK} from '../../shared/mainnetDeployment.js';
 import {Contract,Interface,ZeroAddress,getAddress,zeroPadValue,type ContractRunner,type Provider} from 'ethers';
 import factoryAbi from '../../testnet/abi/TopicMarketStockFactory.json' with {type:'json'};
 import marketAbi from '../../testnet/abi/TopicMarket.json' with {type:'json'};
@@ -9,7 +9,7 @@ const fi=new Interface(factoryAbi);
 interface Options {provider:Provider;factory:string;market:string;store:HistoryStore;maxBlocks?:number;budgetMs?:number;now?:()=>number}
 export async function syncIndexedMarket({provider,factory,market,store,maxBlocks=250000,budgetMs=20000,now=Date.now}:Options):Promise<{status:'updated'|'busy'|'not-market'|'failed';row?:IndexedHistoryRow}>{
  let key:HistoryKey,globalKey:HistoryKey;
- try{factory=getAddress(factory);market=getAddress(market);if(factory===ZeroAddress||market===ZeroAddress)throw Error();key={chainId:46630,factory,market};globalKey={...key,market:ZeroAddress};}catch{return {status:'not-market'};}
+ try{factory=getAddress(factory);market=getAddress(market);if(factory===ZeroAddress||market===ZeroAddress)throw Error();key={chainId:4663,factory,market};globalKey={...key,market:ZeroAddress};}catch{return {status:'not-market'};}
  maxBlocks=Math.max(1,Math.min(250000,Math.floor(maxBlocks)));budgetMs=Math.max(1,Math.min(20000,budgetMs));
  if(!Number.isFinite(maxBlocks)||!Number.isFinite(budgetMs))return {status:'failed'};
  const start=now();let globalToken:string|undefined,token:string|undefined,errorCode:string|undefined;
@@ -17,7 +17,7 @@ export async function syncIndexedMarket({provider,factory,market,store,maxBlocks
  const rpc=async<T>(fn:()=>Promise<T>)=>{guard();const value=await fn();guard();return value;};
  try{
   const lease=await store.claim(globalKey,0,45000);if(!lease)return {status:'busy'};globalToken=lease.token;
-  if((await rpc(()=>provider.getNetwork())).chainId!==46630n)throw Error('WRONG_CHAIN');
+  if((await rpc(()=>provider.getNetwork())).chainId!==4663n)throw Error('WRONG_CHAIN');
   const runner={call:(tx:Parameters<Provider['call']>[0])=>rpc(()=>provider.call(tx))} as ContractRunner;
   const f=new Contract(factory,factoryAbi,runner),m=new Contract(market,marketAbi,runner);
   if(!await f.isMarket(market))return {status:'not-market'};
@@ -49,10 +49,10 @@ export async function syncIndexedMarket({provider,factory,market,store,maxBlocks
     await save({origin:null});
     const topics=[fi.getEvent('MarketCreated')!.topicHash,zeroPadValue(market,32)];
     let logs;
-    if(factory===getAddress(CURRENT_TESTNET_FACTORY)&&head.number>=CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK){
+    if(factory===getAddress(CURRENT_MAINNET_FACTORY)&&head.number>=CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK){
       // 当前工厂的已核实部署区块是扫描下界；按indexed market找创建事件，不逐市场重做时间搜索。
-      try{logs=await wrapped.getLogs({address:factory,fromBlock:CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK,toBlock:head.number,topics});}
-      catch{logs=await getLogsInChunks(wrapped,factory,CURRENT_TESTNET_FACTORY_DEPLOYMENT_BLOCK,head.number,topics,4,50000);}
+      try{logs=await wrapped.getLogs({address:factory,fromBlock:CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK,toBlock:head.number,topics});}
+      catch{logs=await getLogsInChunks(wrapped,factory,CURRENT_MAINNET_FACTORY_DEPLOYMENT_BLOCK,head.number,topics,4,50000);}
     }else{
       const {first,last}=await findTimestampRange(head,BigInt(descriptor.createdAt),block);if(first>last)throw Error('ORIGIN_MISSING');
       logs=await getLogsInChunks(wrapped,factory,first,last,topics,1);
