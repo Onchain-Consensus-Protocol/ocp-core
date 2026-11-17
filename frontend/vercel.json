@@ -47,6 +47,9 @@
     },
     "api/chain-history.ts": {
       "maxDuration": 60
+    },
+    "api/topic-share.ts": {
+      "includeFiles": "{public/logo.png,public/ocp-wordmark.svg}"
     }
   }
 }

@@ -3,6 +3,8 @@ import {ImageResponse} from '@vercel/og';
 import {Contract, FetchRequest, JsonRpcProvider, getAddress} from 'ethers';
 import type {IncomingMessage, ServerResponse} from 'node:http';
 import factoryAbi from '../testnet/abi/TopicMarketStockFactory.json' with {type: 'json'};
+import {TopicCard, type TopicCardData} from '../server/share/topicCard.js';
+import {loadMarketBrand} from '../server/share/marketBrand.js';
 import {CURRENT_MAINNET_FACTORY} from '../shared/mainnetDeployment.js';
 
 const origin = 'https://market.ocp-protocol.org';
@@ -45,20 +47,40 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const topic = String(record.topic);
     const lang = url.searchParams.get('lang') === 'zh' ? 'zh' : 'en';
     const target = origin + '/degen.html?market=' + market + '&lang=' + lang;
-    const image = origin + '/api/topic-share?market=' + market + '&image=1';
+    const image = origin + '/api/topic-share?market=' + market + '&image=1&v=2';
     let body: string | Buffer;
     const isImage = url.searchParams.get('image') === '1';
     if (isImage) {
-      const h = React.createElement;
-      const card = h('div', {style: {
-        width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
-        background: '#0d0f12', color: '#f1f5f9', padding: '56px 64px',
-        borderTop: '8px solid #ff9454', fontFamily: 'sans-serif',
-      }},
-      h('div', {style: {display: 'flex', color: '#ff9454', fontSize: 30}}, 'OCP TOPIC MARKET'),
-      h('div', {style: {display: 'flex', fontSize: 48, lineHeight: 1.3, marginTop: 62, overflow: 'hidden', height: 275, wordBreak: 'break-word'}}, Array.from(topic).slice(0, 140).join('')),
-      h('div', {style: {display: 'flex', marginTop: 'auto', justifyContent: 'space-between', fontSize: 24, color: '#9ba3b1'}},
-        h('span', null, 'Robinhood Mainnet'), h('span', null, 'market.ocp-protocol.org')));
+      const stock = await factory.marketCollateral(market);
+      const token = new Contract(stock, ['function symbol() view returns (string)'], provider);
+      const pool = new Contract(market, [
+        'function phase() view returns (uint8)',
+        'function outcome() view returns (uint8)',
+        'function priceYes() view returns (uint256)',
+        'function R() view returns (uint256)',
+        'function rTarget() view returns (uint256)',
+      ], provider);
+      const [phaseValue, symbol] = await Promise.all([pool.phase(), token.symbol()]);
+      const phase = Number(phaseValue);
+      const cutoff = Number(record.coreCutoff);
+      const now = Math.floor(Date.now() / 1000);
+      let stage = ['Genesis', 'Formal market', 'Awaiting Core settlement', 'Settled', 'Graduation failed'][phase] ?? 'Market';
+      if (phase === 0 && now >= Number(record.genesisCutoff)) stage = 'Genesis ended · Awaiting processing';
+      if (phase === 1 && now >= Number(record.formalCutoff)) stage = 'Trading closed · Core active';
+      if ((phase === 1 || phase === 2) && now >= cutoff) stage = 'Awaiting settlement';
+      const data: TopicCardData = {
+        topic, symbol: String(symbol), stage, market,
+        deadline: new Date(cutoff * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC',
+      };
+      if (phase === 1 || phase === 2) {
+        data.yesPercent = Number(await pool.priceYes()) / 1e16;
+      } else if (phase === 0) {
+        const [raised, target] = await Promise.all([pool.R(), pool.rTarget()]);
+        data.progressPercent = target > 0n ? Math.min(100, Number(raised * 10000n / target) / 100) : 0;
+      } else {
+        data.result = phase === 4 ? 'Not graduated' : ['Pending', 'YES', 'NO', 'INVALID'][Number(await pool.outcome())] ?? 'Settled';
+      }
+      const card = React.createElement(TopicCard, {data, ...await loadMarketBrand('dark')});
       body = Buffer.from(await new ImageResponse(card, {width: 1200, height: 630}).arrayBuffer());
     } else {
       const title = escapeHtml(topic);
