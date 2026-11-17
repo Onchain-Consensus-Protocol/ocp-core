@@ -282,7 +282,7 @@ function HowPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <OCPMenu lang={lang} suffix="HOW IT WORKS" />
           <div className="flex items-center gap-3">
-            <a href="/explore.html" className="hidden items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-bold text-accent transition-colors hover:bg-accent/5 sm:inline-flex">
+            <a href={`https://market.ocp-protocol.org/market.html?lang=${lang}`} className="hidden items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-bold text-accent transition-colors hover:bg-accent/5 sm:inline-flex">
               <Landmark className="h-3.5 w-3.5" />{t.navExplore}
             </a>
             <LanguageToggle lang={lang} setLang={setLang} />
