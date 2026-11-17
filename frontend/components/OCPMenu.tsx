@@ -97,6 +97,14 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
             <Waypoints className="w-4 h-4 shrink-0" />
             {lang === "zh" ? "OCP 与市场如何协作" : "How OCP Core & OCP Market Work"}
           </a>
+          <a
+            href={`${MARKET_ORIGIN}/market.html?lang=${lang}`}
+            role="menuitem"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
+          >
+            <Landmark className="w-4 h-4 shrink-0" />
+            {lang === "zh" ? "主网市场" : "Market"}
+          </a>
           <details className="group/future">
             <summary
               role="menuitem"

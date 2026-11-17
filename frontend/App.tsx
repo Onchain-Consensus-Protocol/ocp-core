@@ -26,11 +26,12 @@ function App() {
   const [currentView, setCurrentView] = useState<View>(initialView);
 
   const t = CONTENT[lang].ui;
-  const marketUrl = `https://market.ocp-protocol.org/?lang=${lang}`;
+  const marketUrl = `https://market.ocp-protocol.org/market.html?lang=${lang}`;
+  const simulationUrl = `https://market.ocp-protocol.org/?lang=${lang}`;
   // 兼容旧演示书签，统一进入同一多人市场及账户体系。
   useEffect(() => {
-    if (window.location.hash === '#sim-container') window.location.replace(marketUrl);
-  }, [marketUrl]);
+    if (window.location.hash === '#sim-container') window.location.replace(simulationUrl);
+  }, [simulationUrl]);
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-accent/30 selection:text-white">
@@ -81,11 +82,11 @@ function App() {
                 </div>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
 
-                  <a href={marketUrl} className="inline-flex items-center justify-center px-6 py-3 border border-accent/50 rounded-lg text-accent hover:bg-accent/10 text-sm font-bold font-display">
+                  <a href={simulationUrl} className="inline-flex items-center justify-center px-6 py-3 border border-accent/50 rounded-lg text-accent hover:bg-accent/10 text-sm font-bold font-display">
                     <Terminal className="w-3.5 h-3.5 mr-2" />
                     {t.hero_btn_demo}
                   </a>
-                  <a href={`https://market.ocp-protocol.org/market.html?lang=${lang}`} className="inline-flex items-center justify-center px-6 py-3 border border-accent/50 rounded-lg text-accent hover:bg-accent/10 text-sm font-bold font-display">
+                  <a href={marketUrl} className="inline-flex items-center justify-center px-6 py-3 border border-accent/50 rounded-lg text-accent hover:bg-accent/10 text-sm font-bold font-display">
                     <Landmark className="w-3.5 h-3.5 mr-2" />
                     {lang === 'zh' ? '进入主网市场' : 'Enter Mainnet Market'}
                   </a>
