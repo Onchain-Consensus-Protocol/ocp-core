@@ -29,7 +29,7 @@ import {genesisTokens,genesisPrice} from './components/genesisDisplay';
 
 const copy = {
   en: {
-    navExplore: "Open OCP Market",
+    navExplore: "Market",
     eyebrow: "CAPITAL CONSENSUS × CONTINUOUS PRICING",
     title: "How OCP Core & OCP Market Work",
     intro:
@@ -89,7 +89,7 @@ const copy = {
     ctaDesc: "Write a topic, trade through Genesis, and explore formal market trading, Core staking and conditional LP payouts.",
   },
   zh: {
-    navExplore: "打开市场",
+    navExplore: "Market",
     eyebrow: "资本共识 × 连续定价",
     title: "OCP Core 与市场如何协作",
     intro: "零初始本金发射话题，在 Genesis 买卖 gToken。R储备达标即毕业，正式市场与 OCP Core 同时开启，最后按 Core 结果结算。",
