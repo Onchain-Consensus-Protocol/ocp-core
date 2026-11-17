@@ -11,7 +11,7 @@
           "value": "market.ocp-protocol.org"
         }
       ],
-      "dest": "/explore.html"
+      "dest": "/market.html"
     },
     {
       "handle": "filesystem"

@@ -9,7 +9,7 @@ import {MarketCard,marketDescription,type ShareMarket} from './marketCard.js';
 
 const escapeHtml=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export function marketShareHtml(m:ShareMarket,snapshot?:MarketShareSnapshot):string {
- const share=snapshot?marketSnapshotUrl(snapshot.id):marketShareUrl(m.id),image=share+'&image=1',target=`https://market.ocp-protocol.org/?market=${encodeURIComponent(m.id)}`;
+ const share=snapshot?marketSnapshotUrl(snapshot.id):marketShareUrl(m.id),image=share+'&image=1',target=`https://market.ocp-protocol.org/explore.html?market=${encodeURIComponent(m.id)}`;
  const summary=snapshot?`${snapshot.prices.map(p=>`${p.label}: ${p.value}${p.change?' ('+p.change+')':''}`).join(' · ')}${snapshot.pnl?` · ${snapshot.pnl.label}: ${snapshot.pnl.low.toFixed(2)}${snapshot.pnl.high===snapshot.pnl.low?'':' to '+snapshot.pnl.high.toFixed(2)} virtual USD`:''} · ${new Date(snapshot.at*1000).toISOString()} · Virtual funds only`:marketDescription(m);
  const title=escapeHtml(m.title),description=escapeHtml(summary);
  // 公开页只序列化话题与聚合状态；不传用户身份、钱包、持仓或整个市场对象。

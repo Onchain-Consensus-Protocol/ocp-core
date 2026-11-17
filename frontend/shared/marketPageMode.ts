@@ -1,6 +1,6 @@
-/** Simulation remains the default; chain actions live behind an explicit mainnet URL. */
-export function isMainnetMarketPage(pathname: string, _search = ''): boolean {
-  return pathname === '/market.html' || pathname === '/degen.html';
+export function isMainnetMarketPage(pathname: string, hostname = ''): boolean {
+  return pathname === '/market.html' || pathname === '/degen.html' ||
+    (pathname === '/' && hostname === 'market.ocp-protocol.org');
 }
 
 export function marketViewHref(degen:boolean,search:string,lang:string){

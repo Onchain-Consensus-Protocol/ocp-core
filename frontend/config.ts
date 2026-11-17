@@ -1,6 +1,6 @@
 import {CURRENT_MAINNET_FACTORY} from "./shared/mainnetDeployment";
 import {isMainnetMarketPage} from "./shared/marketPageMode";
-const mainnetMode=typeof window !== "undefined" && isMainnetMarketPage(window.location.pathname, window.location.search);
+const mainnetMode=typeof window !== "undefined" && isMainnetMarketPage(window.location.pathname, window.location.hostname);
 const mainnetFactory=mainnetMode ? CURRENT_MAINNET_FACTORY : "";
 export const config = {
   apiBase: "",

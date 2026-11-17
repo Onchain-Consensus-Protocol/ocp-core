@@ -45,7 +45,7 @@ describe('public market share cards',()=>{
   expect(html).not.toContain('<img src=x');expect(html).toContain('&lt;/script&gt;');expect(html).not.toContain('secret@example.test');expect(html).not.toContain('wallet');expect(html).toContain('name="twitter:card" content="summary_large_image"');expect(html).toContain('https://market.ocp-protocol.org/api/market-share?id=test-market&amp;image=1');
  });
  it('serves anonymous HTML with fixed canonical and destination origins',async()=>{
-  const r=await request('/api/market-share?id=test-market');expect(r.status).toBe(200);expect(r.headers['Content-Type']).toContain('text/html');expect(r.body).toContain(market.title);expect(r.body).not.toContain('untrusted.test');expect(r.body).toContain('location.replace("https://market.ocp-protocol.org/?market=test-market")');
+  const r=await request('/api/market-share?id=test-market');expect(r.status).toBe(200);expect(r.headers['Content-Type']).toContain('text/html');expect(r.body).toContain(market.title);expect(r.body).not.toContain('untrusted.test');expect(r.body).toContain('location.replace("https://market.ocp-protocol.org/explore.html?market=test-market")');
  });
  it('rejects invalid input before loading and never caches failures',async()=>{
   for(const [url,method,status]of [['/api/market-share?id=%3Cscript%3E','GET',400],['/api/market-share?id=test-market','POST',405]] as const){const r=await request(url,method);expect(r.status).toBe(status);expect(r.load).not.toHaveBeenCalled();}

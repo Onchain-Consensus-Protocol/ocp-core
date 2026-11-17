@@ -26,8 +26,8 @@ function App() {
   const [currentView, setCurrentView] = useState<View>(initialView);
 
   const t = CONTENT[lang].ui;
-  const marketUrl = `https://market.ocp-protocol.org/market.html?lang=${lang}`;
-  const simulationUrl = `https://market.ocp-protocol.org/?lang=${lang}`;
+  const marketUrl = `https://market.ocp-protocol.org/?lang=${lang}`;
+  const simulationUrl = `https://market.ocp-protocol.org/explore.html?lang=${lang}`;
   // 兼容旧演示书签，统一进入同一多人市场及账户体系。
   useEffect(() => {
     if (window.location.hash === '#sim-container') window.location.replace(simulationUrl);

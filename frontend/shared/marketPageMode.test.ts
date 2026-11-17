@@ -1,16 +1,17 @@
 import {describe, it, expect} from 'vitest';
 import {isMainnetMarketPage,marketViewHref} from './marketPageMode';
 describe('separate simulation and mainnet entries', () => {
-  it('keeps the normal market and existing bookmarks in simulation mode', () => {
-    for (const path of ['/', '/explore.html']) {
-      expect(isMainnetMarketPage(path, '?lang=zh')).toBe(false);
-      expect(isMainnetMarketPage(path, '?market=existing&stock=TSLA')).toBe(false);
-    }
+  it('uses the mainnet market on the market domain root', () => {
+    expect(isMainnetMarketPage('/', 'market.ocp-protocol.org')).toBe(true);
+    expect(isMainnetMarketPage('/', 'ocp-protocol.org')).toBe(false);
   });
-  it('enables onchain actions only for an explicit mainnet entry', () => {
-    expect(isMainnetMarketPage('/market.html', '?lang=zh')).toBe(true);expect(isMainnetMarketPage('/degen.html', '?lang=zh')).toBe(true);
-    expect(isMainnetMarketPage('/', '?mode=testnet')).toBe(false);
-    expect(isMainnetMarketPage('/', '?mode=simulation')).toBe(false);
+
+  it('keeps explicit simulation and mainnet pages separate', () => {
+    const hostname = 'market.ocp-protocol.org';
+    expect(isMainnetMarketPage('/explore.html', hostname)).toBe(false);
+    expect(isMainnetMarketPage('/market.html', hostname)).toBe(true);
+    expect(isMainnetMarketPage('/degen.html', hostname)).toBe(true);
+    expect(isMainnetMarketPage('/testnet.html', hostname)).toBe(false);
   });
 });
 

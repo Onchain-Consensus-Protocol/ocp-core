@@ -37,7 +37,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
-const mainnetMode=isMainnetMarketPage(window.location.pathname, window.location.search);
+const mainnetMode=isMainnetMarketPage(window.location.pathname, window.location.hostname);
 const degenMode=mainnetMode && new URLSearchParams(window.location.search).get('view')!=='full';
 const publicKey=(import.meta as ImportMeta & {env:Record<string,string>}).env.VITE_CLERK_PUBLISHABLE_KEY;
 function AuthenticatedMarket({lang}:{lang:"zh"|"en"}) {
@@ -57,10 +57,10 @@ function ExploreStandalone() {
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 sm:flex sm:justify-between sm:h-16 sm:py-0">
             <OCPMenu lang={lang} suffix="MARKET" />
             <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-              <a className="hidden sm:inline whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent" href={`${mainnetMode ? '/' : '/market.html'}?lang=${lang}`}>{mainnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '主网入口' : 'Mainnet')}</a>
+              <a className="hidden sm:inline whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent" href={`${mainnetMode ? '/explore.html' : '/market.html'}?lang=${lang}`}>{mainnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '主网入口' : 'Mainnet')}</a>
               <LanguageToggle lang={lang} setLang={setLang} />
             </div>
-            <a className="col-span-2 justify-self-end whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent sm:hidden" href={`${mainnetMode ? '/' : '/market.html'}?lang=${lang}`}>{mainnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '主网入口' : 'Mainnet')}</a>
+            <a className="col-span-2 justify-self-end whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent sm:hidden" href={`${mainnetMode ? '/explore.html' : '/market.html'}?lang=${lang}`}>{mainnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '主网入口' : 'Mainnet')}</a>
           </div>
         </div>
       </nav>
