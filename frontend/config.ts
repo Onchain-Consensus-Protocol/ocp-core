@@ -1,34 +1,22 @@
-/**
- * 前端配置：API 与网络
- * 构建时从环境变量读取，未设置时使用 Base Mainnet 默认值
- */
-const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
-
-/** Base Mainnet 当前唯一支持的 V5 Factory 与原生 USDC */
-const DEFAULT_FACTORY_ADDRESS = "0x97B33092848a38Bb1abCAD3FEf0c72e2e3B8bBf0";
-const DEFAULT_DEPOSIT_TOKEN_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
+import {resolveTestnetFactory} from "./shared/testnetDeployment";
+import {isTestnetMarketPage} from "./shared/marketPageMode";
+/** 当前合约测试网入口仅在显式testnet模式启用，避免激活历史链上入口。 */
+const env=(import.meta as ImportMeta & {env:Record<string,string|undefined>}).env;
+const testnetMode=typeof window !== "undefined" && isTestnetMarketPage(window.location.pathname, window.location.search);
+const testnetFactory=testnetMode ? resolveTestnetFactory(env.VITE_TOPIC_MARKET_FACTORY ?? "") : "";
 export const config = {
-  /** ocp-api 根地址，如 https://your-api.vercel.app */
-  apiBase: env?.VITE_API_BASE ?? "",
-  /** 官方 Vault 工厂地址（用于读取已创建的 Vault） */
-  factoryAddress: env?.VITE_FACTORY_ADDRESS ?? DEFAULT_FACTORY_ADDRESS,
-  /** 默认质押代币地址 */
-  depositTokenAddress: env?.VITE_DEPOSIT_TOKEN_ADDRESS ?? DEFAULT_DEPOSIT_TOKEN_ADDRESS,
-  /** Vault 与 LMSR 市场由同一个官方 Factory 原子创建并登记 */
-  marketFactoryAddress:
-    env?.VITE_MARKET_FACTORY_ADDRESS
-    ?? env?.VITE_FACTORY_ADDRESS
-    ?? DEFAULT_FACTORY_ADDRESS,
-  /** 链 ID: Base Mainnet 8453 */
-  chainId: parseInt(env?.VITE_CHAIN_ID ?? "8453", 10),
-  /** RPC URL，用于钱包与合约读取 */
-  rpcUrl: env?.VITE_RPC_URL ?? "https://base-rpc.publicnode.com",
-  /** 区块浏览器 */
-  explorer: env?.VITE_EXPLORER ?? "https://basescan.org",
-  /** V5 Factory 原子创建 Vault + LMSR Market；仅可显式设为 false 关闭 */
-  marketEnabled: env?.VITE_MARKET_ENABLED !== "false",
+  apiBase: "",
+  factoryAddress: "",
+  depositTokenAddress: "",
+  marketFactoryAddress: testnetFactory,
+  chainId: testnetMode ? 46630 : 0,
+  rpcUrl: testnetMode ? "https://rpc.testnet.chain.robinhood.com" : "",
+  explorer: testnetMode ? "https://explorer.testnet.chain.robinhood.com" : "",
+  marketEnabled: testnetMode && /^0x[0-9a-fA-F]{40}$/.test(testnetFactory) && !/^0x0{40}$/.test(testnetFactory),
+  isLocalDev: false,
+  chainName: testnetMode ? "Robinhood Chain Testnet" : "",
+  nativeCurrencyName: testnetMode ? "Ether" : "",
+  nativeCurrencySymbol: testnetMode ? "ETH" : "",
 };
 
 export const VAULT_ABI = [
@@ -44,6 +32,13 @@ export const VAULT_ABI = [
   "function emptySettlementRecipient() external view returns (address)",
   "function stakeToken() external view returns (address)",
   "function resolutionTime() external view returns (uint256)",
+  "function originalResolutionTime() external view returns (uint256)",
+  "function effectiveResolutionTime() external view returns (uint256)",
+  "function permissionlessCreator() external view returns (address)",
+  "function earlyTerminationEnabled() external view returns (bool)",
+  "function terminatedEarlyAt() external view returns (uint256)",
+  "function terminationReasonHash() external view returns (bytes32)",
+  "function terminateEarly(bytes32 reasonHash) external",
   "function minStake() external view returns (uint256)",
   "function totalPrincipal() external view returns (uint256)",
   "function totalDonations() external view returns (uint256)",
@@ -67,6 +62,7 @@ export const VAULT_ABI = [
   "function resolved() external view returns (bool)",
   "function outcome() external view returns (uint8)",
   "event Staked(address indexed user, uint8 indexed side, uint256 amount, uint256 totalAmount)",
+  "event EarlyTerminated(address indexed creator, uint256 terminatedAt, uint256 blockNumber, bytes32 indexed reasonHash, uint8 outcome, uint256 totalYes, uint256 totalNo, uint256 totalInvalid)",
 ] as const;
 
 export const FACTORY_ABI = [
@@ -115,21 +111,25 @@ export const MARKET_ABI = [
   "function factory() external view returns (address)",
   "function officialLiquidityPool() external view returns (address)",
   "function subsidyProvider() external view returns (address)",
+  "function collateralScale() external view returns (uint256)",
   "function subsidy() external view returns (uint256)",
   "function conditionType() external view returns (uint8)",
   "function conditionParams() external view returns (bytes)",
   "function feeBps() external view returns (uint256)",
   "function vaultFeeBps() external view returns (uint256)",
   "function protocolLpFeeBps() external view returns (uint256)",
+  "function creatorFeeBps() external view returns (uint256)",
   "function feeEscrow() external view returns (uint256)",
   "function pendingVaultFees() external view returns (uint256)",
   "function pendingProtocolLpFees() external view returns (uint256)",
+  "function pendingCreatorFees() external view returns (uint256)",
   "function totalVaultFeesPaid() external view returns (uint256)",
   "function totalTradingVolume() external view returns (uint256)",
   "function liquidityParameter() external view returns (uint256)",
   "function requiredSubsidy() external view returns (uint256)",
   "function activated() external view returns (bool)",
   "function resolutionTime() external view returns (uint256)",
+  "function effectiveResolutionTime() external view returns (uint256)",
   "function resolved() external view returns (bool)",
   "function outcome() external view returns (uint8)",
   "function getYesNoPrice() external view returns (uint256 yesPrice, uint256 noPrice)",
@@ -137,6 +137,7 @@ export const MARKET_ABI = [
   "function noShares(address) external view returns (uint256)",
   "function totalYesShares() external view returns (uint256)",
   "function totalNoShares() external view returns (uint256)",
+  "function remainingLiability() external view returns (uint256)",
   "function quoteBuy(bool isYes, uint256 sharesOut) external view returns (uint256 totalCost, uint256 fee)",
   "function quoteSell(bool isYes, uint256 sharesIn) external view returns (uint256 netPayout, uint256 fee)",
   "function buyYes(uint256 sharesOut, uint256 maxTotalCost, uint256 deadline) external returns (uint256 totalCost)",
@@ -145,8 +146,20 @@ export const MARKET_ABI = [
   "function sellNo(uint256 sharesIn, uint256 minPayout, uint256 deadline) external returns (uint256 netPayout)",
   "function resolve() external",
   "function redeem() external returns (uint256 payout)",
+  "function redeemFor(address user) external returns (uint256 payout)",
+  "function redeemForMany(address[] users) external returns (uint256 totalPayout)",
   "function claimProtocolLpFees() external returns (uint256 amount)",
-  "event FeeAccrued(address indexed trader, uint256 grossCashFlow, uint256 totalFee, uint256 vaultFee, uint256 protocolLpFee)",
+  "function claimCreatorFees() external returns (uint256 amount)",
+  "function withdrawSubsidy() external returns (uint256 amount)",
+  "function claimMarketMakingPayout() external returns (uint256 amount)",
+  "function previewMarketMakingPayout(address user) external view returns (uint256)",
+  "function marketMakingSharesOf(address user) external view returns (uint256)",
+  "function marketMakingShareSupply() external view returns (uint256)",
+  "function accMarketMakingPayoutPerShare() external view returns (uint256)",
+  "function marketMakingPayoutClaimed(address user) external view returns (uint256)",
+  "function marketMakingDistributionBalance() external view returns (uint256)",
+  "function totalMarketMakingDistributed() external view returns (uint256)",
+  "event FeeAccrued(address indexed trader, uint256 grossCashFlow, uint256 totalFee, uint256 vaultFee, uint256 creatorFee, uint256 protocolLpFee)",
   "event MarketActivated(address indexed subsidyProvider, uint256 subsidy, uint256 liquidityParameter)",
 ] as const;
 
@@ -155,4 +168,57 @@ export const MARKET_FACTORY_ABI = [
   "function isMarket(address market) external view returns (bool)",
   "function marketByVault(address vault) external view returns (address)",
   "function vaultByMarket(address market) external view returns (address)",
+  "function genesisByVault(address vault) external view returns (address)",
+  "function vaultByGenesis(address genesis) external view returns (address)",
+  "function getGenesisTopicMeta(address vault) external view returns (string title,string description)",
+  "function getVaultMeta(address vault) external view returns (string title,string description)",
+] as const;
+
+// 独立 Pump Genesis：与正式 LMSR 地址、仓位和报价单位均分离。
+export const GENESIS_ABI = [
+  "error WrongPhase()", "error TradeTooSmall()", "error SlippageExceeded()",
+  "error TopicClosed()", "error InvalidAmount()", "error NoPosition()",
+  "error Unauthorized()", "error AlreadyClaimed()", "error InsufficientBalance()",
+  "function factory() view returns (address)",
+  "function vaultContract() view returns (address)",
+  "function asset() view returns (address)",
+  "function creator() view returns (address)",
+  "function protocolTreasury() view returns (address)",
+  "function phase() view returns (uint8)",
+  "function phaseEpoch() view returns (uint256)",
+  "function formalMarket() view returns (address)",
+  "function selectedFormalB() view returns (uint256)",
+  "function virtualQuote() view returns (uint256)",
+  "function buyCapitalBps() view returns (uint256)",
+  "function virtualGSupply() view returns (uint256)",
+  "function graduationThreshold() view returns (uint256)",
+  "function totalRetainedCapital() view returns (uint256)",
+  "function cumulativeRetainedIn() view returns (uint256)",
+  "function graduationProgressX18() view returns (uint256)",
+  "function realYesReserve() view returns (uint256)",
+  "function realNoReserve() view returns (uint256)",
+  "function lockedGraduationCapital() view returns (uint256)",
+  "function totalGYes() view returns (uint256)",
+  "function totalGNo() view returns (uint256)",
+  "function gYes(address) view returns (uint256)",
+  "function gNo(address) view returns (uint256)",
+  "function marketMakingShares(address) view returns (uint256)",
+  "function totalMarketMakingShares() view returns (uint256)",
+  "function snapshotMarketMakingShares() view returns (uint256)",
+  "function snapshotYesReserve() view returns (uint256)",
+  "function snapshotNoReserve() view returns (uint256)",
+  "function cashRemaining() view returns (uint256)",
+  "function failureClaimed(address) view returns (bool)",
+  "function pendingProtocolFees() view returns (uint256)",
+  "function spotPriceX18(bool) view returns (uint256)",
+  "function previewCashEntitlement(address,bool) view returns (uint256)",
+  "function quoteBuy(bool,uint256) view returns (uint256 actualGrossIn,uint256 fee,uint256 curveIn,uint256 capitalIn,uint256 gOut,bool graduates)",
+  "function quoteSell(bool,uint256) view returns (uint256 netOut,uint256 fee,uint256 grossOut)",
+  "function buy(bool,uint256,uint256,uint256) returns (uint256 gOut,uint256 actualGrossIn)",
+  "function sell(bool,uint256,uint256,uint256) returns (uint256 netOut)",
+  "function fail()", "function cancel(bytes32)",
+  "function claimCash(bool,uint256) returns (uint256 paid)",
+  "function migrateCash(bool,uint256,uint256,uint256) returns (uint256 cashSpent)",
+  "function claimFailureRefund() returns (uint256 amount)",
+  "function claimProtocolFees() returns (uint256 amount)",
 ] as const;

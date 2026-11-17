@@ -1,5 +1,31 @@
 {
   "framework": "vite",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "routes": [
+    {
+      "src": "^/$",
+      "has": [
+        {
+          "type": "host",
+          "value": "market.ocp-protocol.org"
+        }
+      ],
+      "dest": "/explore.html"
+    },
+    {
+      "handle": "filesystem"
+    }
+  ],
+  "functions": {
+    "api/paper.ts": {
+      "includeFiles": "server/paper/schema.sql"
+    },
+    "api/market-share.ts": {
+      "includeFiles": "{server/paper/schema.sql,public/logo.png,public/ocp-wordmark.svg}"
+    },
+    "api/chain-history.ts": {
+      "maxDuration": 60
+    }
+  }
 }

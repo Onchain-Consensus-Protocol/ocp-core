@@ -1,0 +1,249 @@
+{
+  "chainIdExpected": 4663,
+  "block": 100224815,
+  "blockHash": "0xcc4d2b228a629feab47ca0e66c0c3aedb5dc2172d98d0e693f5b5865a0ea8198",
+  "blockTimestamp": 1793206215,
+  "blockUTC": "2026-10-28T16:50:15+00:00",
+  "source": "https://rpc.mainnet.chain.robinhood.com",
+  "reads": [
+    {
+      "asset": "ETH",
+      "address": "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9",
+      "method": "decimals",
+      "success": true,
+      "value": 8
+    },
+    {
+      "asset": "ETH",
+      "address": "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9",
+      "method": "description",
+      "success": true,
+      "value": "ETH / USD"
+    },
+    {
+      "asset": "ETH",
+      "address": "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9",
+      "method": "latestRoundData",
+      "success": true,
+      "value": {
+        "roundId": 18446744073709554575,
+        "answer": 233531578009,
+        "startedAt": 1793196259,
+        "updatedAt": 1793196271,
+        "answeredInRound": 18446744073709554575
+      },
+      "ageSeconds": 9944
+    },
+    {
+      "asset": "TSLA",
+      "address": "0x4A1166a659A55625345e9515b32adECea5547C38",
+      "method": "decimals",
+      "success": true,
+      "value": 8
+    },
+    {
+      "asset": "TSLA",
+      "address": "0x4A1166a659A55625345e9515b32adECea5547C38",
+      "method": "description",
+      "success": true,
+      "value": "RHTSLA / USD"
+    },
+    {
+      "asset": "TSLA",
+      "address": "0x4A1166a659A55625345e9515b32adECea5547C38",
+      "method": "latestRoundData",
+      "success": true,
+      "value": {
+        "roundId": 18446744073709553396,
+        "answer": 40204069999,
+        "startedAt": 1793200614,
+        "updatedAt": 1793200626,
+        "answeredInRound": 18446744073709553396
+      },
+      "ageSeconds": 5589
+    },
+    {
+      "asset": "NVDA",
+      "address": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15",
+      "method": "decimals",
+      "success": true,
+      "value": 8
+    },
+    {
+      "asset": "NVDA",
+      "address": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15",
+      "method": "description",
+      "success": true,
+      "value": "RHNVDA / USD"
+    },
+    {
+      "asset": "NVDA",
+      "address": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15",
+      "method": "latestRoundData",
+      "success": true,
+      "value": {
+        "roundId": 18446744073709552985,
+        "answer": 21797270766,
+        "startedAt": 1793195359,
+        "updatedAt": 1793195371,
+        "answeredInRound": 18446744073709552985
+      },
+      "ageSeconds": 10844
+    },
+    {
+      "asset": "AAPL",
+      "address": "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0",
+      "method": "decimals",
+      "success": true,
+      "value": 8
+    },
+    {
+      "asset": "AAPL",
+      "address": "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0",
+      "method": "description",
+      "success": true,
+      "value": "Robinhood AAPL / USD"
+    },
+    {
+      "asset": "AAPL",
+      "address": "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0",
+      "method": "latestRoundData",
+      "success": true,
+      "value": {
+        "roundId": 18446744073709552441,
+        "answer": 34500886714,
+        "startedAt": 1793195973,
+        "updatedAt": 1793195985,
+        "answeredInRound": 18446744073709552441
+      },
+      "ageSeconds": 10230
+    },
+    {
+      "asset": "GOOGL",
+      "address": "0xF6f373a037c30F0e5010d854385cA89185AE638b",
+      "method": "decimals",
+      "success": true,
+      "value": 8
+    },
+    {
+      "asset": "GOOGL",
+      "address": "0xF6f373a037c30F0e5010d854385cA89185AE638b",
+      "method": "description",
+      "success": true,
+      "value": "Robinhood GOOGL / USD"
+    },
+    {
+      "asset": "GOOGL",
+      "address": "0xF6f373a037c30F0e5010d854385cA89185AE638b",
+      "method": "latestRoundData",
+      "success": true,
+      "value": {
+        "roundId": 18446744073709552695,
+        "answer": 32359974171,
+        "startedAt": 1793199033,
+        "updatedAt": 1793199046,
+        "answeredInRound": 18446744073709552695
+      },
+      "ageSeconds": 7169
+    },
+    {
+      "asset": "SPCX",
+      "address": "0xB265810950ba6c5C0Ff821c9963014a56fD8Bffb",
+      "method": "decimals",
+      "success": true,
+      "value": 8
+    },
+    {
+      "asset": "SPCX",
+      "address": "0xB265810950ba6c5C0Ff821c9963014a56fD8Bffb",
+      "method": "description",
+      "success": true,
+      "value": "Robinhood SPCX / USD"
+    },
+    {
+      "asset": "SPCX",
+      "address": "0xB265810950ba6c5C0Ff821c9963014a56fD8Bffb",
+      "method": "latestRoundData",
+      "success": true,
+      "value": {
+        "roundId": 18446744073709555692,
+        "answer": 14481500000,
+        "startedAt": 1793201647,
+        "updatedAt": 1793201659,
+        "answeredInRound": 18446744073709555692
+      },
+      "ageSeconds": 4556
+    },
+    {
+      "asset": "TSLA",
+      "address": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d",
+      "method": "oraclePaused",
+      "success": true,
+      "value": 0
+    },
+    {
+      "asset": "TSLA",
+      "address": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d",
+      "method": "uiMultiplier",
+      "success": true,
+      "value": 1000000000000000000
+    },
+    {
+      "asset": "NVDA",
+      "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+      "method": "oraclePaused",
+      "success": true,
+      "value": 0
+    },
+    {
+      "asset": "NVDA",
+      "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+      "method": "uiMultiplier",
+      "success": true,
+      "value": 1000775159164630595
+    },
+    {
+      "asset": "AAPL",
+      "address": "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
+      "method": "oraclePaused",
+      "success": true,
+      "value": 0
+    },
+    {
+      "asset": "AAPL",
+      "address": "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
+      "method": "uiMultiplier",
+      "success": true,
+      "value": 1000566080061092436
+    },
+    {
+      "asset": "GOOGL",
+      "address": "0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3",
+      "method": "oraclePaused",
+      "success": true,
+      "value": 0
+    },
+    {
+      "asset": "GOOGL",
+      "address": "0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3",
+      "method": "uiMultiplier",
+      "success": true,
+      "value": 1000193924414112587
+    },
+    {
+      "asset": "SPCX",
+      "address": "0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa",
+      "method": "oraclePaused",
+      "success": true,
+      "value": 0
+    },
+    {
+      "asset": "SPCX",
+      "address": "0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa",
+      "method": "uiMultiplier",
+      "success": true,
+      "value": 1000000000000000000
+    }
+  ],
+  "chainId": 4663
+}

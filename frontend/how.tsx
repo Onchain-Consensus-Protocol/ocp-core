@@ -1,0 +1,356 @@
+import {CoreLifecycleLab} from './components/CoreLifecycleLab';
+import React, { useMemo, useState } from "react";
+import ReactDOM from "react-dom/client";
+import {
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowRight,
+  BadgeDollarSign,
+  Banknote,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock3,
+  GitBranch,
+  Landmark,
+  Scale,
+  ShieldCheck,
+  TrendingUp,
+  TriangleAlert,
+  Users,
+  XCircle,
+} from "lucide-react";
+
+import "./index.css";
+import { LanguageToggle } from "./components/LanguageToggle";
+import { OCPMenu } from "./components/OCPMenu";
+import type { Language } from "./types";
+import {createTopicMarketDemo,topicMarketCreate,topicMarketBuy,topicMarketSell} from './components/topicMarketDemoModel';
+import {genesisTokens,genesisPrice} from './components/genesisDisplay';
+
+const copy = {
+  en: {
+    navExplore: "Open OCP Market",
+    eyebrow: "CAPITAL CONSENSUS × CONTINUOUS PRICING",
+    title: "How OCP Core & OCP Market Work",
+    intro:
+      "Launch a topic at zero initial capital. Trade gToken during Genesis. When the graduation funding target is met, Genesis ends and the formal market and OCP Core open together.",
+    vault: "OCP Core",
+    vaultDesc: "Opens only after Genesis graduation. Stake on YES, NO or INVALID; add only to your chosen side while staked. Full exit returns 90% and forfeits 10% plus accrued fee rewards; after exit you may choose another side. Core principal determines the result.",
+    market: "Market",
+    marketDesc: "After graduation, buy and sell YES / NO shares. Trades change market prices; they do not directly change Core stakes or the final result.",
+    shared: "Shared final outcome",
+    sharedDesc: "Core finalizes one result: YES, NO or INVALID. Market shares and LP rights settle using that same result.",
+    lifecycle: "One market lifecycle",
+    steps: [["Launch a topic", "Define the question and YES / NO / INVALID criteria. Launch with zero creator capital and set one final Core deadline. Genesis closes one hour before the formal market, two hours before the final Core deadline, and may graduate earlier."], ["Trade gToken", "Buy and sell on the Genesis curve. For a buy of 100 dUSDC, 99 buys gToken, 0.7 is the creator fee and 0.3 is the protocol fee. Sales use the same split on the curve gross amount."], ["Reach the reserve target", "The graduation funding target is 4.2 ETH equivalent, converted at creation and fixed in dUSDC. Each trade checks the Graduation target; the triggering order executes in full, then graduation is immediate. Genesis gToken becomes LP rights."], ["Formal Market + Core open", "Both open at graduation. Set one final Core deadline. The formal market closes 1 hour earlier, and Genesis closes 1 hour before the formal market. Deadlines follow server time, without fast-forward. Early graduation opens trading sooner; it does not reset deadlines."], ["Trade and stake", "Formal market trades allocate 98% to share purchases / seller proceeds, 1% to LP, 0.7% to Core rewards and 0.3% to the protocol. Core staking is separate; eligible stakes earn fees only as those fees occur."], ["Settle and claim", "Core determines the result. Claim winning shares, Core principal / rewards and LP settlement amounts. Redeeming LP burns those tokens. If Genesis fails, the reserve is distributed by gToken holdings; creator fees are not refunded."]],
+    capitalLab: "Capital consensus lab",
+    capitalLabDesc: "An illustrative Core snapshot: YES or NO must exceed 50% of all three sides combined. Otherwise the result is INVALID.",
+    total: "Total capital",
+    result: "Final result",
+    perUnit: "Winning-side Core payout per unit",
+    allRefund: "For INVALID, each side receives its own staked principal back; rewards are accounted for separately.",
+    marketLab: "Market price example",
+    marketLabDesc: "Illustrative price curve, not a quote from an active market. Adjust the net share balance to see price impact.",
+    netShares: "Net YES shares − NO shares",
+    marginal: "Current marginal price",
+    curveNote: "A trade executes along the curve, so its average price differs from the final marginal price.",
+    formula: "LP at settlement",
+    maxLoss: "LP bears market-making gains and losses",
+    subsidy: "LP net assets are the pool’s stock cash plus accumulated LP fees, less outstanding outcome payouts. LP holders receive their proportional share after settlement. Profit is not guaranteed.",
+    feeTitle: "Market trades: 2% total allocation",
+    vaultFee: "0.7% → eligible Core rewards",
+    protocolFee: "1% → LP · 0.3% → protocol",
+    feeBasis: "Buy 100 dUSDC: 98 buys shares. Sell for a curve gross amount of 100: receive 98. The remaining 2 is split as above; the pool pays the full gross amount on a sale.",
+    outcomes: "What happens at settlement",
+    yesResult: "YES exceeds 50% of all Core principal",
+    noResult: "NO exceeds 50% of all Core principal",
+    invalidResult: "Neither YES nor NO exceeds 50%",
+    vaultSettlement: "OCP Core",
+    pmSettlement: "Market shares",
+    feeSettlement: "Core rewards (0.7%)",
+    yesVault: "YES stakers share the entire Core principal pool. Other sides lose their principal.",
+    noVault: "NO stakers share the entire Core principal pool. Other sides lose their principal.",
+    invalidVault: "Each account receives its own Core principal back.",
+    yesPm: "YES pays 1 dUSDC per share; NO pays 0.",
+    noPm: "NO pays 1 dUSDC per share; YES pays 0.",
+    invalidPm: "YES and NO each pay 0.5 dUSDC per share.",
+    yesFee: "Pays the YES-eligible rewards accrued when fees occurred; late staking earns no past fees.",
+    noFee: "Pays the NO-eligible rewards accrued when fees occurred; late staking earns no past fees.",
+    invalidFee: "Pays the INVALID-conditional ledger to eligible YES / NO stakes. INVALID stakes receive no market-fee rewards.",
+    separation: "Two roles, two risks",
+    staker: "Core staker",
+    stakerDesc: "Back an outcome with principal. You may fully exit while Core is open, receiving 90% and abandoning the 10% penalty and historical fee rewards; re-entry may choose another side. Winners share losing principal and eligible historical market fees.",
+    trader: "Market trader",
+    traderDesc: "Takes a priced YES/NO position. Shares can be sold before the deadline or redeemed after settlement.",
+    coupling: "The same wallet may be both.",
+    couplingDesc: "Market holdings and Core stakes are separate. Holding LP does not automatically earn Core rewards; staking in Core does not automatically grant LP.",
+    boundaries: "Important boundaries",
+    boundariesList: ["The current release is a multiplayer virtual trading game. Creating and trading markets requires sign-in; no real funds are used.", "Core opens only after graduation. A failed Genesis never opens formal market trading or Core staking.", "Genesis has a single gToken curve: Reserve = kS², P = 2kS. Price starts at zero with zero supply; buying and selling use curve integration.", "LP remains locked until settlement in the current demo. LP secondary trading is not offered. Their conditional payout estimates are not executable sale prices.", "LP earns 1% of formal trade amounts and bears market-making gains and losses.", "At Genesis failure, fixed snapshot budgets and denominators determine refunds. Claim order does not change the per-token payout; paid creator fees are not refunded.", "Core measures capital consensus. Its outcome is not a guarantee of independently verified facts."],
+    cta: "Enter OCP Market",
+    ctaDesc: "Write a topic, trade through Genesis, and explore formal market trading, Core staking and conditional LP payouts.",
+  },
+  zh: {
+    navExplore: "打开市场",
+    eyebrow: "资本共识 × 连续定价",
+    title: "OCP Core 与市场如何协作",
+    intro: "零初始本金发射话题，在 Genesis 买卖 gToken。R储备达标即毕业，正式市场与 OCP Core 同时开启，最后按 Core 结果结算。",
+    vault: "OCP Core",
+    vaultDesc: "Genesis 毕业后才开启。选择 YES、NO 或 INVALID 质押，有仓时只可同侧追加；开放期可按规则全仓退出，退90%、罚没10%并放弃历史手续费，退出后可重新选边。Core本金决定最终结果。",
+    market: "市场",
+    marketDesc: "毕业后买卖 YES／NO 份额。交易影响市场价格，不会直接改变 Core 质押或最终结果。",
+    shared: "共享同一个最终结果",
+    sharedDesc: "Core 产生 YES、NO 或 INVALID 结果；市场份额及 LP 权益使用同一结果结算。",
+    lifecycle: "一个市场的生命周期",
+    steps: [["发射话题", "填写话题内容，定义 YES／NO／INVALID 判定条件。创建者无需初始本金；Genesis比正式市场提前1小时截止，达标可提前毕业；只需设置最终Core截止时间。"], ["买卖 gToken", "Genesis 按曲线买卖。买入 100 dUSDC，99 买 gToken，0.7 为创建者手续费、0.3 为协议手续费。卖出按曲线毛额采用相同比例。"], ["储备达标毕业", "毕业目标为 4.2 ETH 等值，创建时快照换算后固定。每笔交易完成后检查毕业进度，达标立即毕业。触发订单完整成交；gToken 转为 LP 权益。"], ["市场与 Core 同时开启", "仅毕业后开放。只需设置最终Core截止：正式市场提前1小时关闭，Genesis再提前1小时截止。所有截止时间按服务器时间计算，不能快进。提前毕业就提前开放，但不重置截止时间。"], ["交易与质押", "正式买卖的98%用于购买份额／卖家实收，1%归LP，0.7%归Core奖励、0.3%归协议。Core质押独立记账，只分参与期间符合条件的新增费用。"], ["结算并领取", "按Core结果领取份额赔付、Core本金及奖励，以及LP结算款。领取LP需销毁对应代币。未毕业则R按gToken份额清算，已付创建者手续费不退。"]],
+    capitalLab: "资本共识实验",
+    capitalLabDesc: "这是一个 Core 资本快照示例：YES 或 NO 必须严格超过三个方向全部质押的50%，否则为 INVALID。",
+    total: "总资本",
+    result: "最终结果",
+    perUnit: "Core胜方每单位本金兑付",
+    allRefund: "INVALID 时各账户领取自己的质押本金，费用奖励独立计算。",
+    marketLab: "市场价格示例",
+    marketLabDesc: "调整净份额，观察交易带来的价格影响。这里只是曲线示例，不是某个真实市场的可成交报价。",
+    netShares: "YES 净份额 − NO 净份额",
+    marginal: "当前边际价格",
+    curveNote: "交易沿曲线成交，因此平均成交价不会等于交易后的最终边际价格。",
+    formula: "LP 如何结算",
+    maxLoss: "LP承担做市盈亏",
+    subsidy: "LP净资产等于池内股票现金加累计LP费用，再减去未兑付结果份额的赔付。结算后LP持有人按份额领取，承担做市盈亏，不保证盈利。",
+    feeTitle: "正式市场：费用合计2%",
+    vaultFee: "0.7% → Core合格质押者奖励",
+    protocolFee: "1% → LP · 0.3% → 协议",
+    feeBasis: "买入100 dUSDC，98用于购买份额；卖出曲线毛额100，98到账，其余2按上述比例分配。卖出时交易池支付完整毛额，不是只扣98。",
+    outcomes: "三种终局分别发生什么",
+    yesResult: "YES严格超过Core全部质押本金的50%",
+    noResult: "NO严格超过Core全部质押本金的50%",
+    invalidResult: "YES与NO均未严格超过50%",
+    vaultSettlement: "OCP Core",
+    pmSettlement: "市场份额",
+    feeSettlement: "Core奖励（0.7%）",
+    yesVault: "YES质押者按比例分享Core全部质押本金，其他方向损失本金。",
+    noVault: "NO质押者按比例分享Core全部质押本金，其他方向损失本金。",
+    invalidVault: "剩余质押本金退还；罚金及失败申请保证金按全部剩余本金比例分配。",
+    yesPm: "YES每份兑付1 dUSDC，NO为0。",
+    noPm: "NO每份兑付1 dUSDC，YES为0。",
+    invalidPm: "YES与NO每份各兑付0.5 dUSDC。",
+    yesFee: "领取费用发生时累计的YES条件奖励；晚质押不分过去的费用。",
+    noFee: "领取费用发生时累计的NO条件奖励；晚质押不分过去的费用。",
+    invalidFee: "按INVALID条件账向合格YES／NO质押者分配；INVALID质押不获得市场费用奖励。",
+    separation: "两个角色，两套风险",
+    staker: "Core质押者",
+    stakerDesc: "用本金支持结果；有仓时同侧追加，开放期可全仓退出，退90%、罚没10%并放弃历史费用，之后可重新选边。赢方按规则分享本金及合格费用。",
+    trader: "市场交易者",
+    traderDesc: "持有按价格买入的 YES/NO 份额；截止前可以卖出，终局后可以兑付。",
+    coupling: "同一个钱包可以同时扮演两种角色。",
+    couplingDesc: "市场持仓与Core质押独立记账。持有LP不会自动获得Core奖励；质押Core也不会自动获得LP。",
+    boundaries: "必须理解的边界",
+    boundariesList: ["当前发布的是多人虚拟交易游戏，登录后可以创建和交易市场；不使用真实资金。", "Core只在Genesis毕业后开启；未毕业清算不会开启正式交易或Core质押。", "Genesis采用单一gToken二次曲线：储备 = kS²，P = 2kS。零供应时价格为零，实际买卖按曲线积分成交。", "当前模拟中LP持有至结算，不提供中途撤走或LP二级交易。不同结果下的预计领取金额不是可直接卖出的价格。", "LP获得正式交易额的1%收入，并承担做市盈亏。", "未毕业清算使用失败时固定的预算与总份额，先领后领不改变每份兑付金额；创建者手续费不退。", "Core体现资本共识，不保证结果经过外部事实验证。"],
+    cta: "进入 OCP Market",
+    ctaDesc: "填写话题，从 Genesis 买卖开始，体验正式交易到最终结算的完整周期。",
+  },
+} as const;
+
+function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return (
+    <div className="mb-7">
+      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-accent">{eyebrow}</div>
+      <h2 className="mt-2 font-display text-xl font-bold tracking-wide text-text sm:text-2xl">{title}</h2>
+    </div>
+  );
+}
+
+function CapitalLab({ lang }: { lang: Language }) {
+  const t = copy[lang];
+  const [yes, setYes] = useState(60);
+  const [no, setNo] = useState(30);
+  const [invalid, setInvalid] = useState(10);
+  const total = Math.max(0, yes) + Math.max(0, no) + Math.max(0, invalid);
+  const outcome = total > 0 && yes * 2 > total ? "YES" : total > 0 && no * 2 > total ? "NO" : "INVALID";
+  const yesPct = total ? (yes / total) * 100 : 0;
+  const noPct = total ? (no / total) * 100 : 0;
+  const invalidPct = total ? (invalid / total) * 100 : 0;
+  const winnerCapital = outcome === "YES" ? yes : outcome === "NO" ? no : total;
+  const perUnit = winnerCapital > 0 ? total / winnerCapital : 0;
+
+  const field = (label: string, value: number, setter: (value: number) => void, color: string) => (
+    <label className="rounded-xl border border-border bg-white/60 p-3">
+      <span className={`text-[10px] font-bold ${color}`}>{label}</span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={value}
+        onChange={(event) => setter(Math.max(0, Number(event.target.value) || 0))}
+        className="mt-1 w-full bg-transparent text-lg font-bold text-text outline-none"
+      />
+    </label>
+  );
+
+  return (
+    <div className="rounded-2xl border border-border bg-white/45 p-5 shadow-sm sm:p-6">
+      <div className="grid grid-cols-3 gap-2">
+        {field("YES", yes, setYes, "text-success")}
+        {field("NO", no, setNo, "text-danger")}
+        {field("INVALID", invalid, setInvalid, "text-yellow-600")}
+      </div>
+      <div className="mt-5 flex h-4 overflow-hidden rounded-full border border-border bg-white">
+        <div className="bg-success transition-all" style={{ width: `${yesPct}%` }} />
+        <div className="bg-danger transition-all" style={{ width: `${noPct}%` }} />
+        <div className="bg-yellow-400 transition-all" style={{ width: `${invalidPct}%` }} />
+      </div>
+      <div className="mt-2 grid grid-cols-3 text-[10px] font-bold">
+        <span className="text-success">YES {yesPct.toFixed(1)}%</span>
+        <span className="text-center text-danger">NO {noPct.toFixed(1)}%</span>
+        <span className="text-right text-yellow-600">INVALID {invalidPct.toFixed(1)}%</span>
+      </div>
+      <div className="mt-5 grid gap-3 border-t border-border pt-5 sm:grid-cols-3">
+        <div><div className="text-[10px] text-text-muted">{t.total}</div><div className="mt-1 font-bold">{total.toFixed(2)}</div></div>
+        <div><div className="text-[10px] text-text-muted">{t.result}</div><div className={`mt-1 font-bold ${outcome === "YES" ? "text-success" : outcome === "NO" ? "text-danger" : "text-yellow-600"}`}>{outcome}</div></div>
+        <div><div className="text-[10px] text-text-muted">{t.perUnit}</div><div className="mt-1 font-bold">{perUnit.toFixed(4)}</div></div>
+      </div>
+      {outcome === "INVALID" && <p className="mt-4 text-xs leading-5 text-text-muted">{t.allRefund}</p>}
+    </div>
+  );
+}
+
+function LmsrLab({ lang }: { lang: Language }) {
+  const t = copy[lang];
+  const [netShares, setNetShares] = useState(0);
+  const yesPrice = 1 / (1 + Math.exp(-netShares / 1000));
+  return (
+    <div className="rounded-2xl border border-border bg-white/45 p-5 shadow-sm sm:p-6">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <div className="text-[10px] text-text-muted">{t.netShares}</div>
+          <div className="mt-1 font-bold tabular-nums">{netShares.toLocaleString()} shares</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] text-text-muted">{t.marginal}</div>
+          <div className="mt-1 font-bold"><span className="text-success">YES {(yesPrice * 100).toFixed(1)}%</span> · <span className="text-danger">NO {((1 - yesPrice) * 100).toFixed(1)}%</span></div>
+        </div>
+      </div>
+      <input
+        type="range"
+        min="-3000"
+        max="3000"
+        step="50"
+        value={netShares}
+        onChange={(event) => setNetShares(Number(event.target.value))}
+        className="mt-7 w-full accent-orange-600"
+      />
+      <div className="mt-2 flex justify-between text-[10px] text-text-muted"><span>NO</span><span>50 / 50</span><span>YES</span></div>
+      <details className="mt-6 rounded-xl border border-border bg-white/70 p-4 text-xs leading-6"><summary className="cursor-pointer text-text-muted">{lang==='zh'?'查看定价公式':'Pricing formulas'}</summary><div className="mt-3 font-mono">
+        <div>C(q) = b · ln(e<sup>qᵧ/b</sup> + e<sup>qₙ/b</sup>)</div>
+        <div>p(YES) = e<sup>qᵧ/b</sup> / (e<sup>qᵧ/b</sup> + e<sup>qₙ/b</sup>)</div>
+      </div></details>
+      <p className="mt-4 text-xs leading-5 text-text-muted">{t.curveNote}</p>
+    </div>
+  );
+}
+
+function GenesisLab({lang}:{lang:Language}) {
+  const zh=lang==='zh';
+  const initial=()=>topicMarketCreate(createTopicMarketDemo({Q:2000,k:1e-6,b:150,creatorAccount:-1,protocolAccount:-1}));
+  const [state,setState]=useState(initial),[amount,setAmount]=useState(100),[message,setMessage]=useState('');
+  const active=state.phase==='GENESIS',account=state.accounts[0];
+  const fmt=(n:number)=>n.toLocaleString('en-US',{maximumFractionDigits:2});
+  const transact=(buy:boolean)=>{try{setState(buy?topicMarketBuy(state,0,amount):topicMarketSell(state,0,account.g/2));setMessage('')}catch{setMessage(zh?'请检查金额、余额或持仓。':'Check amount, balance and holdings.')}};
+  return <div className="rounded-2xl border border-border bg-white p-5 sm:p-6" data-testid="genesis-lab">
+    <div className="flex justify-between items-center gap-3"><strong>{zh?'买卖 gToken，观察价格与毕业进度':'Trade gToken and watch graduation progress'}</strong><button type="button" onClick={()=>{setState(initial());setMessage('')}} className="text-xs underline text-accent">{zh?'重置':'Reset'}</button></div>
+    <div className="grid grid-cols-2 gap-4 my-5"><div><p className="text-xs text-text-muted">{zh?'gToken价格':'gToken price'}</p><strong className="block mt-2">{genesisPrice(2*state.k*state.S)} dUSDC</strong></div><div><p className="text-xs text-text-muted">{zh?'我的gToken':'My gToken'}</p><strong className="block mt-2">{fmt(genesisTokens(account.g))}</strong></div></div>
+    <label className="block text-xs text-text-muted">{zh?'买入金额（dUSDC）':'Buy amount (dUSDC)'}<input aria-label={zh?'Genesis买入金额':'Genesis buy amount'} type="number" min="0.01" step="1" disabled={!active} value={amount} onChange={e=>setAmount(Number(e.target.value))} className="mt-2 w-full border border-border rounded-lg p-3 text-text"/></label>
+    <div className="flex gap-3 my-3"><button type="button" disabled={!active||!Number.isFinite(amount)||amount<=0||amount>account.wallet} onClick={()=>transact(true)} className="flex-1 border border-success/40 text-success rounded-lg p-3 text-sm font-bold disabled:opacity-40">{zh?'买入gToken':'Buy gToken'}</button><button type="button" disabled={!active||account.g<=0} onClick={()=>transact(false)} className="flex-1 border border-danger/40 text-danger rounded-lg p-3 text-sm font-bold disabled:opacity-40">{zh?'卖出一半':'Sell half'}</button></div>
+    <div className="text-xs text-text-muted mb-5">{zh?'可用余额':'Available balance'}: {fmt(account.wallet)} dUSDC</div>
+    {([['R',state.R,state.rTarget]] as const).map(([name,value,target])=><div key={name} className="mt-3"><div className="flex justify-between text-xs mb-2"><strong>{zh?"毕业进度":"Graduation progress"}</strong><span>{fmt(value)} / {fmt(target)} dUSDC</span></div><div className="h-3 bg-slate-100 rounded-full overflow-hidden"><div className={name==='R'?'h-full bg-purple-500':'h-full bg-orange-500'} style={{width:`${Math.min(100,value/target*100)}%`}}/></div></div>)}
+    <p className="mt-4 text-xs leading-6 text-text-muted">{active?(zh?'买入推动价格上涨并提高毕业进度；卖出降低价格和毕业进度。进度达标即毕业。':'Buys raise the price and graduation progress; sales reduce both. Graduation occurs when the target is reached.'):(zh?'已毕业：Genesis停止交易，Formal与Core同时开启。点击重置重新体验。':'Graduated: Genesis closes; Formal and Core open together. Reset to try again.')}</p>
+    <details className="mt-3 text-xs text-text-muted"><summary className="cursor-pointer">{zh?'费用说明':'Cost details'}</summary><p className="mt-2 leading-6">{zh?'买入100：99买gToken，0.7为创建者手续费、0.3为协议手续费。卖出毛额100：99到账，0.7为创建者手续费、0.3为协议手续费。':'Buy 100: 99 buys gToken, 0.7 pays the creator and 0.3 pays the protocol. Sell gross 100: receive 99, the creator receives 0.7 and the protocol receives 0.3.'}</p></details>
+    {message&&<p role="alert" className="text-danger text-xs mt-2">{message}</p>}
+  </div>;
+}
+
+function HowPage() {
+  const [lang, setLang] = useState<Language>(() => new URLSearchParams(window.location.search).get("lang") === "zh" ? "zh" : "en");
+  const t = copy[lang];
+  const outcomeCards = useMemo(() => [
+    { result: "YES", condition: t.yesResult, color: "border-success/35", text: "text-success", vault: t.yesVault, pm: t.yesPm, fee: t.yesFee, icon: CheckCircle2 },
+    { result: "NO", condition: t.noResult, color: "border-danger/35", text: "text-danger", vault: t.noVault, pm: t.noPm, fee: t.noFee, icon: XCircle },
+    { result: "INVALID", condition: t.invalidResult, color: "border-yellow-500/45", text: "text-yellow-600", vault: t.invalidVault, pm: t.invalidPm, fee: t.invalidFee, icon: TriangleAlert },
+  ], [t]);
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] text-text">
+      <nav className="sticky top-0 z-50 border-b border-border bg-white/85 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <OCPMenu lang={lang} suffix="HOW IT WORKS" />
+          <div className="flex items-center gap-3">
+            <a href="/explore.html" className="hidden items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-bold text-accent transition-colors hover:bg-accent/5 sm:inline-flex">
+              <Landmark className="h-3.5 w-3.5" />{t.navExplore}
+            </a>
+            <LanguageToggle lang={lang} setLang={setLang} />
+          </div>
+        </div>
+      </nav>
+
+      <main>
+        <section className="relative overflow-hidden border-b border-border px-4 py-20 sm:py-28">
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: "radial-gradient(circle at 20% 15%, rgba(234,88,12,.18), transparent 30%), radial-gradient(circle at 80% 75%, rgba(91,33,182,.13), transparent 32%)" }} />
+          <div className="relative mx-auto max-w-4xl text-center">
+            <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-accent">{t.eyebrow}</div>
+            <h1 className="mt-5 font-display text-3xl font-black tracking-wide text-text text-glow sm:text-5xl">{t.title}</h1>
+            <p className="mx-auto mt-6 max-w-3xl text-sm leading-7 text-text-muted sm:text-base">{t.intro}</p>
+
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-3xl px-4 pt-10 pb-2 sm:px-6">
+          <div className="rounded-2xl border border-border bg-white p-5 text-center text-sm font-bold leading-8">{lang==='zh'?'发射话题 → Genesis → 毕业 → LMSR二元市场交易与 Core 质押 → 结算':'Launch → Genesis → Graduation → LMSR binary market trading & Core staking → Settlement'}</div>
+          <p className="mt-3 text-center text-xs leading-6 text-text-muted">{lang==='zh'?'填写话题及 YES／NO／INVALID 条件即可发射，创建者无需初始本金。以下为模拟演示，不使用真实资金。':'Define a topic and YES / NO / INVALID criteria to launch with no creator principal. The examples below are simulations with no real funds.'}</p>
+        </section>
+
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6" id="genesis-guide"><SectionTitle eyebrow="01 / GENESIS" title={lang==='zh'?'Genesis · 启动与价格发现':'Genesis · Launch and price discovery'}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{lang==='zh'?'通过早期投机交易实现话题冷启动、价格发现和做市资本积累，并筛选有真实市场需求的话题进入 Formal Market。采用二次储备曲线：买入推高价格，卖出降低价格，实际成交按曲线积分计算。':'Early trading bootstraps topics, discovers prices and builds market-making capital, filtering demand into the Formal Market. A quadratic reserve curve raises prices on buys and lowers them on sales; orders execute along the curve.'}</p><details className="mb-5 text-xs text-text-muted"><summary className="cursor-pointer">{lang==='zh'?'价格曲线与毕业条件':'Price curve and graduation rules'}</summary><p className="mt-3 leading-7">{lang==='zh'?'储备 = kS²，边际价格 P = 2kS。储备为真实入池资金，S 是 gToken 供应量，k = 0.000001；页面数量与合约代币单位一致。零供应时价格为零。毕业筹资达到 4.2 ETH 等值时毕业，目标按创建时价格快照固定；达标立即毕业。':'Reserve = kS²; marginal price P = 2kS. Reserve is actual deposited capital, S is gToken supply and k = 0.000001. Displayed quantities match the contract token units. Price starts at zero supply. Graduation requires funding ≥ 4.2 ETH equivalent, fixed at creation; graduation is immediate when the target is reached.'}</p></details><GenesisLab lang={lang}/><div className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6" id="graduation-guide"><h3 className="font-display text-xl font-bold mb-3">{lang==='zh'?'毕业转换':'Graduation conversion'}</h3><p className="text-sm leading-7 text-text">{lang==='zh'?'gToken → 正式LMSR二元市场的 LP 代币':'gToken → LP tokens in the formal LMSR binary market'}</p><p className="mt-2 text-sm leading-7 text-text-muted">{lang==='zh'?'按你持有的 gToken 占总供应量的比例，转换为 LP 代币，代表正式市场流动性池的份额，享有做市资产及 LP 费用的相应权益。':'Your share of the total gToken supply converts into LP tokens, representing proportional rights to the Formal Market liquidity pool’s assets and LP fees.'}</p><p className="mt-2 text-sm leading-7 text-text-muted">{lang==='zh'?'gToken 不直接转换为 YES／NO 份额；毕业时将b固定为实际入池资金，正式交易不增发LP。':'gToken does not convert directly into YES / NO shares. At graduation, b is fixed to actual deposited capital; formal trades do not mint LP.'}</p></div></section>
+
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="02 / FORMAL" title={t.marketLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.marketLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'毕业后与 Core 同时开启。买卖 YES／NO 份额，截止前可卖出，最终按 Core 结果兑付。交易费用合计 2%：LP 1%、Core 0.7%、协议 0.3%。交易在创建时设定的Core截止前1小时停止，按服务器真实时间计算。':'Opens with Core at graduation. Trade YES / NO shares until the trading deadline; settlement follows Core. Trading fees total 2%: LP 1%, Core 0.7%, protocol 0.3%. Trading closes one hour before the Core deadline set at creation, following real elapsed server time.'}</p><LmsrLab lang={lang}/></section>
+        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6"><SectionTitle eyebrow="03 / OCP CORE" title={t.capitalLab}/><p className="-mt-4 mb-6 text-sm leading-6 text-text-muted">{t.capitalLabDesc}</p><p className="mb-5 text-sm leading-7 text-text-muted">{lang==='zh'?'用本金支持结果，有仓时仅可同侧追加。毕业后开放，原 Core 截止比 Formal 交易晚1小时；Formal 截止不代表 Core 不能继续质押或退出。YES 或 NO 必须严格超过全部活跃本金的一半（包含 INVALID 本金），否则为 INVALID。赢方分享输方本金及符合条件的历史费用。':'Back an outcome with principal and add only to that side while staked. Core opens at graduation and its original cutoff is one hour after Formal trading closes; the Formal cutoff does not stop Core staking or exits. YES or NO must strictly exceed half of all active principal, including INVALID stakes, or the result is INVALID. Winners share losing principal and eligible historical fees.'}</p><CapitalLab lang={lang}/><div className="mt-6 grid gap-4 text-sm leading-7"><details className="rounded-xl border border-border bg-white p-5"><summary className="cursor-pointer font-bold">{lang==='zh'?'全仓退出与重新选边':'Full exit and re-entry'}</summary><p className="mt-3">{lang==='zh'?'Core开放期间可全仓解除质押：罚没本金10%并按抵押代币原始单位向上取整，其余约90%退还，同时放弃该仓位全部历史条件手续费奖励。退出本金立即从各方向总额及多数分母中移除，罚没资金不参与投票。退出后可重新选择 YES、NO 或 INVALID，但不恢复旧奖励。原 Core 截止或提前申请确认期到期后，不能先退出再改变结算状态。':'While Core is open, fully exit by forfeiting 10% of principal rounded up in collateral-native units; the remainder, approximately 90%, is refunded. All historical conditional fee rewards for that position are abandoned. The principal leaves side totals and the majority denominator immediately; penalties have no voting weight. Re-entry may choose YES, NO or INVALID without restoring old rewards. Exit is unavailable after the original Core cutoff or a pending confirmation window ends.'}</p></details><details className="rounded-xl border border-border bg-white p-5"><summary className="cursor-pointer font-bold">{lang==='zh'?'固定股票保证金与提前结算':'Fixed stock bond and early settlement'}</summary><p className="mt-3">{lang==='zh'?'任何玩家均可申请 YES 或 NO，包括当前不领先的方向；只须 Core 有活跃本金。保证金股票数量按创建时500 USD等值换算后固定，之后不随股价调整。可用USDG按当前兑换报价支付；成功退还相同数量股票，换回USDG不保证仍值500。模拟使用固定演示汇率。一次只允许一个不可撤回申请，确认期1小时，结束时间必须严格早于原 Core 截止，不能申请 INVALID。':'Any player may propose YES or NO, including a non-leading side, provided Core has active principal. The stock quantity is fixed using 500 USD at creation and does not change with prices. USDG payment uses current swap quotes. Success refunds the same stock quantity, whose USDG value may differ. Simulations use fixed illustrative rates. Only one non-withdrawable request may be pending. Its one-hour window must end strictly before the original Core cutoff. INVALID cannot be proposed.'}</p><p className="mt-3">{lang==='zh'?'确认期内，尚未到各自原截止时间的操作照常开放。确认期一到，买卖、质押与退出暂停；任意玩家点击处理，无需另交保证金，也不能指定结果。冻结本金的实际结果匹配申请方向则立即结算，生效截止固定为确认期结束时刻，即使晚处理也不改变。全额保证金记为申请者独立可领取退款，不混入赢方收入。':'During the window, operations remain available before their own original deadlines. When it ends, trades, stakes and exits pause until any player processes the request without another bond or choosing the result. If the frozen principal result matches the proposal, settlement takes effect at the window end even when processed later. The full bond becomes a separate refund claim for the proposer, not winner income.'}</p><p className="mt-3">{lang==='zh'?'不匹配（含平局或 INVALID）时保证金罚没，并仅恢复原截止仍未到的操作；若处理时已过原 Core 截止，则按原截止正常结算。罚金及失败保证金最终按结果分配，INVALID时按全部剩余本金分；历史手续费仍只分给合格YES/NO参与者。所有处理与结算由玩家发起，不需要Keeper。':'A mismatch, including ties or INVALID, forfeits the bond and reopens only operations whose original deadlines remain. If the original Core cutoff has passed, regular settlement follows. Penalties and failed bonds follow the final result; under INVALID they are shared by all remaining principal. Historical fee rewards remain limited to eligible YES/NO participants. Players trigger processing and settlement; no Keeper is required.'}</p></details></div><CoreLifecycleLab lang={lang}/></section>
+
+
+
+        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <SectionTitle eyebrow="04 / SETTLEMENT" title={t.outcomes} />
+          <div className="grid gap-4 lg:grid-cols-3">
+            {outcomeCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div key={card.result} className={`rounded-2xl border bg-white p-5 ${card.color}`}>
+                  <div className="flex items-center gap-3"><Icon className={`h-5 w-5 ${card.text}`} /><span className={`font-display font-bold ${card.text}`}>{card.result}</span></div>
+                  <p className="mt-3 min-h-10 text-xs leading-5 text-text-muted">{card.condition}</p>
+                  <div className="mt-5 space-y-4 border-t border-border pt-5 text-xs leading-5">
+                    <div><div className="text-[10px] font-bold uppercase text-text-muted">{t.vaultSettlement}</div><div className="mt-1">{card.vault}</div></div>
+                    <div><div className="text-[10px] font-bold uppercase text-text-muted">{t.pmSettlement}</div><div className="mt-1">{card.pm}</div></div>
+                    <div><div className="text-[10px] font-bold uppercase text-text-muted">{t.feeSettlement}</div><div className="mt-1">{card.fee}</div></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-white p-5"><h3 className="font-bold text-sm">{lang==='zh'?'LP 做市权益':'LP market-making rights'}</h3><p className="mt-3 text-sm leading-7 text-text-muted">{lang==='zh'?'LP 分享做市资产及 1% LP 费用，并承担做市盈亏。结算后按份额领取池中资产并销毁对应 LP 代币。':'LP shares market-making assets and 1% LP fees, and bears gains and losses. Settlement claims distribute pool assets proportionally and burn LP tokens.'}</p></div>
+            <div className="rounded-2xl border border-border bg-white p-5"><h3 className="font-bold text-sm">{lang==='zh'?'如果 Genesis 未毕业':'If Genesis does not graduate'}</h3><p className="mt-3 text-sm leading-7 text-text-muted">{lang==='zh'?'到Genesis截止时（正式市场截止前1小时）仍未达标，则进入失败清算，市场与 Core 均不开启。储备按 gToken 份额领取，销毁对应权益；已支付的创建者费用不退。':'If targets are not met by the Genesis deadline, one hour before the formal market closes, Genesis enters failure settlement. Neither the formal market nor Core opens. Reserve is claimed by gToken share, burning the corresponding rights. Creator fees already paid are not refunded.'}</p></div>
+          </div>
+
+        </section>
+
+        <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+          <div className="mt-8 rounded-3xl bg-accent px-6 py-9 text-center text-white">
+            <h2 className="font-display text-xl font-bold">{t.cta}</h2><p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-orange-100">{t.ctaDesc}</p>
+            <div className="mt-6 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center gap-3">
+              <a href={`https://market.ocp-protocol.org/?lang=${lang}`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-xs font-bold text-accent transition-transform hover:scale-[1.02]">{lang==='zh'?'进入模拟市场':'Enter Simulation'}<ArrowRight className="h-4 w-4" /></a>
+              <a href={`https://market.ocp-protocol.org/testnet.html?lang=${lang}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/70 px-5 py-3 text-xs font-bold text-white hover:bg-white/10 transition-transform hover:scale-[1.02]">{lang==='zh'?'进入测试网市场':'Enter Testnet Market'}<ArrowRight className="h-4 w-4" /></a>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer className="border-t border-border py-7 text-center text-[10px] text-text-muted">OCP · OnChain Consensus Protocol</footer>
+    </div>
+  );
+}
+
+const root = document.getElementById("root");
+if (root) ReactDOM.createRoot(root).render(<React.StrictMode><HowPage /></React.StrictMode>);

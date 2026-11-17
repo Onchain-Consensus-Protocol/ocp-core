@@ -1,0 +1,27 @@
+{
+  "chainId": "46630",
+  "wallet": "0x1556a9a5c01ecc4ef11e751cacc847dd36971be7",
+  "eth": "0.00973835163",
+  "nonce": 25,
+  "pool": {
+    "token0": "0x7E955252E15c84f5768B83c41a71F9eba181802F",
+    "token1": "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
+    "fee": "3000",
+    "liquidity": "1004877263416"
+  },
+  "routerFactory": "0xFECCB63CD759d768538458Ea56F47eA8004323c1",
+  "tokens": {
+    "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E": {
+      "symbol": "TSLA",
+      "decimals": 18,
+      "walletBalance": "4949511084273463005",
+      "poolBalance": "50488915726536995"
+    },
+    "0x7E955252E15c84f5768B83c41a71F9eba181802F": {
+      "symbol": "USDG",
+      "decimals": 6,
+      "walletBalance": "3973139",
+      "poolBalance": "20000598"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# One page click: approval then execution
+
+Frontend-only change. Genesis/Formal stock and USDG buys, Core staking and early proposals automatically wait for exact-amount ERC20 approval confirmation and then request the original business transaction. Existing sufficient allowances skip approval. Sells remain approval-free. Ordinary wallets still require separate approval/business confirmations.
+
+One synchronous pending lock spans both transactions and business confirmation. Approval rejection/revert/missing successful receipt prevents business submission; confirmed approval is followed by fresh allowance verification. Captured original quote expiry never extends due to approval; draft identity/epoch, account, chain, market, side, amount, asset and reason are checked after waits and immediately before signing. Unmount stops continuation. The original slippage bounds apply and no automatic repricing or unlimited approval is introduced. If approval succeeds and the business transaction fails, UI reports their independent outcomes.
+
+355 frontend/server tests passed, 9 external integration tests skipped. Twenty focused tests cover ordering, approval failure/cancellation, draft/session/expiry/unmount changes, insufficient allowance, duplicate clicks and business receipt failure. TypeScript and testnet build passed. No contract changes, redeployment or real wallet transactions performed.

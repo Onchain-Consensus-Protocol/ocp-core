@@ -6,11 +6,14 @@ import React, { useState, Component, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
 import { Shield, AlertTriangle } from "lucide-react";
-import { ExploreView } from "./components/ExploreView";
+import { useSiteTheme } from "./components/ThemeToggle";
+import { isTestnetMarketPage } from "./shared/marketPageMode";
+import { TestnetMarketApp } from "./components/TestnetMarketApp";
+import { PaperMarketApp } from "./components/paper/PaperMarketApp";
+import {ClerkProvider,useAuth,useClerk} from "@clerk/react";
 import { OCPMenu } from "./components/OCPMenu";
 import { LanguageToggle } from "./components/LanguageToggle";
-import { WalletButton } from "./components/WalletButton";
-import { useWallet } from "./useWallet";
+
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: unknown }> {
   state = { hasError: false, error: null as unknown };
@@ -34,50 +37,49 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+const testnetMode=isTestnetMarketPage(window.location.pathname, window.location.search);
+const degenMode=testnetMode && new URLSearchParams(window.location.search).get('view')!=='full';
+const publicKey=(import.meta as ImportMeta & {env:Record<string,string>}).env.VITE_CLERK_PUBLISHABLE_KEY;
+function AuthenticatedMarket({lang}:{lang:"zh"|"en"}) {
+ const {isLoaded,isSignedIn,getToken}=useAuth();const clerk=useClerk();
+ return <PaperMarketApp lang={lang} authLoaded={isLoaded} signedIn={!!isSignedIn} getToken={getToken} onLogin={()=>void clerk.openSignIn({appearance:{elements:{socialButtonsBlock:{display:"none"},socialButtons:{display:"none"},dividerRow:{display:"none"}}}})} onLogout={()=>void clerk.signOut()}/>;
+}
+const noToken=async()=>null;
 function ExploreStandalone() {
-  const [lang, setLang] = useState<"zh" | "en">("en");
-  const wallet = useWallet();
+  const [lang, setLang] = useState<"zh" | "en">(new URLSearchParams(window.location.search).get("lang")==="zh"?"zh":"en");
+  const theme = useSiteTheme();
+
 
   return (
-    <div className="min-h-screen flex flex-col selection:bg-accent/30 selection:text-white">
+    <div className={(degenMode?"degen-page ":"")+"min-h-screen flex flex-col selection:bg-accent/30 selection:text-white"}>
       <nav className="sticky top-0 z-50 backdrop-blur-md bg-transparent border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <OCPMenu lang={lang} suffix="STAKE WAR" />
-            <div className="flex items-center gap-4">
-              <WalletButton
-                lang={lang}
-                connected={wallet.connected}
-                address={wallet.address}
-                chainId={wallet.chainId}
-                onTargetNetwork={wallet.onTargetNetwork}
-                targetChainId={wallet.targetChainId}
-                onConnect={wallet.connectWallet}
-                onDisconnect={wallet.disconnectWallet}
-              />
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 sm:flex sm:justify-between sm:h-16 sm:py-0">
+            <OCPMenu lang={lang} suffix="MARKET" />
+            <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+              <a className="hidden sm:inline whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent" href={`${testnetMode ? '/' : '/testnet.html'}?lang=${lang}`}>{testnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '测试网入口' : 'Testnet')}</a>
               <LanguageToggle lang={lang} setLang={setLang} />
             </div>
+            <a className="col-span-2 justify-self-end whitespace-nowrap text-xs font-bold text-text-muted hover:text-accent sm:hidden" href={`${testnetMode ? '/' : '/testnet.html'}?lang=${lang}`}>{testnetMode ? (lang === 'zh' ? '返回模拟市场' : 'Simulation') : (lang === 'zh' ? '测试网入口' : 'Testnet')}</a>
           </div>
         </div>
       </nav>
       <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <ExploreView
-            lang={lang}
-            isWalletConnected={wallet.connected}
-            walletAddress={wallet.address}
-            signer={wallet.signer}
-            onConnectWallet={wallet.connectWallet}
-          />
+          {testnetMode?<TestnetMarketApp lang={lang} degen={degenMode}/>:publicKey?<ClerkProvider publishableKey={publicKey} appearance={{variables:{colorBackground:theme === 'dark' ? '#15181d' : '#ffffff',colorForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorMutedForeground:theme === 'dark' ? '#9ba3b1' : '#64748b',colorInput:theme === 'dark' ? '#1b1f26' : '#ffffff',colorInputForeground:theme === 'dark' ? '#edeef0' : '#0f172a',colorPrimary:theme === 'dark' ? '#ff9454' : '#ea580c'},elements:{socialButtonsBlock:{display:"none"},socialButtons:{display:"none"},dividerRow:{display:"none"}}}}><AuthenticatedMarket lang={lang}/></ClerkProvider>:<PaperMarketApp lang={lang} authLoaded signedIn={false} getToken={noToken} onLogin={()=>{}} onLogout={()=>{}} authAvailable={false}/>}
         </div>
       </main>
-      <footer className="py-6 border-t border-border bg-[#0b0c11]/60">
-        <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
+      <footer className="py-6 border-t border-border bg-surface">
+        <div className="max-w-7xl mx-auto px-4 flex flex-wrap gap-4 justify-between items-center">
           <div className="flex items-center gap-2 opacity-60">
             <Shield className="w-5 h-5 text-accent" />
-            <span className="font-display font-bold text-text text-sm tracking-widest">OCP EXPLORER</span>
+            <span className="font-display font-bold text-text text-sm tracking-widest">OCP MARKET</span>
           </div>
-          <span className="text-text-muted text-xs font-mono">{lang === "zh" ? "风险提示：请勿投入超过承受范围的资金" : "Do not invest more than you can afford to lose."}</span>
+          <div className="flex items-center gap-4 text-xs text-text-muted">
+            <a href="/about.html" className="underline hover:text-accent">{lang === "zh" ? "应用介绍" : "About OCP Market"}</a>
+            <a href="/privacy.html" className="underline hover:text-accent">{lang === "zh" ? "隐私政策" : "Privacy policy"}</a>
+          </div>
+          <span className="text-text-muted text-xs font-mono">{testnetMode?(lang === "zh" ? "Robinhood 测试网 · 测试资产" : "Robinhood Testnet · Test assets"):(lang === "zh" ? "多人模拟 · 仅使用虚拟资金" : "Multiplayer simulation · Virtual funds only.")}</span>
         </div>
       </footer>
     </div>

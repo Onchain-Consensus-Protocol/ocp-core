@@ -1,0 +1,1262 @@
+Compiling 7 files with Solc 0.8.20
+Solc 0.8.20 finished in 207.50s
+Compiler run successful!
+2026-10-29T11:11:32.830451Z  WARN evm::traces: failed to flush signature cache err=failed to create file "/Users/chen/.foundry/cache/signatures": Operation not permitted (os error 1)
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockFactory.sol:26:30
+   |
+26 |     address public immutable protocol;
+   |                              ^^^^^^^^ help: consider using: `PROTOCOL`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketIntegrationV20.t.sol:60:20
+   |
+60 |         (, uint256 aliceLP,,) = market.previewAccount(alice, result);
+   |                    ^^^^^^^ help: consider using: `aliceLp`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:28:30
+   |
+28 |     address public immutable trustedForwarder;
+   |                              ^^^^^^^^^^^^^^^^ help: consider using: `TRUSTED_FORWARDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> src/TopicMarket.sol:29:20
+   |
+29 |     uint256 public SCALE; // collateral native units -> outcome WAD
+   |                    ^^^^^ help: consider using: `scale`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> src/TopicMarket.sol:30:20
+   |
+30 |     uint256 public LIMIT; // 1e12 whole collateral-token research bound
+   |                    ^^^^^ help: consider using: `limit`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:39:30
+   |
+39 |     IToken6 public immutable token;
+   |                              ^^^^^ help: consider using: `TOKEN`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:40:39
+   |
+40 |     ITopicMarketCore public immutable core;
+   |                                       ^^^^ help: consider using: `CORE`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:41:45
+   |
+41 |     TopicMarketRightsToken public immutable lpToken;
+   |                                             ^^^^^^^ help: consider using: `LP_TOKEN`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:42:45
+   |
+42 |     TopicMarketRightsToken public immutable bToken;
+   |                                             ^^^^^^ help: consider using: `B_TOKEN`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> src/TopicMarket.sol:43:20
+   |
+43 |     uint256 public unmaterializedLP;
+   |                    ^^^^^^^^^^^^^^^^ help: consider using: `unmaterializedLp`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:45:30
+   |
+45 |     address public immutable creator;
+   |                              ^^^^^^^ help: consider using: `CREATOR`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:46:30
+   |
+46 |     address public immutable protocol;
+   |                              ^^^^^^^^ help: consider using: `PROTOCOL`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-const]: constants should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketTestnetTargets.t.sol:12:29
+   |
+12 |     uint256 public constant unit=1e18;
+   |                             ^^^^ help: consider using: `UNIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-const
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> test/TopicMarketCoreFeeHistoryAudit.t.sol:28:78
+   |
+28 |     function _user(uint256 i) private pure returns (address) {return address(uint160(i + 1));}
+   |                                                                              ^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint160' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketStockIntegration.t.sol:17:29
+   |
+17 |     uint8 private immutable precision;
+   |                             ^^^^^^^^^ help: consider using: `PRECISION`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketAssetRouter.t.sol:29:9
+   |
+29 |         ERC20(input).transferFrom(msg.sender, address(this), amount);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketPriceSnapshot.sol:27:45
+   |
+27 |     ITopicMarketAggregator public immutable ethUsd;
+   |                                             ^^^^^^ help: consider using: `ETH_USD`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-const]: constants should use SCREAMING_SNAKE_CASE
+  --> test/RHSharedFactoryFork.t.sol:16:29
+   |
+16 |     uint256 public constant unit=1e18;
+   |                             ^^^^ help: consider using: `UNIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-const
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockFactory.sol:27:46
+   |
+27 |     TopicMarketCoreDeployer public immutable coreDeployer;
+   |                                              ^^^^^^^^^^^^ help: consider using: `CORE_DEPLOYER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockFactory.sol:28:42
+   |
+28 |     TopicMarketDeployer public immutable marketDeployer;
+   |                                          ^^^^^^^^^^^^^^ help: consider using: `MARKET_DEPLOYER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketFeesV19.t.sol:21:17
+   |
+21 |         uint256 B0=market.B(); uint256 lp0=market.lpFees(); uint256 creator0=market.creatorFees(); uint256 dust0=market.dust();
+   |                 ^^ help: consider using: `b0`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketTestnetTargets.t.sol:16:57
+   |
+16 | contract TestnetRouterBinding {address public immutable factory;constructor(address f){factory=f;}}
+   |                                                         ^^^^^^^ help: consider using: `FACTORY`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketAssetRouter.t.sol:32:9
+   |
+32 |         ERC20(output).transfer(msg.sender, value);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketPriceSnapshot.sol:28:45
+   |
+28 |     ITopicMarketAggregator public immutable usdcUsd;
+   |                                             ^^^^^^^ help: consider using: `USDC_USD`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketPriceSnapshot.sol:29:30
+   |
+29 |     uint256 public immutable ethHeartbeat;
+   |                              ^^^^^^^^^^^^ help: consider using: `ETH_HEARTBEAT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:47:29
+   |
+47 |     uint64 public immutable topicCutoff;
+   |                             ^^^^^^^^^^^ help: consider using: `TOPIC_CUTOFF`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:48:29
+   |
+48 |     uint64 public immutable coreCutoff;
+   |                             ^^^^^^^^^^ help: consider using: `CORE_CUTOFF`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:49:29
+   |
+49 |     uint64 public immutable formalCutoff;
+   |                             ^^^^^^^^^^^^ help: consider using: `FORMAL_CUTOFF`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unused-import]: unused imports should be removed
+  --> test/TopicMarketTestnetTargets.t.sol:10:9
+   |
+10 | import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketStockIntegration.t.sol:23:30
+   |
+23 |     address public immutable stock;address public immutable usd;bool public fail;
+   |                              ^^^^^ help: consider using: `STOCK`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+  --> src/TopicMarketStockFactory.sol:56:5
+   |
+56 |     modifier nonReentrant() { require(entered == 1, "REENTER"); entered = 2; _; entered = 1; }
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: wrap modifier logic to reduce code size
+   |
+56 ~     modifier nonReentrant() {
+57 + _nonReentrantBefore();
+58 + _;
+59 + _nonReentrantAfter();
+60 + }
+61 + 
+62 + function _nonReentrantBefore() internal {
+63 + require(entered == 1, "REENTER");
+64 + entered = 2;
+65 + }
+66 + 
+67 + function _nonReentrantAfter() internal {
+68 + entered = 1;
+69 + }
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketAssetRouter.t.sol:53:9
+   |
+53 |         token.transferFrom(msg.sender, address(this), input);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketFeesV19.t.sol:36:17
+   |
+36 | ...   uint256 B0=market.B(); uint256 fee0=market.lpFees(); uint256 core0=market.coreFeesSent(); uint256 creator0=market.creatorFees();
+   |               ^^ help: consider using: `b0`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketStockIntegration.t.sol:23:61
+   |
+23 |     address public immutable stock;address public immutable usd;bool public fail;
+   |                                                             ^^^ help: consider using: `USD`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketPriceSnapshot.sol:30:30
+   |
+30 |     uint256 public immutable usdcHeartbeat;
+   |                              ^^^^^^^^^^^^^ help: consider using: `USDC_HEARTBEAT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketFeeSafety.t.sol:26:75
+   |
+26 |         _graduate();uint256 gross=market.quoteFormalBuy(true,W/3);uint256 Bbefore=market.B();
+   |                                                                           ^^^^^^^ help: consider using: `bbefore`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[named-struct-fields]: prefer initializing structs with named fields
+  --> src/TopicMarketStockFactory.sol:74:25
+   |
+74 |         stocks[stock] = StockConfig(oracle_, forwarder_, k_, decimals_, true);
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using named fields: `StockConfig({ priceOracle: oracle_, trustedForwarder: forwarder_, k: k_, decimals: decimals_, enabled: true })`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#named-struct-fields
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketFeesV19.t.sol:67:17
+   |
+67 |         uint256 B0=market.B(); uint256 acc=market.formalBAccrued(); uint256 fee0=market.lpFees(); uint256 cash=market.cash();
+   |                 ^^ help: consider using: `b0`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:50:29
+   |
+50 |     uint64 public immutable genesisCutoff;
+   |                             ^^^^^^^^^^^^^ help: consider using: `GENESIS_CUTOFF`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:51:30
+   |
+51 |     uint256 public immutable rTarget;
+   |                              ^^^^^^^ help: consider using: `R_TARGET`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarket.sol:52:30
+   |
+52 |     uint256 public immutable bTarget;
+   |                              ^^^^^^^ help: consider using: `B_TARGET`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketAssetRouter.t.sol:58:9
+   |
+58 |         token.transferFrom(msg.sender, address(this), quantity);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketAssetRouter.t.sol:63:9
+   |
+63 |         token.transfer(msg.sender, quantity);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketAssetRouter.t.sol:67:9
+   |
+67 |         token.transfer(msg.sender, amount);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketFeesV19.t.sol:47:26
+   |
+47 |         vm.prank(alice); bt.transfer(dave,tokens);
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarketFactory.t.sol:6:22
+  |
+6 | import {TopicMarket, IToken6, ITopicMarketCore} from "../src/TopicMarket.sol";
+  |                      ^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketFeeSafety.t.sol:63:17
+   |
+63 |         uint256 budgetLP=market.lpBudgetRemaining();uint256 collateral=market.collateralCash();vm.prank(creator);market.claimFees();
+   |                 ^^^^^^^^ help: consider using: `budgetLp`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketAssetRouter.t.sol:88:9
+   |
+88 |         token.transferFrom(msg.sender, address(this), amount);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketPriceSnapshot.sol:31:30
+   |
+31 |     uint256 public immutable ethNormalization;
+   |                              ^^^^^^^^^^^^^^^^ help: consider using: `ETH_NORMALIZATION`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketPriceSnapshot.sol:32:30
+   |
+32 |     uint256 public immutable usdcNormalization;
+   |                              ^^^^^^^^^^^^^^^^^ help: consider using: `USDC_NORMALIZATION`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-function]: function names should use mixedCase
+   --> src/TopicMarket.sol:494:14
+    |
+494 |     function quoteAddLP(uint256) public pure returns (AddQuote memory) { revert("LP_LOCKED"); }
+    |              ^^^^^^^^^^ help: consider using: `quoteAddLp`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[mixed-case-function]: function names should use mixedCase
+   --> src/TopicMarket.sol:495:14
+    |
+495 |     function addLP(uint256, uint256, uint256, uint256, uint64) external pure { revert("LP_LOCKED"); }
+    |              ^^^^^ help: consider using: `addLp`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[mixed-case-function]: function names should use mixedCase
+   --> src/TopicMarket.sol:497:14
+    |
+497 |     function exitLP(uint256, uint256, uint256, uint256) external pure { revert("LP_LOCKED"); }
+    |              ^^^^^^ help: consider using: `exitLp`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[mixed-case-function]: function names should use mixedCase
+   --> src/TopicMarket.sol:500:14
+    |
+500 |     function materializeLP(address account) external lock returns (uint256 amount) {
+    |              ^^^^^^^^^^^^^ help: consider using: `materializeLp`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketAssetRouter.t.sol:92:33
+   |
+92 |         principal[actor()] = 0; token.transfer(msg.sender, amount);
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+   --> test/TopicMarketMerge.t.sol:103:95
+    |
+103 |             else if(op==2){uint256 held=market.lpToken().balanceOf(a); if(held>0){vm.prank(a);lpRights.transfer(to,held/2);}}
+    |                                                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketFeeSafety.t.sol:58:120
+   |
+58 | ...256 rights=token.balanceOf(alice);vm.prank(alice);token.transfer(carol,rights);
+   |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarket.t.sol:3:26
+  |
+3 | import {TopicMarketBase, MockCore, MockUSDC} from "./TopicMarketBase.sol";
+  |                          ^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarket.t.sol:3:36
+  |
+3 | import {TopicMarketBase, MockCore, MockUSDC} from "./TopicMarketBase.sol";
+  |                                    ^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarket.t.sol:4:9
+  |
+4 | import {TopicMarket} from "../src/TopicMarket.sol";
+  |         ^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketStockIntegration.t.sol:29:9
+   |
+29 |         ERC20(input).transferFrom(msg.sender,address(this),value);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[mixed-case-function]: function names should use mixedCase
+   --> src/TopicMarket.sol:504:14
+    |
+504 |     function _materializeLP(address account) private returns (uint256 amount) {
+    |              ^^^^^^^^^^^^^^ help: consider using: `_materializeLp`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+   --> test/TopicMarketMerge.t.sol:104:94
+    |
+104 |             else if(op==3){uint256 held=market.bToken().balanceOf(a); if(held>0){vm.prank(a);bRights.transfer(to,held/2);}}
+    |                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/VaultCoreAdapter.sol:30:35
+   |
+30 |     ILegacyVault public immutable vault;
+   |                                   ^^^^^ help: consider using: `VAULT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketStockIntegration.t.sol:31:42
+   |
+31 |         require(out>=minimum,"SLIPPAGE");ERC20(output).transfer(msg.sender,out);
+   |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:10:30
+   |
+10 |     address public immutable earlyTerminationImplementation;
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `EARLY_TERMINATION_IMPLEMENTATION`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:11:30
+   |
+11 |     address public immutable factory;
+   |                              ^^^^^^^ help: consider using: `FACTORY`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/VaultCoreAdapter.sol:31:30
+   |
+31 |     address public immutable binder;
+   |                              ^^^^^^ help: consider using: `BINDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/VaultCoreAdapter.sol:32:30
+   |
+32 |     IToken6 public immutable feeToken;
+   |                              ^^^^^^^^ help: consider using: `FEE_TOKEN`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unused-import]: unused imports should be removed
+ --> src/TopicMarketMath.sol:4:9
+  |
+4 | import {UD60x18, ud} from "@prb/math/src/UD60x18.sol";
+  |         ^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> src/TopicMarketPriceSnapshot.sol:57:17
+   |
+57 |         require(uint256(answer) <= type(uint256).max / normalization, "FEED_RANGE");
+   |                 ^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint256' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarketDeadlines.t.sol:3:26
+  |
+3 | import {TopicMarketBase, MockCore} from "./TopicMarketBase.sol";
+  |                          ^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketV3Router02Exchange.sol:27:45
+   |
+27 |     ITopicMarketV3Router02 public immutable dexRouter;
+   |                                             ^^^^^^^^^ help: consider using: `DEX_ROUTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketV3Router02Exchange.sol:28:30
+   |
+28 |     address public immutable stock;
+   |                              ^^^^^ help: consider using: `STOCK`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketV3Router02Exchange.sol:29:30
+   |
+29 |     address public immutable stable;
+   |                              ^^^^^^ help: consider using: `STABLE`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketV3Router02Exchange.sol:30:29
+   |
+30 |     uint24 public immutable fee;
+   |                             ^^^ help: consider using: `FEE`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarketGraduationDepth.t.sol:6:9
+  |
+6 | import {TopicMarketMath} from "../src/TopicMarketMath.sol";
+  |         ^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketV3Exchange.sol:28:47
+   |
+28 |     ITopicMarketV3SwapRouter public immutable dexRouter;
+   |                                               ^^^^^^^^^ help: consider using: `DEX_ROUTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-function]: function names should use mixedCase
+   --> src/TopicMarket.sol:592:14
+    |
+592 |     function claimLP() external lock returns (uint256 pay) {
+    |              ^^^^^^^ help: consider using: `claimLp`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:12:30
+   |
+12 |     address public immutable codeA;
+   |                              ^^^^^ help: consider using: `CODE_A`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:13:30
+   |
+13 |     address public immutable codeB;
+   |                              ^^^^^ help: consider using: `CODE_B`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:14:30
+   |
+14 |     uint256 public immutable lengthA;
+   |                              ^^^^^^^ help: consider using: `LENGTH_A`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:15:30
+   |
+15 |     uint256 public immutable lengthB;
+   |                              ^^^^^^^ help: consider using: `LENGTH_B`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketAssetRouter.sol:48:49
+   |
+48 |     ITopicMarketRouterRegistry public immutable factory;
+   |                                                 ^^^^^^^ help: consider using: `FACTORY`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketAssetRouter.sol:49:48
+   |
+49 |     ITopicMarketAssetExchange public immutable exchange;
+   |                                                ^^^^^^^^ help: consider using: `EXCHANGE`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketStatefulInvariant.t.sol:12:31
+   |
+12 |     MockUSDC public immutable usd;
+   |                               ^^^ help: consider using: `USD`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+ --> src/TopicMarketStockPriceSnapshot.sol:9:45
+  |
+9 |     ITopicMarketAggregator public immutable ethUsd;
+  |                                             ^^^^^^ help: consider using: `ETH_USD`
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:10:45
+   |
+10 |     ITopicMarketAggregator public immutable stockUsd;
+   |                                             ^^^^^^^^ help: consider using: `STOCK_USD`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketStatefulInvariant.t.sol:13:34
+   |
+13 |     TopicMarket public immutable market;
+   |                                  ^^^^^^ help: consider using: `MARKET`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketStatefulInvariant.t.sol:14:39
+   |
+14 |     VaultCoreAdapter public immutable adapter;
+   |                                       ^^^^^^^ help: consider using: `ADAPTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketV3Exchange.sol:29:30
+   |
+29 |     address public immutable stock;
+   |                              ^^^^^ help: consider using: `STOCK`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketV3Exchange.sol:30:30
+   |
+30 |     address public immutable stable;
+   |                              ^^^^^^ help: consider using: `STABLE`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> src/TopicMarketPriceSnapshot.sol:58:16
+   |
+58 |         return uint256(answer) * normalization;
+   |                ^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint256' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> test/RHEarlyTerminationFork.t.sol:53:111
+   |
+53 | ...   assertGe(update,start);assertLe(update,block.timestamp);assertLe(block.timestamp-update,86400);return(uint256(answer),decimals);
+   |                                                                                                             ^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint256' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:58:30
+   |
+58 |     address public immutable factory;
+   |                              ^^^^^^^ help: consider using: `FACTORY`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:59:30
+   |
+59 |     address public immutable codeA;
+   |                              ^^^^^ help: consider using: `CODE_A`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:60:30
+   |
+60 |     address public immutable codeB;
+   |                              ^^^^^ help: consider using: `CODE_B`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:61:30
+   |
+61 |     uint256 public immutable lengthA;
+   |                              ^^^^^^^ help: consider using: `LENGTH_A`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketFactory.sol:62:30
+   |
+62 |     uint256 public immutable lengthB;
+   |                              ^^^^^^^ help: consider using: `LENGTH_B`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketStatefulInvariant.t.sol:15:30
+   |
+15 |     OCPCore public immutable vault;
+   |                              ^^^^^ help: consider using: `VAULT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketEconomicExamples.t.sol:36:17
+   |
+36 |         uint256 initialLPPrincipal = Math.mulDiv(market.initialCollateral(), minted, market.graduationSupply());
+   |                 ^^^^^^^^^^^^^^^^^^ help: consider using: `initialLpPrincipal`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[mixed-case-function]: function names should use mixedCase
+  --> test/TopicMarketRightsSecurity.t.sol:18:14
+   |
+18 |     function materializeLP(address) external returns(uint256);
+   |              ^^^^^^^^^^^^^ help: consider using: `materializeLp`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[mixed-case-function]: function names should use mixedCase
+  --> test/TopicMarketRightsSecurity.t.sol:19:14
+   |
+19 |     function claimLP(uint256) external returns(uint256);
+   |              ^^^^^^^ help: consider using: `claimLp`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> src/TopicMarketFactory.sol:109:30
+    |
+109 |     IToken6 public immutable token;
+    |                              ^^^^^ help: consider using: `TOKEN`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-function]: function names should use mixedCase
+   --> src/TopicMarket.sol:599:14
+    |
+599 |     function claimLP(uint256 amountWad) external lock returns (uint256 pay) {
+    |              ^^^^^^^ help: consider using: `claimLp`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[screaming-snake-case-const]: constants should use SCREAMING_SNAKE_CASE
+  --> test/RHMainnetFork.t.sol:17:29
+   |
+17 |     uint256 public constant unit=1e18;
+   |                             ^^^^ help: consider using: `UNIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-const
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> src/TopicMarketFactory.sol:110:30
+    |
+110 |     address public immutable protocol;
+    |                              ^^^^^^^^ help: consider using: `PROTOCOL`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketV3Exchange.sol:31:29
+   |
+31 |     uint24 public immutable fee;
+   |                             ^^^ help: consider using: `FEE`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-function]: function names should use mixedCase
+   --> src/TopicMarket.sol:605:14
+    |
+605 |     function _claimLP(uint256 amountWad) private returns (uint256 pay) {
+    |              ^^^^^^^^ help: consider using: `_claimLp`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketRightsSecurity.t.sol:25:91
+   |
+25 |     MockUSDC usd; MockCore oracle; TopicMarket m; ISecurityMarket rights; ISecurityRights cachedLP; ISecurityRights cachedB;
+   |                                                                                           ^^^^^^^^ help: consider using: `cachedLp`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:11:45
+   |
+11 |     ITopicMarketAggregator public immutable sequencer;
+   |                                             ^^^^^^^^^ help: consider using: `SEQUENCER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> src/TopicMarketFactory.sol:112:48
+    |
+112 |     ITopicMarketPriceSnapshot public immutable priceOracle;
+    |                                                ^^^^^^^^^^^ help: consider using: `PRICE_ORACLE`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketRightsSecurity.t.sol:75:35
+   |
+75 | ...   vm.prank(thief);(bool mintOK,)=tokens[i].call(abi.encodeWithSignature("mint(address,uint256)",thief,1));assertFalse(mintOK);
+   |                             ^^^^^^ help: consider using: `mintOk`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+  --> test/TopicMarketRightsSecurity.t.sol:76:35
+   |
+76 |             vm.prank(thief);(bool burnOK,)=tokens[i].call(abi.encodeWithSignature("burn(address,uint256)",a,1));assertFalse(burnOK);
+   |                                   ^^^^^^ help: consider using: `burnOk`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[mixed-case-function]: function names should use mixedCase
+   --> test/TopicMarketStatefulInvariant.t.sol:137:14
+    |
+137 |     function invariantUSDCNeverCreatedOrLostAcrossEscrows() public view {
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `invariantUsdcNeverCreatedOrLostAcrossEscrows`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> src/TopicMarketFactory.sol:113:46
+    |
+113 |     TopicMarketCoreDeployer public immutable coreDeployer;
+    |                                              ^^^^^^^^^^^^ help: consider using: `CORE_DEPLOYER`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> src/TopicMarketFactory.sol:114:42
+    |
+114 |     TopicMarketDeployer public immutable marketDeployer;
+    |                                          ^^^^^^^^^^^^^^ help: consider using: `MARKET_DEPLOYER`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> test/RHProductionOracleFork.t.sol:40:16
+   |
+40 |         return uint256(answer);
+   |                ^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint256' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+ --> test/TopicMarketStockCollateral.t.sol:8:28
+  |
+8 |     uint8 public immutable decimals;
+  |                            ^^^^^^^^ help: consider using: `DECIMALS`
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+  --> src/TopicMarketEarlyTerminationModule.sol:32:5
+   |
+32 | /     modifier onlyCore() {
+33 | |         require(msg.sender == core && core != address(0), "MODULE_ONLY_CORE");
+34 | |         _;
+35 | |     }
+   | |_____^
+   |
+help: wrap modifier logic to reduce code size
+   |
+32 ~     modifier onlyCore() {
+33 +         _onlyCore();
+34 +         _;
+35 +     }
+36 + 
+37 +     function _onlyCore() internal {
+38 +         require(msg.sender == core && core != address(0), "MODULE_ONLY_CORE");
+39 +     }
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[screaming-snake-case-const]: constants should use SCREAMING_SNAKE_CASE
+ --> src/TopicMarketTestnetStockFactory.sol:9:26
+  |
+9 |     bool public constant fixedTestnetGraduation = true;
+  |                          ^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `FIXED_TESTNET_GRADUATION`
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-const
+
+note[screaming-snake-case-const]: constants should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketTestnetStockFactory.sol:10:29
+   |
+10 |     uint256 public constant testRTarget = 36e14; // 0.0036 TSLA
+   |                             ^^^^^^^^^^^ help: consider using: `TEST_R_TARGET`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-const
+
+note[screaming-snake-case-const]: constants should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketTestnetStockFactory.sol:11:29
+   |
+11 |     uint256 public constant testBTarget = 6e14;  // 0.0006 TSLA
+   |                             ^^^^^^^^^^^ help: consider using: `TEST_B_TARGET`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-const
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketLiquidityAdd.t.sol:25:26
+   |
+25 |         vm.prank(alice); rights.transfer(dave,lp);
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:12:30
+   |
+12 |     uint256 public immutable ethHeartbeat;
+   |                              ^^^^^^^^^^^^ help: consider using: `ETH_HEARTBEAT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:13:30
+   |
+13 |     uint256 public immutable stockHeartbeat;
+   |                              ^^^^^^^^^^^^^^ help: consider using: `STOCK_HEARTBEAT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:14:30
+   |
+14 |     uint256 public immutable grace;
+   |                              ^^^^^ help: consider using: `GRACE`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:15:30
+   |
+15 |     uint256 public immutable unit;
+   |                              ^^^^ help: consider using: `UNIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:16:30
+   |
+16 |     uint256 public immutable maximum;
+   |                              ^^^^^^^ help: consider using: `MAXIMUM`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:17:31
+   |
+17 |     uint256 private immutable ethFactor;
+   |                               ^^^^^^^^^ help: consider using: `ETH_FACTOR`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> src/TopicMarketStockPriceSnapshot.sol:18:31
+   |
+18 |     uint256 private immutable stockFactor;
+   |                               ^^^^^^^^^^^ help: consider using: `STOCK_FACTOR`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketStockCollateral.t.sol:18:30
+   |
+18 |     address public immutable trustedForwarder;
+   |                              ^^^^^^^^^^^^^^^^ help: consider using: `TRUSTED_FORWARDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+ --> test/TopicMarketPriceSnapshot.t.sol:7:28
+  |
+7 |     uint8 public immutable decimals;
+  |                            ^^^^^^^^ help: consider using: `DECIMALS`
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarketRealCore.t.sol:5:27
+  |
+5 | import {VaultCoreAdapter, ILegacyVault} from "../src/VaultCoreAdapter.sol";
+  |                           ^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+  --> src/TopicMarketFactory.sol:33:5
+   |
+33 |     modifier onlyFactory() { require(msg.sender == factory, "ONLY_FACTORY"); _; }
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: wrap modifier logic to reduce code size
+   |
+33 ~     modifier onlyFactory() {
+34 +     _onlyFactory();
+35 +     _;
+36 +     }
+37 + 
+38 +     function _onlyFactory() internal {
+39 +     require(msg.sender == factory, "ONLY_FACTORY");
+40 +     }
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/TopicMarketBase.sol:46:30
+   |
+46 |     address public immutable admin = msg.sender;
+   |                              ^^^^^ help: consider using: `ADMIN`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> src/TopicMarketStockPriceSnapshot.sol:33:17
+   |
+33 |         require(uint256(answer)<=type(uint256).max/factor,"RANGE");
+   |                 ^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint256' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> src/TopicMarketStockPriceSnapshot.sol:34:16
+   |
+34 |         return uint256(answer)*factor;
+   |                ^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint256' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[unused-import]: unused imports should be removed
+ --> script/DeployTopicMarket.s.sol:5:9
+  |
+5 | import {VaultCoreAdapter} from "../src/VaultCoreAdapter.sol";
+  |         ^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarketBase.sol:4:9
+  |
+4 | import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+  |         ^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketV3Exchange.t.sol:22:9
+   |
+22 |         ERC20(p.tokenIn).transferFrom(msg.sender, address(this), shortPull ? p.amountIn - 1 : p.amountIn);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+ --> src/TopicMarketRightsToken.sol:8:30
+  |
+8 |     address public immutable market;
+  |                              ^^^^^^ help: consider using: `MARKET`
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/TopicMarketV3Exchange.t.sol:24:9
+   |
+24 |         ERC20(p.tokenOut).transfer(p.recipient, amountOut); if (lie) ++amountOut;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[unused-import]: unused imports should be removed
+ --> test/TopicMarketRealCore.t.sol:6:9
+  |
+6 | import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+  |         ^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+  --> src/TopicMarketRightsToken.sol:9:5
+   |
+ 9 | /     modifier onlyMarket() {
+10 | |         require(msg.sender == market, "ONLY_MARKET");
+11 | |         _;
+12 | |     }
+   | |_____^
+   |
+help: wrap modifier logic to reduce code size
+   |
+ 9 ~     modifier onlyMarket() {
+10 +         _onlyMarket();
+11 +         _;
+12 +     }
+13 + 
+14 +     function _onlyMarket() internal {
+15 +         require(msg.sender == market, "ONLY_MARKET");
+16 +     }
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+

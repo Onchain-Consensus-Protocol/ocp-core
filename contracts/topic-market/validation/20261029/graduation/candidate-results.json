@@ -1,0 +1,540 @@
+{
+  "scope": "Research model, not production code or EVM proof",
+  "current_lp_examples": [
+    {
+      "fraction": 0.001,
+      "pre_net_per_R": 0.0018890549999999997,
+      "linear_LP_NAV_per_R": 0.001
+    },
+    {
+      "fraction": 0.01,
+      "pre_net_per_R": 0.0188055,
+      "linear_LP_NAV_per_R": 0.01
+    },
+    {
+      "fraction": 0.1,
+      "pre_net_per_R": 0.17955,
+      "linear_LP_NAV_per_R": 0.1
+    },
+    {
+      "fraction": 0.5,
+      "pre_net_per_R": 0.70875,
+      "linear_LP_NAV_per_R": 0.5
+    },
+    {
+      "fraction": 1,
+      "pre_net_per_R": 0.945,
+      "linear_LP_NAV_per_R": 1
+    }
+  ],
+  "independent_reserve_checks": [
+    {
+      "seed": 0,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 1,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 2,
+      "operations": 1000,
+      "min_solvency_margin": 1.4210854715202004e-14
+    },
+    {
+      "seed": 3,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 4,
+      "operations": 1000,
+      "min_solvency_margin": 7.105427357601002e-15
+    },
+    {
+      "seed": 5,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 6,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 7,
+      "operations": 1000,
+      "min_solvency_margin": -4.263256414560601e-14
+    },
+    {
+      "seed": 8,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 9,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 10,
+      "operations": 1000,
+      "min_solvency_margin": -2.1316282072803006e-14
+    },
+    {
+      "seed": 11,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 12,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 13,
+      "operations": 1000,
+      "min_solvency_margin": -4.263256414560601e-14
+    },
+    {
+      "seed": 14,
+      "operations": 1000,
+      "min_solvency_margin": -4.263256414560601e-14
+    },
+    {
+      "seed": 15,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 16,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 17,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 18,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 19,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 20,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 21,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 22,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 23,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 24,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 25,
+      "operations": 1000,
+      "min_solvency_margin": 7.105427357601002e-15
+    },
+    {
+      "seed": 26,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 27,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 28,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 29,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 30,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 31,
+      "operations": 1000,
+      "min_solvency_margin": -2.1316282072803006e-14
+    },
+    {
+      "seed": 32,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 33,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 34,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 35,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 36,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 37,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 38,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 39,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 40,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 41,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 42,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 43,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 44,
+      "operations": 1000,
+      "min_solvency_margin": -4.263256414560601e-14
+    },
+    {
+      "seed": 45,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 46,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 47,
+      "operations": 1000,
+      "min_solvency_margin": 1.4210854715202004e-14
+    },
+    {
+      "seed": 48,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 49,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 50,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 51,
+      "operations": 1000,
+      "min_solvency_margin": 1.4210854715202004e-14
+    },
+    {
+      "seed": 52,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 53,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 54,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 55,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 56,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 57,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 58,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 59,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 60,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 61,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 62,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 63,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 64,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 65,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 66,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 67,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 68,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 69,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 70,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 71,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 72,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 73,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 74,
+      "operations": 1000,
+      "min_solvency_margin": 1.4210854715202004e-14
+    },
+    {
+      "seed": 75,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 76,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 77,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 78,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 79,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 80,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 81,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 82,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 83,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 84,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 85,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 86,
+      "operations": 1000,
+      "min_solvency_margin": 0.0
+    },
+    {
+      "seed": 87,
+      "operations": 1000,
+      "min_solvency_margin": -7.105427357601002e-15
+    },
+    {
+      "seed": 88,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 89,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 90,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 91,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 92,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 93,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 94,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    },
+    {
+      "seed": 95,
+      "operations": 1000,
+      "min_solvency_margin": -2.1316282072803006e-14
+    },
+    {
+      "seed": 96,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 97,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 98,
+      "operations": 1000,
+      "min_solvency_margin": -1.4210854715202004e-14
+    },
+    {
+      "seed": 99,
+      "operations": 1000,
+      "min_solvency_margin": -2.842170943040401e-14
+    }
+  ],
+  "continuity_cases": 10000,
+  "formal_operations": 100000,
+  "limitations": [
+    "Retains separate launch token; removes automatic gToken-to-LP replacement",
+    "B capital is reassigned risk capital, not both a refundable reserve and LMSR subsidy",
+    "Fee recipients, capital-right mapping, price units and integer rounding require a separate implementation",
+    "Same external collateral snapshot for continuity; no oracle/DEX/slippage proof"
+  ]
+}

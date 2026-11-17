@@ -1,12 +1,12 @@
 # OCP — OnChain Consensus Protocol (Lite)
 
-*A short overview for forum discussion. Full whitepaper and mechanism details are available separately.*
+*A short overview for forum discussion. Targeted update: 2026-11-04. Original framing retained; current market, fees, exits, and early settlement are detailed in the [implementation supplement](./CURRENT_MECHANISM_EN.md).*
 
 ---
 
 ## One-liner
 
-**If Bitcoin gave us value OnChain, OCP aims to give us facts OnChain.** The official Factory owner creates propositions; once created, public staking, finalization, and withdrawal are permissionless.
+**If Bitcoin gave us value OnChain, OCP aims to give us facts OnChain.** The shared Factory owner registers assets; anyone may create topics for enabled stocks and participate, finalize, and claim within their lifecycle.
 
 ---
 
@@ -18,17 +18,19 @@ Real-world questions (“who won?”, “did it happen?”) are hard to get as *
 
 ## Core idea
 
-- **Consensus as a settleable asset.** OCP is a thin protocol layer: an authorized Factory owner defines a proposition; participants finalize it through **stake–lock–finality**.
+- **Consensus as a settleable asset.** OCP is a thin protocol layer: any address defines a proposition for an enabled registered stock; participants finalize it through **stake–lock–finality**.
 - **Proof of Commitment (POC).** Authority comes from **verifiable capital at risk**, not identity or claims. We don’t assume people tell the truth; we assume being wrong is expensive.
-- **Three outcomes:** YES, NO, or **INVALID**. YES or NO must hold strictly more than half of all principal; otherwise INVALID makes all participants share the settlement pool pro rata by principal.
+- **Three outcomes:** YES, NO, or **INVALID**. YES or NO must hold strictly more than half of all principal; otherwise INVALID makes remaining active participants share the principal settlement pool pro rata; historical fees follow separate eligibility.
 
-The official production Factory accepts only Base native USDC. Before the fixed deadline, every address may choose one side and add only to that side; it cannot withdraw or switch. The deadline never extends.
+The current factory registers stock collateral. Active Core positions may add only to their existing side; while open, a full exit incurs a rounded-up 10% principal penalty and forfeits accrued fees, after which re-entry may choose another side. The original deadline never extends. A one-hour bonded request may settle earlier; its full window must fit strictly before that deadline.
 
 Output is **Finalized Consensus**—one canonical OnChain fact per event that contracts and other apps can read. We frame it as “capital-confidence”: what outcome capital is willing to lock in, not a claim about objective truth.
 
 ---
 
 ## Why it might matter for Ethereum
+
+Beyond the current prediction market, the integrations below are future application directions rather than deployed capabilities.
 
 - **Oracle-free prediction markets** and other apps that need “fact finality” without a central data source.
 - **Fixed-deadline governance**: YES, NO, and INVALID remain open until the same deadline; no proposal passes by default.
@@ -47,6 +49,7 @@ We’re not claiming OCP outputs “truth.” It outputs **a capital-confidence 
 
 - Full narrative and design goals: **OCP Whitepaper**
 - Mechanism, game theory, and settlement rules: **POC Whitepaper**
-- First application: **OCP Game Vault** on top of OCP
+- First application: **stock-collateral OCP Market** with Genesis-to-LP graduation and continuous single-pool LMSR; no B pool. Formal fees are 2% of the trade base: 1% LP, 0.7% Core, 0.3% protocol. Genesis fees are 1%: 0.7% creator, 0.3% protocol.
+- Current implementation and test/production boundaries: [supplement](./CURRENT_MECHANISM_EN.md).
 
 Happy to discuss design tradeoffs, L2/composability use cases, or integration ideas in the thread.

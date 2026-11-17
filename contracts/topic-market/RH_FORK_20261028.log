@@ -1,0 +1,38 @@
+No files changed, compilation skipped
+2026-10-28T07:56:19.250152Z  WARN foundry_fork_db::cache: Failed to read cache file err=Os { code: 2, kind: NotFound, message: "No such file or directory" } path="/Users/chen/.foundry/cache/rpc/4663/99917547"
+
+Ran 6 tests for test/RHMainnetFork.t.sol:RHMainnetForkTest
+[PASS] testForkAAPLRealSwapsAndFullLifecycle() (gas: 29127736)
+Logs:
+  stock: 0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9
+  1000 USDG stock out raw: 2883704352086448404
+  roundtrip USDG returned raw: 999000350
+
+[PASS] testForkClassicRouterAbiIsRejectedAndFundsRestored() (gas: 881534)
+[PASS] testForkGOOGLRealSwapsAndFullLifecycle() (gas: 29203782)
+Logs:
+  stock: 0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3
+  1000 USDG stock out raw: 3080070847614290199
+  roundtrip USDG returned raw: 999000355
+
+[PASS] testForkNVDARealSwapsAndFullLifecycle() (gas: 28934439)
+Logs:
+  stock: 0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC
+  1000 USDG stock out raw: 4562559147606789930
+  roundtrip USDG returned raw: 999000266
+
+[PASS] testForkSPCXRealSwapsAndFullLifecycle() (gas: 28973234)
+Logs:
+  stock: 0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa
+  1000 USDG stock out raw: 6667981666639561711
+  roundtrip USDG returned raw: 999000285
+
+[PASS] testForkTSLARealSwapsAndFullLifecycle() (gas: 28970172)
+Logs:
+  stock: 0x322F0929c4625eD5bAd873c95208D54E1c003b2d
+  1000 USDG stock out raw: 2420307820208650701
+  roundtrip USDG returned raw: 994009926
+
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 37.60s (152.54s CPU time)
+
+Ran 1 test suite in 37.60s (37.60s CPU time): 6 tests passed, 0 failed, 0 skipped (6 total tests)

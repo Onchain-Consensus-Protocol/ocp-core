@@ -1,0 +1,293 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import {assertSelectorRemoved} from "./MarketInvariantCheck.sol";
+import {TopicMarketBase, MockCore, MockUSDC} from "./TopicMarketBase.sol";
+import {TopicMarket} from "../src/TopicMarket.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
+contract TopicMarketTest is TopicMarketBase {
+    function testThreeDeadlinesAndCoreOpenOnGraduation() public {
+        assertEq(market.formalCutoff() + 1 hours, market.coreCutoff());
+        assertEq(market.genesisCutoff() + 1 hours, market.formalCutoff());
+        assertEq(oracle.openedAt(), 0);
+        uint256 now_ = block.timestamp;
+        _graduate();
+        assertEq(oracle.openedAt(), now_);
+        assertEq(oracle.deadline(), market.coreCutoff());
+        _accounting();
+    }
+
+    function testBuySplitAndSquareQuote() public {
+        _buy(alice, 100e3);
+        assertEq(market.R(), 99000);
+        assertEq(market.protocolFees(), 300);
+        assertEq(market.creatorFees(), 700);
+        assertEq(market.S(), Math.sqrt(99000 * 1e30));
+        _accounting();
+    }
+
+    function testFullRoundtripAndSellerContribution() public {
+        _buy(alice, 100e3);
+        uint256 bal = market.shares(alice);
+        vm.prank(alice);
+        market.genesisSell(bal, 0, type(uint64).max, 0);
+        // Integer curve reverse may leave at most one microUSDC, isolated from R.
+        assertEq(market.S(), 0);
+        assertEq(market.R(), 0);
+        _accounting();
+    }
+
+    function testSellCannotTriggerGraduationByAccumulatingRemovedB() public {
+        _buy(alice,4e6); uint256 beforeR=market.R(); uint256 qty=market.shares(alice)/10;
+        vm.prank(alice); market.genesisSell(qty,0,type(uint64).max,0);
+        assertLt(market.R(),beforeR); assertLt(market.R(),market.rTarget()); assertEq(uint256(market.phase()),0);
+        uint256 remaining=market.shares(alice);uint256 rBeforeRejected=market.R();uint256 sBeforeRejected=market.S();
+        vm.prank(alice); vm.expectRevert("MUST_GRADUATE"); market.genesisSell(remaining/10,0,type(uint64).max,1);
+        assertEq(market.R(),rBeforeRejected);assertEq(market.S(),sBeforeRejected);assertEq(market.shares(alice),remaining);_accounting();
+    }
+
+    function testBuyGraduationDoesNotCapActualFunds() public {
+        _graduate();
+        assertEq(market.initialCollateral(), 13860000);
+        assertGt(market.initialCollateral() + 0, 4200000);
+        _accounting();
+    }
+
+    function testGenesisAtExactDeadlineFails() public {
+        vm.warp(market.genesisCutoff());
+        vm.prank(alice);
+        vm.expectRevert("GENESIS_CLOSED");
+        market.genesisBuy(1e6, 0, type(uint64).max, 0);
+        market.closeExpired();
+        assertEq(uint256(market.phase()), 4);
+        assertEq(oracle.openedAt(), 0);
+    }
+
+    function testNoGenesisAfterGraduation() public {
+        _graduate();
+        vm.prank(bob);
+        vm.expectRevert("GENESIS_CLOSED");
+        market.genesisBuy(1e6, 0, type(uint64).max, 0);
+    }
+
+    function testIntentAndSlippageRollback() public {
+        vm.prank(alice);
+        vm.expectRevert("MUST_NOT_GRADUATE");
+        market.genesisBuy(14e6, 0, type(uint64).max, 2);
+        assertEq(market.S(), 0);
+        vm.prank(alice);
+        vm.expectRevert("SLIPPAGE");
+        market.genesisBuy(1e6, type(uint256).max, type(uint64).max, 0);
+        _accounting();
+    }
+
+    function testCoreOpenFailureRollsBackUSDC() public {
+        oracle.setReject(true);
+        uint256 pre = usd.balanceOf(alice);
+        vm.prank(alice);
+        vm.expectRevert("MOCK_CORE");
+        market.genesisBuy(14e6, 0, type(uint64).max, 0);
+        assertEq(usd.balanceOf(alice), pre);
+        assertEq(market.S(), 0);
+        assertEq(uint256(market.phase()), 0);
+        _accounting();
+    }
+
+    function testFormalBuyThenSellFees() public {
+        _graduate();
+
+
+        uint256 fee0 = market.lpFees();
+        uint256 gross = market.quoteFormalBuy(true, 1e18);
+        _formalBuy(bob, true, 1e18);
+        assertEq(market.lpFees() - fee0, gross / 100);
+        (uint256 sellGross, uint256 net) = market.quoteFormalSell(true, 1e18);
+        uint256 cashBefore = market.cash();
+        uint256 wallet = usd.balanceOf(bob);
+        vm.prank(bob);
+        market.formalSell(true, 1e18, net, type(uint64).max);
+        assertEq(market.cash(), cashBefore - sellGross);
+        assertEq(usd.balanceOf(bob), wallet + net);
+        assertLt(net, gross);
+        _accounting();
+    }
+
+    function testFormalCutoffCoreKeepsOpen() public {
+        _graduate();
+        vm.warp(market.formalCutoff());
+        vm.prank(bob);
+        vm.expectRevert("FORMAL_CLOSED");
+        market.formalBuy(true, 1e18, type(uint256).max, type(uint64).max);
+        market.closeExpired();
+        assertEq(uint256(market.phase()), 2);
+        assertGt(market.coreCutoff(), block.timestamp);
+        vm.expectRevert("CORE_PENDING");
+        market.finalize();
+        _accounting();
+    }
+
+    function testFormalOversellRejectedButFormerInventoryIsNotACap() public {
+        _graduate();
+        vm.prank(bob);
+        vm.expectRevert("HOLDINGS");
+        market.formalSell(true, 1e18, 0, type(uint64).max);
+        uint256 amount = market.poolBasisWad()*2;
+        _formalBuy(bob,true,amount);assertEq(market.yes(bob),amount);assertGt(market.yesSupply(),market.poolBasisWad());_accounting();
+    }
+
+    function testFormalMaxPriceProtectsWallet() public {
+        _graduate();
+        vm.prank(bob);
+        vm.expectRevert("SLIPPAGE");
+        market.formalBuy(true, 1e18, 1, type(uint64).max);
+        assertEq(market.yes(bob), 0);
+        _accounting();
+    }
+
+
+
+
+
+
+
+    function testLPTransferPausedDoesNotTransferContribution() public {
+        _graduate();
+
+        uint256 part = market.shares(alice) / 3;
+        vm.prank(alice);
+        vm.expectRevert();
+        IRemovedMarketAPI(address(market)).transferShares(bob, part);
+        assertEq(market.shares(bob), 0);
+        _finish(2);
+        _claimAll(alice);
+        _claimAll(bob);
+        _accounting();
+    }
+
+    function testOutcomeTransferDisabledAndOriginalHolderKeepsPayout() public {
+        _graduate();
+        _formalBuy(bob, true, 1e18);
+        vm.prank(bob);
+        vm.expectRevert();
+        IRemovedMarketAPI(address(market)).transferOutcome(carol, true, 1e18);
+        _finish(1);
+        vm.prank(bob);
+        assertEq(market.claimOutcome(), 1e6);
+        vm.prank(carol);
+        vm.expectRevert("CLAIMED");
+        market.claimOutcome();
+        _claimAll(alice);
+        _accounting();
+    }
+
+    function testRepeatedClaimsAndFinalizeRejected() public {
+        _graduate();
+        _formalBuy(bob, true, 1e18);
+        _finish(1);
+        _claimAll(alice);
+        _claimAll(bob);
+        vm.prank(alice);
+        vm.expectRevert("CLAIMED");
+        market.claimLP();
+        vm.prank(alice);
+        assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));
+        vm.expectRevert("CORE_PENDING");
+        market.finalize();
+        _accounting();
+    }
+
+    function testSettlementYes() public {
+        _settleCase(1);
+    }
+
+    function testSettlementNo() public {
+        _settleCase(2);
+    }
+
+    function testSettlementInvalid() public {
+        _settleCase(3);
+    }
+
+    function _settleCase(uint8 r) internal {
+        _graduate();
+        _formalBuy(bob, true, 2e18);
+        _formalBuy(carol, false, 3e18);
+        _finish(r);
+        _accounting();
+        _claimAll(carol);
+        _claimAll(alice);
+        _claimAll(bob);
+        _accounting();
+        assertLe(market.collateralCash(), 3);
+        assertEq(market.lpBudgetRemaining(), 0);
+        }
+
+    function testFeesWithdrawOnlyAccruedNotReserve() public {
+        _graduate();
+        _formalBuy(bob, true, 1e18);
+
+        uint256 c = market.collateralCash();
+        uint256 due = market.creatorFees();
+        vm.prank(creator);
+        market.claimFees();
+        assertEq(usd.balanceOf(creator), due);
+        assertEq(market.collateralCash(), c);
+        vm.prank(dave);
+        market.claimFees();
+        _accounting();
+    }
+
+    function testUnGraduatedClaimsOnlyRemainingGenesisR() public {
+        _buy(alice,100e3);uint256 sold=market.shares(alice);vm.prank(alice);market.genesisSell(sold,0,type(uint64).max,0);
+        _buy(bob,10e3); uint256 rf=market.R(); vm.warp(market.genesisCutoff()); market.closeExpired();
+        vm.prank(bob); assertEq(market.claimFailed(),rf);
+        vm.prank(alice); assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));
+        assertEq(market.failedRRemaining(),0); _accounting();
+    }
+
+    function testZeroSupplyFailureNoDivisionByZero() public {
+        _buy(alice, 1e6);
+        uint256 allG = market.shares(alice);
+        vm.prank(alice);
+        market.genesisSell(allG, 0, type(uint64).max, 0);
+        vm.warp(market.genesisCutoff());
+        market.closeExpired();
+        uint256 walletBefore=usd.balanceOf(alice);
+        vm.prank(alice);assertSelectorRemoved(address(market),abi.encodeWithSignature("claimB()"));
+        vm.prank(alice);vm.expectRevert("CLAIMED");market.claimFailed();
+        assertEq(usd.balanceOf(alice),walletBefore);
+        _accounting();
+        assertEq(market.failedRRemaining(), 0);
+    }
+
+
+
+    function testDonationDoesNotAffectThresholdOrClaimBudget() public {
+        _buy(alice, 1e6);
+        uint256 R = market.R();
+        usd.mint(address(market), 7e6);
+        assertEq(market.R(), R);
+        assertEq(uint256(market.phase()), 0);
+        assertEq(usd.balanceOf(address(market)) - market.accountedBalance(), 7e6);
+    }
+
+    function testNoPendingCoreCanSettle() public {
+        _graduate();
+        vm.warp(market.coreCutoff());
+        vm.expectRevert("CORE_PENDING");
+        market.finalize();
+        assertEq(uint256(market.phase()), 1);
+        _accounting();
+    }
+
+
+}
+
+interface IRemovedMarketAPI {
+    function quoteAddLP(uint256) external;
+    function quoteExit(uint256) external;
+    function addLP(uint256,uint256,uint256,uint256,uint64) external;
+    function exitLP(uint256,uint256,uint256,uint256) external;
+    function transferShares(address,uint256) external;
+    function transferOutcome(address,bool,uint256) external;
+}

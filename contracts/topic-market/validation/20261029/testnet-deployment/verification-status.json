@@ -1,0 +1,82 @@
+{
+  "TopicMarketCoreDeployer": {
+    "address": "0x19BF21294FFBCaa2A83adBbB84e1b6d6Af5Eb715",
+    "verified": false,
+    "name": null
+  },
+  "TopicMarketDeployer": {
+    "address": "0xaaC1107E6FebDbA424A3477DfEEe9D8d3A58cBB7",
+    "verified": false,
+    "name": null
+  },
+  "TopicMarketTestnetStockFactory": {
+    "address": "0xB5C08A89F11D18A62361b87Dc963379281CA6D82",
+    "verified": false,
+    "name": null
+  },
+  "TopicMarketTestnetStockPriceSnapshot": {
+    "address": "0x7Dce9f918bcaDB559035449599764D75eb3BaE4B",
+    "verified": true,
+    "name": "TopicMarketTestnetStockPriceSnapshot"
+  },
+  "TopicMarketV3Exchange": {
+    "address": "0x3B277DfdA0851bBb2888d07D1EC4BD059b805300",
+    "verified": true,
+    "name": "TopicMarketV3Exchange"
+  },
+  "TopicMarketAssetRouter": {
+    "address": "0x1DA3854B8138f8fFd99061393d3fD938c05539de",
+    "verified": true,
+    "name": "TopicMarketAssetRouter"
+  },
+  "coreCodeA": {
+    "address": "0x7eFf7308b8b278cf06d919Abb69919A2696c42E9",
+    "verified": false,
+    "name": null
+  },
+  "coreCodeB": {
+    "address": "0xEeAB346364d2A381787F4b655728f26ae61ce892",
+    "verified": false,
+    "name": null
+  },
+  "marketCodeA": {
+    "address": "0x52742aF4792f34F498D4e643179134471F1972f0",
+    "verified": false,
+    "name": null
+  },
+  "marketCodeB": {
+    "address": "0x0895A2133C39a5D45684548B8061C8659fA81bC4",
+    "verified": false,
+    "name": null
+  },
+  "OCPCore": {
+    "address": "0xaf18a2379AD5D5462A8218c07F56546CbcB8A2d0",
+    "verified": true,
+    "name": "OCPCore"
+  },
+  "VaultCoreAdapter": {
+    "address": "0xC1A0ca08B564c6E4aB88610d0Cd5Dfbd06f38ACa",
+    "verified": false,
+    "name": null
+  },
+  "TopicMarket": {
+    "address": "0xBe0d01292Df5cef376A40be7433C9b5B0C398857",
+    "verified": true,
+    "name": "TopicMarket"
+  },
+  "LPToken": {
+    "address": "0x6C076BBA414122C8c44226f97424b8a82d234c4F",
+    "verified": true,
+    "name": "TopicMarketRightsToken"
+  },
+  "BToken": {
+    "address": "0xA4F483c19FA242007E088e90930d918Bd359c863",
+    "verified": true,
+    "name": "TopicMarketRightsToken"
+  },
+  "TopicMarketEarlyTerminationModule": {
+    "address": "0x276131C2D7Be736B1Ddd9abb5E63507f7D91774c",
+    "verified": true,
+    "name": "TopicMarketEarlyTerminationModule"
+  }
+}

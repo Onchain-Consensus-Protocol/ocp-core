@@ -1,0 +1,26 @@
+{
+  "TopicMarketCoreDeployer": {
+    "runtimeMatchesArtifact": true,
+    "creationInputMatchesArtifact": true
+  },
+  "TopicMarketDeployer": {
+    "runtimeMatchesArtifact": true,
+    "creationInputMatchesArtifact": true
+  },
+  "TopicMarketTestnetStockFactory": {
+    "runtimeMatchesArtifact": true,
+    "creationInputMatchesArtifact": true
+  },
+  "TopicMarketTestnetStockPriceSnapshot": {
+    "runtimeMatchesArtifact": true,
+    "creationInputMatchesArtifact": true
+  },
+  "TopicMarketV3Exchange": {
+    "runtimeMatchesArtifact": true,
+    "creationInputMatchesArtifact": true
+  },
+  "TopicMarketAssetRouter": {
+    "runtimeMatchesArtifact": true,
+    "creationInputMatchesArtifact": true
+  }
+}

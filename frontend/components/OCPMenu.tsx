@@ -6,17 +6,23 @@ import {
   Github,
   GitCommit,
   Home,
+  Landmark,
   Sparkles,
   Twitter,
   Waypoints,
 } from "lucide-react";
 
+import { ThemeToggle } from "./ThemeToggle";
+
 import type { Language } from "../types";
 
 const PRIMARY_LINKS = [
-  { view: "simulation", zh: "开始体验", en: "Start Playing", icon: Home },
+  { view: "simulation", zh: "首页", en: "Home", icon: Home },
   { view: "mechanism", zh: "机制", en: "Mechanism", icon: BookOpen },
 ] as const;
+
+const MARKET_ORIGIN = "https://market.ocp-protocol.org";
+const CORE_ORIGIN = "https://ocp-protocol.org";
 
 const FUTURE_VISION_LINKS = [
   { view: "ai-demo", zh: "AI 对齐演示", en: "AI Alignment", icon: Sparkles },
@@ -46,6 +52,7 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
   }, []);
 
   return (
+    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
     <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
@@ -67,12 +74,13 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
           role="menu"
           className="absolute left-0 top-[calc(100%+12px)] z-[70] w-72 rounded-lg border border-border bg-white shadow-xl p-2"
         >
+
           {PRIMARY_LINKS.map((link) => {
             const Icon = link.icon;
             return (
               <a
                 key={link.view}
-                href={`/?view=${link.view}`}
+                href={`${CORE_ORIGIN}/?view=${link.view}`}
                 role="menuitem"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
               >
@@ -81,6 +89,14 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
               </a>
             );
           })}
+          <a
+            href={`${CORE_ORIGIN}/how.html`}
+            role="menuitem"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
+          >
+            <Waypoints className="w-4 h-4 shrink-0" />
+            {lang === "zh" ? "OCP 与市场如何协作" : "How OCP Core & OCP Market Work"}
+          </a>
           <details className="group/future">
             <summary
               role="menuitem"
@@ -96,7 +112,7 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
                 return (
                   <a
                     key={link.view}
-                    href={`/?view=${link.view}`}
+                    href={`${CORE_ORIGIN}/?view=${link.view}`}
                     role="menuitem"
                     className="flex items-center gap-3 rounded-md px-3 py-2 text-xs font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
                   >
@@ -130,6 +146,8 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
           </a>
         </div>
       )}
+    </div>
+    <ThemeToggle lang={lang} />
     </div>
   );
 }

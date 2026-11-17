@@ -1,0 +1,673 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {TopicMarketMath} from "./TopicMarketMath.sol";
+import {TopicMarketRightsToken} from "./TopicMarketRightsToken.sol";
+
+interface IToken6 {
+    function balanceOf(address) external view returns (uint256);
+    function approve(address, uint256) external returns (bool);
+    function decimals() external view returns (uint8);
+    function transfer(address, uint256) external returns (bool);
+    function transferFrom(address, address, uint256) external returns (bool);
+}
+
+interface ITopicMarketCore {
+    function depositMarketFee(uint256 amount) external;
+    function open(uint64 deadline) external;
+    function openedAt() external view returns (uint64);
+    function deadline() external view returns (uint64);
+    function finalOutcome() external view returns (uint8); // 0 pending,1 YES,2 NO,3 INVALID
+}
+
+/// @notice Isolated locked-liquidity prototype with transferable LP ERC20 rights.
+/// @dev No owner upgrades/rescue. Snapshot supplied at construction, NOT an authenticated oracle.
+/// Genesis/outcomes remain nontransferable internal ledgers; LP is the only market-specific liquidity-rights ERC20.
+contract TopicMarket {
+    using Math for uint256;
+    bool public constant automaticFeePayout = true;
+    uint256 public constant MAX_OUTCOME_SUPPLY = type(uint192).max;
+    address public immutable trustedForwarder;
+    uint256 public SCALE; // collateral native units -> outcome WAD
+    uint256 public LIMIT; // 1e12 whole collateral-token research bound
+    uint256 private curveScale; // native R -> WAD quadratic-curve normalization
+    enum Phase {
+        GENESIS,
+        FORMAL,
+        WAIT_CORE,
+        SETTLED,
+        FAILED
+    }
+    IToken6 public immutable token;
+    ITopicMarketCore public immutable core;
+    TopicMarketRightsToken public immutable lpToken;
+    uint256 public unmaterializedLP;
+    address public immutable creator;
+    address public immutable protocol;
+    uint64 public immutable topicCutoff;
+    uint64 public immutable coreCutoff;
+    uint64 public immutable formalCutoff;
+    uint64 public immutable genesisCutoff;
+    uint256 public immutable rTarget;
+    uint256 public immutable k;
+    Phase public phase;
+    uint256 private entered = 1;
+    uint256 public R;
+    uint256 public S;
+    mapping(address => uint256) public shares; // Genesis余额；毕业后仅作为尚未物化的LP分配记录
+    uint256 public protocolFees;
+    uint256 public creatorFees;
+    uint256 public dust;
+    uint256 public graduationSupply;
+    uint256 public initialCollateral;
+    uint256 public collateralCash;
+    uint256 public liquiditySupply;
+    uint256 public poolBasisWad;
+    uint256 public bWad;
+    uint256 public inventoryY;
+    uint256 public inventoryN;
+    uint256 public cash;
+    uint256 public lpFees;
+    uint256 public coreFeesSent;
+    uint256 public redeemedPairs; // collateral native units: 用户主动完整组合赎回
+    struct LiquidityReference {
+        uint256 lp; uint256 basis; uint256 depth; uint256 y; uint256 n; uint256 money; uint256 fees;
+    }
+
+    LiquidityReference public restartLiquidity;
+    bool public liquidityClosed;
+    mapping(address => uint256) public yes;
+    mapping(address => uint256) public no;
+    uint256 public yesSupply;
+    uint256 public noSupply;
+    uint8 public outcome;
+    uint256 public lpSnapshot;
+    uint256 public lpBudgetInitial;
+    uint256 public lpBudgetRemaining;
+    uint256 public failedRInitial;
+    uint256 public failedRRemaining;
+    uint256 public failedSupply;
+    event LPMaterialized(address indexed account, uint256 amount);
+    event GenesisTrade(address indexed user, bool buy, uint256 base, uint256 quantity);
+    event Graduated(address indexed trigger, bool buy, uint256 collateral);
+    event FormalTrade(address indexed user, bool buy, bool isYes, uint256 amount, uint256 base);
+    event LiquidityAdded(address indexed user,uint256 lp,uint256 money,uint256 yesIn,uint256 noIn,bool restart);
+    event Exited(address indexed user, uint256 lp, uint256 money, uint256 yesOut, uint256 noOut);
+    event Closed(Phase phase);
+    event PairsMerged(uint256 cashReleased, uint256 tokensBurned);
+    event PairsRedeemed(address indexed user, uint256 cashReleased, uint256 tokensBurned);
+    event CoreFeeSent(uint256 amount);
+    event Finalized(uint8 result, uint256 lpBudget);
+    event Claimed(address indexed user, bytes32 kind, uint256 amount); // gross entitlement
+    modifier lock() {
+        _lockBefore();
+        _;
+        _lockAfter();
+    }
+    function _lockBefore() private {
+        require(entered == 1, "REENTER");
+        entered = 2;
+    }
+    function _lockAfter() private { entered = 1; }
+
+    constructor(
+        IToken6 token_,
+        ITopicMarketCore core_,
+        address creator_,
+        address protocol_,
+        uint64 coreEnd_,
+        uint256 ethPrice6, // legacy name: collateral native units per ETH, not necessarily 6 decimals
+        uint256 kWad
+    ) {
+        require(
+            address(token_) != address(0) && address(core_) != address(0) && creator_ != address(0)
+                && protocol_ != address(0),
+            "ADDRESS"
+        );
+        uint8 decimals_ = token_.decimals();
+        require(decimals_ >= 6 && decimals_ <= 18, "DECIMALS");
+        uint256 scale_ = 10 ** (18 - decimals_);
+        SCALE = scale_;
+        LIMIT = 1e30 / scale_;
+        curveScale = 1e36 * scale_;
+        require(block.timestamp <= type(uint64).max - 4 hours, "TIME");
+        require(uint256(coreEnd_) > block.timestamp + 4 hours, "DEADLINES");
+        bool fixedTestTargets = ethPrice6 == 0;
+        if (fixedTestTargets) {
+            require(block.chainid == 46630
+                && address(token_) == 0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E && decimals_ == 18,
+                "PRICE");
+        } else require(ethPrice6 <= LIMIT * 10 / 42, "PRICE");
+        require(kWad >= 1e12 && kWad <= 1e24, "PARAMS");
+        (bool ok, bytes memory data) = address(core_).staticcall(abi.encodeWithSignature("trustedForwarder()"));
+        trustedForwarder = ok && data.length == 32 ? abi.decode(data,(address)) : address(0);
+        require(trustedForwarder != protocol_, "FEE_RECIPIENT_FORWARDER");
+        token = token_;
+        lpToken = new TopicMarketRightsToken("Topic Market LP", "TOPIC-LP");
+        core = core_;
+        creator = creator_;
+        protocol = protocol_;
+        topicCutoff = coreEnd_;
+        coreCutoff = coreEnd_;
+        formalCutoff = coreEnd_ - 1 hours;
+        genesisCutoff = coreEnd_ - 2 hours;
+        rTarget = fixedTestTargets ? 42e14 : Math.mulDiv(ethPrice6, 42, 10);
+        require(rTarget > 0, "TINY_TARGET");
+        k = kWad;
+    }
+
+    function isTrustedForwarder(address forwarder) external view returns (bool) {
+        return forwarder != address(0) && forwarder == trustedForwarder;
+    }
+
+    function _actor() private view returns (address account) {
+        if (msg.sender == trustedForwarder && msg.data.length >= 20) {
+            assembly { account := shr(96, calldataload(sub(calldatasize(),20))) }
+        } else account = msg.sender;
+    }
+
+    function _send(address to, uint256 amount) private {
+        if (amount > 0) require(token.transfer(to, amount), "TRANSFER");
+    }
+
+    function _receive(uint256 amount) private {
+        uint256 beforeBal = token.balanceOf(address(this));
+        require(token.transferFrom(msg.sender, address(this), amount), "TRANSFER_FROM");
+        require(token.balanceOf(address(this)) == beforeBal + amount, "NOT_EXACT_TOKEN");
+    }
+
+    function _splitGen(uint256 base)
+        private
+        pure
+        returns (uint256 net, uint256 fee, uint256 remainder)
+    {
+        net = Math.mulDiv(base, 99, 100);
+        fee = base / 100;
+        remainder = base - net - fee;
+    }
+
+    function _accrueGen(uint256 base, uint256 fee, uint256 remainder) private {
+        // 按同一gross独立向下取整0.7%/0.3%；剩余原始单位明确归dust。
+        uint256 creatorPart = Math.mulDiv(base, 7, 1000);
+        creatorFees += creatorPart;
+        uint256 protocolPart = Math.mulDiv(base, 3, 1000);
+        protocolFees += protocolPart;
+        dust += remainder + fee - creatorPart - protocolPart;
+    }
+
+    function _checkIntent(bool hit, uint8 intent) private pure {
+        require(intent <= 2, "INTENT");
+        require(intent != 1 || hit, "MUST_GRADUATE");
+        require(intent != 2 || !hit, "MUST_NOT_GRADUATE");
+    }
+
+    function quoteGenesisBuy(uint256 paid) public view returns (uint256 minted) {
+        require(paid > 0 && paid <= LIMIT, "AMOUNT");
+        (uint256 net,,) = _splitGen(paid);
+        require(net > 0 && R + net <= LIMIT, "AMOUNT");
+        uint256 next = TopicMarketMath.sqrt((R + net) * curveScale / k);
+        require(next > S, "TINY");
+        return next - S;
+    }
+
+    function genesisBuy(uint256 paid, uint256 minTokens, uint64 expiry, uint8 intent) external lock {
+        address user = _actor();
+        require(
+            phase == Phase.GENESIS && block.timestamp < genesisCutoff && block.timestamp <= expiry, "GENESIS_CLOSED"
+        );
+        uint256 minted = quoteGenesisBuy(paid);
+        require(minted >= minTokens, "SLIPPAGE");
+        (uint256 net, uint256 fee, uint256 rem) = _splitGen(paid);
+        bool hit = R + net >= rTarget;
+        _checkIntent(hit, intent);
+        _receive(paid);
+        R += net;
+        S += minted;
+        shares[user] += minted;
+        _accrueGen(paid, fee, rem);
+        emit GenesisTrade(user, true, paid, minted);
+        if (hit) _graduate(true);
+    }
+
+    function quoteGenesisSell(uint256 quantity) public view returns (uint256 gross, uint256 seller) {
+        require(quantity > 0 && quantity <= S, "AMOUNT");
+        uint256 left = S - quantity;
+        gross = Math.mulDiv(k, S * S - left * left, curveScale);
+        require(gross > 0 && gross <= R, "TINY");
+        seller = Math.mulDiv(gross, 99, 100);
+    }
+
+    function genesisSell(uint256 quantity, uint256 minOut, uint64 expiry, uint8 intent) external lock {
+        address user = _actor();
+        require(
+            phase == Phase.GENESIS && block.timestamp < genesisCutoff && block.timestamp <= expiry, "GENESIS_CLOSED"
+        );
+        require(shares[user] >= quantity, "HOLDINGS");
+        (uint256 gross, uint256 seller) = quoteGenesisSell(quantity);
+        require(seller >= minOut, "SLIPPAGE");
+        (, uint256 fee, uint256 rem) = _splitGen(gross);
+        bool hit = R - gross >= rTarget;
+        _checkIntent(hit, intent);
+        R -= gross;
+        S -= quantity;
+        shares[user] -= quantity;
+        _accrueGen(gross, fee, rem);
+        if (S == 0) {
+            dust += R; // isolate only when all Genesis supply has been burned
+            R = 0;
+        }
+        emit GenesisTrade(user, false, gross, quantity);
+        if (hit) _graduate(false);
+        _send(msg.sender, Math.mulDiv(gross, 99, 100));
+    }
+
+
+    function _graduate(bool buy) private {
+        phase = Phase.FORMAL;
+        graduationSupply = S;
+        liquiditySupply = S;
+        unmaterializedLP = S;
+        // 一次性把全部毕业LP放到市场托管，当前ERC20总量永远包含未物化权益。
+        lpToken.mint(address(this), S);
+        initialCollateral = R;
+        // 唯一真实风险本金：不预先拆抵押、不预铸结果，不重复承诺LP与用户负债。
+        cash = R;
+        R = 0;
+        poolBasisWad = initialCollateral * SCALE;
+        // 深度取毕业时实际进入正式市场的抵押本金，统一为18位份额单位。
+        // 此后买卖、配对赎回均不改变b，也不增发LP。
+        bWad = poolBasisWad;
+        core.open(coreCutoff);
+        require(core.deadline() == coreCutoff && core.openedAt() == block.timestamp, "CORE_OPEN");
+        emit Graduated(_actor(), buy, initialCollateral);
+    }
+
+    function isFormalMarket() external view returns (bool) {
+        return phase == Phase.FORMAL || phase == Phase.WAIT_CORE || phase == Phase.SETTLED;
+    }
+
+    function coordinates() public view returns (uint256 qY, uint256 qN) {
+        return (yesSupply, noSupply);
+    }
+
+    function priceYes() external view returns (uint256) {
+        require(!liquidityClosed && bWad > 0, "NO_LIQUIDITY");
+        (uint256 y, uint256 n) = coordinates();
+        return TopicMarketMath.priceYes(y, n, bWad);
+    }
+
+    function _requireCoreTrading() private view {
+        // 测试/旧结果适配器无此扩展时沿用固定截止；真实新Adapter明确检查到期申请。
+        (bool ok, bytes memory data) = address(core).staticcall(abi.encodeWithSignature("tradingAllowed()"));
+        if (ok && data.length == 32) require(abi.decode(data,(bool)), "CORE_FROZEN");
+    }
+
+    function _formalOpen() private view {
+        _requireCoreTrading();
+        require(phase == Phase.FORMAL && block.timestamp < formalCutoff && !liquidityClosed, "FORMAL_CLOSED");
+    }
+
+    function _splitFormal(uint256 base)
+        private pure returns (uint256 net, uint256 lpFee, uint256 coreFee, uint256 rem)
+    {
+        net = Math.mulDiv(base, 98, 100);
+        lpFee = base / 100;
+        coreFee = Math.mulDiv(base, 7, 1000);
+        rem = base - net - lpFee - coreFee;
+    }
+
+    /// @dev 扩展深度至1e30 WAD后，误差保护随深度保守放大；普通资金规模仍至少为1e-6整枚C。
+    function _formalGuard() private view returns (uint256) {
+        return Math.ceilDiv(Math.max(1e12, bWad / 1e14 + 100), SCALE);
+    }
+
+    function quoteFormalBuy(bool isYes, uint256 amount) public view returns (uint256 gross) {
+        require(amount > 0 && amount <= MAX_OUTCOME_SUPPLY - (isYes ? yesSupply : noSupply), "AMOUNT");
+        require(bWad > 0, "NO_LIQUIDITY");
+        (uint256 y, uint256 n) = coordinates();
+        uint256 beforeCost = TopicMarketMath.cost(y, n, bWad);
+        uint256 afterCost = TopicMarketMath.cost(y + (isYes ? amount : 0), n + (isYes ? 0 : amount), bWad);
+        require(afterCost >= beforeCost, "NUMERIC");
+        uint256 requiredNet = Math.ceilDiv(afterCost - beforeCost, SCALE) + _formalGuard();
+        gross = Math.mulDiv(requiredNet, 100, 98, Math.Rounding.Ceil);
+        require(gross <= LIMIT, "AMOUNT");
+    }
+
+    function formalBuy(bool isYes, uint256 amount, uint256 maxPaid, uint64 expiry) external lock {
+        address user = _actor();
+        _formalOpen();
+        require(block.timestamp <= expiry, "EXPIRED");
+        uint256 gross = quoteFormalBuy(isYes, amount);
+        require(gross <= maxPaid && gross <= LIMIT, "SLIPPAGE");
+        (uint256 net, uint256 lpFee, uint256 coreFee, uint256 rem) = _splitFormal(gross);
+        _receive(gross);
+        cash += net;
+        lpFees += lpFee;
+        // 全部做市费用计入LP。
+        uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
+        protocolFees += protocolPart;
+        dust += rem - protocolPart;
+        if (isYes) {
+            yesSupply += amount;
+            yes[user] += amount;
+        } else {
+            noSupply += amount;
+            no[user] += amount;
+        }
+        _assertOutcomeSolvency();
+        _sendCoreFee(coreFee);
+        emit FormalTrade(user, true, isYes, amount, gross);
+    }
+
+    /// @dev 经典LMSR：q_i为当前外部未兑份额；卖出烧毁份额，无库存或裸卖路径。
+    function quoteFormalSellDetailed(bool isYes, uint256 amount)
+        public view returns (uint256 gross, uint256 seller, uint256 merge6)
+    {
+        require(amount > 0 && bWad > 0 && !liquidityClosed, "AMOUNT");
+        (uint256 y, uint256 n) = coordinates();
+        require(amount <= (isYes ? y : n), "CAPACITY");
+        uint256 beforeCost = TopicMarketMath.cost(y, n, bWad);
+        uint256 afterCost = TopicMarketMath.cost(y - (isYes ? amount : 0), n - (isYes ? 0 : amount), bWad);
+        require(beforeCost >= afterCost, "NUMERIC");
+        uint256 raw = (beforeCost - afterCost) / SCALE;
+        uint256 guard = _formalGuard();
+        require(raw > guard, "TINY");
+        gross = raw - guard;
+        require(gross <= cash, "CASH");
+        seller = Math.mulDiv(gross, 98, 100);
+        merge6 = 0; // 保留旧报价ABI，本版没有池内merge路径。
+    }
+
+    function quoteFormalSell(bool isYes, uint256 amount) public view returns (uint256 gross, uint256 seller) {
+        (gross, seller,) = quoteFormalSellDetailed(isYes, amount);
+    }
+
+    function _sendCoreFee(uint256 amount) private {
+        if (amount == 0) return;
+        // Core失败回滚整笔交易，绝不先支付卖家、留下未入账手续费。
+        require(token.approve(address(core), 0) && token.approve(address(core), amount), "APPROVE_CORE");
+        uint256 beforeBalance = token.balanceOf(address(this));
+        core.depositMarketFee(amount);
+        require(token.balanceOf(address(this)) + amount == beforeBalance, "CORE_FEE_TRANSFER");
+        require(token.approve(address(core), 0), "APPROVE_CORE");
+        coreFeesSent += amount;
+        emit CoreFeeSent(amount);
+    }
+
+    function formalSell(bool isYes, uint256 amount, uint256 minOut, uint64 expiry) external lock {
+        address user = _actor();
+        _formalOpen();
+        require(block.timestamp <= expiry, "EXPIRED");
+        require((isYes ? yes[user] : no[user]) >= amount, "HOLDINGS");
+        (uint256 gross, uint256 seller) = quoteFormalSell(isYes, amount);
+        require(seller >= minOut, "SLIPPAGE");
+        (, uint256 lpFee, uint256 coreFee, uint256 rem) = _splitFormal(gross);
+        if (isYes) {
+            yes[user] -= amount;
+            yesSupply -= amount;
+        } else {
+            no[user] -= amount;
+            noSupply -= amount;
+        }
+        cash -= gross;
+        lpFees += lpFee;
+        // 全部做市费用计入LP。
+        uint256 protocolPart = Math.mulDiv(gross, 3, 1000);
+        protocolFees += protocolPart;
+        dust += rem - protocolPart;
+        _assertOutcomeSolvency();
+        _sendCoreFee(coreFee);
+        emit FormalTrade(user, false, isYes, amount, gross);
+        _send(msg.sender, Math.mulDiv(gross, 98, 100));
+    }
+
+    /// @dev Independent integer check, excluding fee/debt buckets: all YES/NO/INVALID liabilities
+    /// are covered by trading cash alone. Initial R=b exceeds the classical maximum loss b*ln(2).
+    function _assertOutcomeSolvency() private view {
+        require(cash >= Math.ceilDiv(Math.max(yesSupply, noSupply), SCALE), "OUTCOME_SOLVENCY");
+    }
+
+    /// @notice 免交易费完整组合兑换；参数为collateral native units金额，两侧各烧amount6*SCALE份。
+    /// @dev 不依赖做市深度，全LP退出/等待Core时仍可用；终局快照之后禁止此入口。
+    function redeemPairs(uint256 amount6) external lock {
+        _requireCoreTrading();
+        address user = _actor();
+        require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "PHASE");
+        require(amount6 > 0 && amount6 <= cash, "AMOUNT");
+        uint256 burn = amount6 * SCALE;
+        require(yes[user] >= burn && no[user] >= burn, "HOLDINGS");
+        yes[user] -= burn;
+        no[user] -= burn;
+        yesSupply -= burn;
+        noSupply -= burn;
+        // C(qY-a,qN-a)=C(qY,qN)-a：烧完整组合与实付一份抵押同步，不留隐藏坐标偏移。
+        cash -= amount6;
+        redeemedPairs += amount6;
+        _assertOutcomeSolvency();
+        emit PairsRedeemed(user, amount6, burn);
+        _send(msg.sender, amount6);
+    }
+
+    /// @notice 任意人可代触发，但托管LP只交给原始筹资权益人，不能指定第三方收款。
+    function materializeLP(address account) external lock returns (uint256 amount) {
+        return _materializeLP(account);
+    }
+
+    function _materializeLP(address account) private returns (uint256 amount) {
+        require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE || phase == Phase.SETTLED, "PHASE");
+        amount = shares[account];
+        if (amount == 0) return 0;
+        shares[account] = 0;
+        unmaterializedLP -= amount;
+        require(lpToken.transfer(account, amount), "LP_TRANSFER");
+        emit LPMaterialized(account, amount);
+    }
+
+    function closeExpired() external lock {
+        if (phase == Phase.GENESIS) {
+            require(block.timestamp >= genesisCutoff, "EARLY");
+            phase = Phase.FAILED;
+            failedRInitial = R;
+            failedRRemaining = R;
+            R = 0;
+            failedSupply = S;
+
+        } else {
+            require(phase == Phase.FORMAL && block.timestamp >= formalCutoff, "EARLY");
+            phase = Phase.WAIT_CORE;
+        }
+        emit Closed(phase);
+        if (phase == Phase.FAILED) _flushFees();
+    }
+
+    function _value(uint256 y, uint256 n, uint8 result) private view returns (uint256) {
+        if (result == 1) return y / SCALE;
+        if (result == 2) return n / SCALE;
+        return (y + n) / (2 * SCALE);
+    }
+
+    function finalize() external lock {
+        require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "CORE_PENDING");
+        uint8 result = core.finalOutcome();
+        require(result >= 1 && result <= 3, "CORE_PENDING");
+        outcome = result;
+        phase = Phase.SETTLED;
+        uint256 liability = _value(yesSupply, noSupply, result);
+        require(cash >= liability, "OUTCOME_SOLVENCY");
+        // 先隔离全部玩家兑付预算；LP只享有剩余真实资产，领取次序不改变偿付。
+        collateralCash = liability;
+        uint256 nav = cash + lpFees - liability;
+        cash = 0;
+        lpFees = 0;
+        // 固定原始毕业总份额，不能因物化、转让或已领取销毁而缩小分母。
+        lpSnapshot = graduationSupply;
+        lpBudgetInitial = nav;
+        lpBudgetRemaining = nav;
+        emit Finalized(result, lpBudgetInitial);
+        _flushFees();
+    }
+
+    function claimOutcome() external lock returns (uint256 pay) {
+        return _claimOutcome();
+    }
+
+    function _claimOutcome() private returns (uint256 pay) {
+        address user = _actor();
+        require(phase == Phase.SETTLED, "PHASE");
+        uint256 y = yes[user];
+        uint256 n = no[user];
+        require(y + n > 0, "CLAIMED");
+        yes[user] = 0;
+        no[user] = 0;
+        yesSupply -= y;
+        noSupply -= n;
+        pay = _value(y, n, outcome);
+        collateralCash -= pay;
+        emit Claimed(user, "OUTCOME", pay);
+        _send(msg.sender, pay);
+    }
+
+    function claimLP() external lock returns (uint256 pay) {
+        address user = _actor();
+        require(phase == Phase.SETTLED, "PHASE");
+        _materializeLP(user);
+        return _claimLP(lpToken.balanceOf(user));
+    }
+
+    function claimLP(uint256 amountWad) external lock returns (uint256 pay) {
+        require(phase == Phase.SETTLED, "PHASE");
+        _materializeLP(_actor());
+        return _claimLP(amountWad);
+    }
+
+    function _claimLP(uint256 amountWad) private returns (uint256 pay) {
+        address user = _actor();
+        require(amountWad > 0 && lpSnapshot > 0 && lpToken.balanceOf(user) >= amountWad, "CLAIMED");
+        // 权利以当前token持有人为准。正数份额即使舍入到0，也允许烧毁避免dust权利卡死。
+        lpToken.burn(user, amountWad);
+        liquiditySupply -= amountWad;
+        pay = Math.mulDiv(lpBudgetInitial, amountWad, lpSnapshot);
+        lpBudgetRemaining -= pay;
+        emit Claimed(user, "LP", pay);
+        _send(msg.sender, pay);
+    }
+
+
+    function claimFailed() external lock returns (uint256 pay) {
+        return _claimFailed();
+    }
+
+    function _claimFailed() private returns (uint256 pay) {
+        address user = _actor();
+        require(phase == Phase.FAILED, "PHASE");
+        uint256 amount = shares[user];
+        require(amount > 0 && failedSupply > 0, "CLAIMED");
+        shares[user] = 0;
+        S -= amount;
+        pay = Math.mulDiv(failedRInitial, amount, failedSupply);
+        failedRRemaining -= pay;
+        emit Claimed(user, "FAILED", pay);
+        _send(msg.sender, pay);
+    }
+
+    /// @notice Frozen/current-state budgets in collateral native units, excluding future trades and fees.
+    /// @dev Uses the same integer settlement arithmetic; no state or entitlement is changed.
+    function previewSettlement(uint8 result) public view returns (uint256 lpBudget) {
+        require(result >= 1 && result <= 3, "RESULT");
+        if (phase == Phase.SETTLED) {
+            require(result == outcome, "FINAL_RESULT");
+            return lpBudgetInitial;
+        }
+        require(phase == Phase.FORMAL || phase == Phase.WAIT_CORE, "PHASE");
+        uint256 nav = cash + lpFees - _value(yesSupply, noSupply, result);
+        return nav;
+    }
+
+    /// @notice Account payout, including escrowed LP rights.
+    /// @dev Failed launches ignore result because no YES/NO market ever opened.
+    function previewAccount(address account, uint8 result)
+        external view returns (uint256 outcomePay, uint256 lpPay, uint256 failedPay)
+    {
+        if (phase == Phase.FAILED) {
+            if (failedSupply > 0) failedPay = Math.mulDiv(failedRInitial, shares[account], failedSupply);
+            return (0, 0, failedPay);
+        }
+        uint256 lpBudget = previewSettlement(result);
+        outcomePay = _value(yes[account], no[account], result);
+        uint256 denominator = phase == Phase.SETTLED ? lpSnapshot : graduationSupply;
+        if (denominator > 0) lpPay = Math.mulDiv(lpBudget, shares[account] + lpToken.balanceOf(account), denominator);
+    }
+
+    /// @notice Same single market claim action as the demo, never claiming on another wallet's behalf.
+    function claimAll() external lock returns (uint256 total) {
+        address user = _actor();
+        require(phase == Phase.SETTLED || phase == Phase.FAILED, "PHASE");
+        bool hasRights;
+        if (phase == Phase.FAILED && shares[user] > 0) {
+            hasRights = true;
+            total += _claimFailed();
+        }
+        if (phase == Phase.SETTLED) {
+            _materializeLP(user);
+            uint256 lp = lpToken.balanceOf(user);
+            if (lp > 0) { hasRights = true; total += _claimLP(lp); }
+            if (yes[user] + no[user] > 0) { hasRights = true; total += _claimOutcome(); }
+        }
+        require(hasRights, "CLAIMED");
+    }
+
+    event FeePayout(address indexed recipient, uint256 amount, bool paid);
+    event DustCollected(uint256 amount);
+
+    /// @notice Permissionless retries; every payment goes to its immutable beneficiary.
+    function claimFees() external lock { _flushFees(); }
+    function flushFees() external lock { _flushFees(); }
+
+    function _flushFees() private {
+        if (creatorFees == 0 && protocolFees == 0) return;
+        // gas不足必须回滚整笔交易，让钱包估算覆盖付款；不得静默跳过。
+        require(gasleft() >= 300000, "FEE_PAYOUT_GAS");
+        uint256 amount = creatorFees;
+        if (amount > 0) {
+            creatorFees = 0;
+            try this.executeFeeTransfer{gas: 100000}(creator, amount) {
+                emit FeePayout(creator, amount, true);
+            } catch { creatorFees = amount; emit FeePayout(creator, amount, false); }
+        }
+        amount = protocolFees;
+        if (amount > 0) {
+            protocolFees = 0;
+            try this.executeFeeTransfer{gas: 100000}(protocol, amount) {
+                emit FeePayout(protocol, amount, true);
+            } catch { protocolFees = amount; emit FeePayout(protocol, amount, false); }
+        }
+    }
+
+    /// @dev 独立子调用使false/revert/异常转账整体回滚，不能污染已冻结的结算账本。
+    function executeFeeTransfer(address recipient, uint256 amount) external {
+        require(msg.sender == address(this), "SELF_ONLY");
+        uint256 beforeBalance = token.balanceOf(address(this));
+        uint256 beforeRecipient = token.balanceOf(recipient);
+        require(token.transfer(recipient, amount), "FEE_TRANSFER");
+        require(token.balanceOf(address(this)) + amount == beforeBalance && token.balanceOf(recipient) == beforeRecipient + amount, "FEE_EXACT");
+    }
+
+    /// @notice Only after every transferable/internal player right has been burned may rounding
+    /// residues and unsolicited surplus become protocol funds. Unclaimed fees remain separate debts.
+    function collectDust() external lock returns (uint256 amount) {
+        require(phase == Phase.SETTLED || phase == Phase.FAILED, "PHASE");
+        require(phase == Phase.FAILED ? S == 0 : liquiditySupply == 0 && yesSupply == 0 && noSupply == 0, "OUTSTANDING_RIGHTS");
+        amount = token.balanceOf(address(this)) - creatorFees - protocolFees;
+        R = 0; dust = 0; collateralCash = 0; cash = 0; lpFees = 0;
+        lpBudgetRemaining = 0; failedRRemaining = 0;
+        protocolFees += amount;
+        emit DustCollected(amount);
+        _flushFees();
+    }
+
+    /// @notice Retained liabilities, excluding unsolicited donations. Player budgets and pending fee liabilities remain protected until all rights are burned.
+    function accountedBalance() public view returns (uint256) {
+        return R + protocolFees + creatorFees + dust + collateralCash + cash + lpFees + lpBudgetRemaining
+            + failedRRemaining;
+    }
+}

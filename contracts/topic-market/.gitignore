@@ -1,0 +1,12 @@
+out/
+cache/
+broadcast/
+.env
+
+# Local-only development reports; keep source, config and licenses public.
+/DEPLOYMENT_REHEARSAL/
+/*.md
+!/README.md
+/*.txt
+/*.json
+!/ROBINHOOD_V3_ROUTING_CONFIG.json

@@ -1,0 +1,26 @@
+{
+  "chainId": 46630,
+  "network": "Robinhood Chain Testnet",
+  "deployer": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+  "owner": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+  "coreFallbackRecipient": "0x1556a9A5C01ecc4eF11e751CacC847DD36971be7",
+  "contracts": {
+    "TopicMarketCoreDeployer": {
+      "address": "0x9cf6392765683e147b1b5bdb60654f9d627773cc",
+      "transactionHash": "0x80dc67c766e4e8050cd35236475975dea42d3cf062c1e3351ff3037625649a55",
+      "sourceVerification": "not verified; Blockscout automatic attempt failed, native submission pending"
+    },
+    "TopicMarketDeployer": {
+      "address": "0x3d2fb30e303f5e2d36a2f435adaee254afe801d1",
+      "transactionHash": "0x000983525cfd15444eaebaa2476476859b6d9d6ab0ef596f73a0b790b2f2bb1d",
+      "sourceVerification": "not verified; Blockscout automatic attempt failed, native submission pending"
+    },
+    "TopicMarketStockFactory": {
+      "address": "0x21210a6213d7b1c6d83f393488f0afc0913ebed5",
+      "transactionHash": "0x2ac2ae4b1e813e7872df90f1d46aa5850ef6c3689ba1c35b9d3069f889eecebd",
+      "sourceVerification": "not verified; Blockscout automatic attempt failed, native submission pending"
+    }
+  },
+  "stocks": [],
+  "status": "factory deployed; asset registration pending user selection; no test prices or replacement stablecoin silently configured"
+}
