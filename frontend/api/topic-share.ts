@@ -47,7 +47,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const topic = String(record.topic);
     const lang = url.searchParams.get('lang') === 'zh' ? 'zh' : 'en';
     const target = origin + '/degen.html?market=' + market + '&lang=' + lang;
-    const image = origin + '/api/topic-share?market=' + market + '&image=1&v=2';
+    const image = origin + '/api/topic-share?market=' + market + '&image=1&v=3';
     let body: string | Buffer;
     const isImage = url.searchParams.get('image') === '1';
     if (isImage) {
