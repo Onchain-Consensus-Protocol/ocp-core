@@ -1,0 +1,35 @@
+.lottery-page {
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.lottery-page :is(button, a, input):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.lottery-page a:not([role="menuitem"]) { text-decoration: underline; text-underline-offset: 3px; }
+.lottery-subtle { color: var(--text-muted); }
+.lottery-amount { font-variant-numeric: tabular-nums; }
+.lottery-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.lottery-rule { border-color: var(--border); }
+.lottery-action {
+  background: var(--text);
+  color: var(--surface);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-weight: 650;
+  text-align: center;
+}
+.lottery-action:disabled { opacity: .55; cursor: not-allowed; }
+.lottery-field {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  width: 100%;
+  min-width: 0;
+}
