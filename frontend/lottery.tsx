@@ -1,10 +1,12 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { Contract, JsonRpcProvider, ZeroAddress, formatUnits, isAddress } from "ethers";
 import { OCPMenu } from "./components/OCPMenu";
+import { LanguageToggle } from "./components/LanguageToggle";
 import { config } from "./config";
 import { lotteryApiUrl, lotteryContractAddress } from "./shared/lotteryConfig";
 import { useWallet } from "./useWallet";
+import type { Language } from "./types";
 import "./index.css";
 import "./lottery.css";
 
@@ -23,14 +25,6 @@ const isUint = (value: unknown): value is string =>
 const isEpoch = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= 8_640_000_000_000;
 
-const params = new URLSearchParams(window.location.search);
-const lang = params.get("lang") === "zh" || (!params.has("lang") && navigator.language.startsWith("zh")) ? "zh" : "en";
-const t = (zh: string, en: string) => lang === "zh" ? zh : en;
-const date = new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
-  year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-  timeZone: "America/Los_Angeles", timeZoneName: "short", hour12: lang === "en",
-});
-const formatDate = (timestamp: number) => date.format(timestamp * 1000);
 const snapshotUrl = lotteryApiUrl("snapshot");
 const reportUrl = lotteryApiUrl("report");
 const rpc = new JsonRpcProvider(config.rpcUrl, config.chainId, { staticNetwork: true });
@@ -104,6 +98,16 @@ async function getChainRound(address: string): Promise<ChainRound> {
 }
 
 function LotteryPage() {
+  const [lang, setLang] = useState<Language>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("lang") === "zh" || (!params.has("lang") && navigator.language.startsWith("zh")) ? "zh" : "en";
+  });
+  const t = (zh: string, en: string) => lang === "zh" ? zh : en;
+  const date = useMemo(() => new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    timeZone: "America/Los_Angeles", timeZoneName: "short", hour12: lang === "en",
+  }), [lang]);
+  const formatDate = (timestamp: number) => date.format(timestamp * 1000);
   const { signer, address, connectWallet } = useWallet();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [chain, setChain] = useState<ChainRound | null>(null);
@@ -117,6 +121,18 @@ function LotteryPage() {
   const [claiming, setClaiming] = useState(false);
   const [claimMessage, setClaimMessage] = useState("");
   const pollInterval = Math.floor(now / 30_000);
+
+  useEffect(() => {
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+    document.title = lang === "zh" ? "OCP 每周协议费抽奖" : "OCP Weekly Fee Lottery";
+  }, [lang]);
+
+  function changeLanguage(language: Language) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", language);
+    window.history.replaceState(window.history.state, "", url);
+    setLang(language);
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -235,9 +251,12 @@ function LotteryPage() {
     : null;
 
   return <div className="lottery-page">
-    <header className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-5 pt-5 sm:px-8">
+    <header className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-8">
       <OCPMenu lang={lang} />
-      <a className="text-sm font-semibold" href={`/market.html?lang=${lang}`}>{t("返回市场", "Back to markets")}</a>
+      <div className="flex items-center gap-3 sm:gap-4">
+        <a className="whitespace-nowrap text-sm font-semibold" href={`/market.html?lang=${lang}`}>{t("返回市场", "Back to markets")}</a>
+        <LanguageToggle lang={lang} setLang={changeLanguage} />
+      </div>
     </header>
     <main className="mx-auto max-w-4xl px-5 pb-16 pt-10 sm:px-8">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
@@ -354,5 +373,4 @@ function LotteryPage() {
   </div>;
 }
 
-document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
 createRoot(document.getElementById("root")!).render(<LotteryPage />);
