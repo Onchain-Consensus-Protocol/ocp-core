@@ -26,8 +26,9 @@ const isEpoch = (value: unknown): value is number =>
 const params = new URLSearchParams(window.location.search);
 const lang = params.get("lang") === "zh" || (!params.has("lang") && navigator.language.startsWith("zh")) ? "zh" : "en";
 const t = (zh: string, en: string) => lang === "zh" ? zh : en;
-const date = new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-GB", {
-  dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai",
+const date = new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
+  year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  timeZone: "America/Los_Angeles", timeZoneName: "short", hour12: lang === "en",
 });
 const formatDate = (timestamp: number) => date.format(timestamp * 1000);
 const snapshotUrl = lotteryApiUrl("snapshot");
@@ -242,7 +243,10 @@ function LotteryPage() {
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{t("每周协议费抽奖", "Weekly fee lottery")}</h1>
-          <p className="lottery-subtle mt-2 text-sm">{t("周日 20:00 截止，周一 08:00 补漏结束（北京时间）。", "Eligibility closes Sunday at 20:00. Corrections close Monday at 08:00 (Beijing time).")}</p>
+          <p className="lottery-subtle mt-2 text-sm">{t(
+            "美国太平洋时间：周日 04:00 截止，16:00 补漏结束（PST）。夏令时为周日 05:00 和 17:00（PDT）。",
+            "US Pacific Time: eligibility closes Sunday at 4 AM and corrections close at 4 PM (PST). During daylight time, the cutoffs are Sunday at 5 AM and 5 PM (PDT).",
+          )}</p>
         </div>
         {(lotteryContractAddress || snapshotUrl) && !address && <button type="button" className="lottery-action" onClick={connectWallet}>
           {t("连接钱包", "Connect wallet")}
@@ -268,7 +272,7 @@ function LotteryPage() {
           <div>
             <p className="text-sm">{t("中奖地址", "Winner")}</p>
             <code className="block break-all text-sm">{chain.winner}</code>
-            <p className="lottery-subtle mt-1 text-sm">{t("领取截止", "Claim deadline")} · <time dateTime={new Date(chain.claimDeadline * 1000).toISOString()}>{formatDate(chain.claimDeadline)}</time> {t("北京时间", "Beijing time")}</p>
+            <p className="lottery-subtle mt-1 text-sm">{t("领取截止", "Claim deadline")} · <time dateTime={new Date(chain.claimDeadline * 1000).toISOString()}>{formatDate(chain.claimDeadline)}</time></p>
           </div>
           {!!chain.assets.length && <ul className="lottery-amount space-y-2">
             {chain.assets.map(asset => <li className="flex flex-wrap items-center gap-2 break-all" key={asset.token}>
@@ -298,7 +302,7 @@ function LotteryPage() {
         {snapshotError && <p role="alert" className="mt-3 text-sm">{t("暂时无法读取抽奖明细。", "The lottery ledger is temporarily unavailable.")}</p>}
         {!snapshotError && !snapshot && <p role="status" className="lottery-subtle mt-3 text-sm">{t("正在读取明细…", "Loading lottery ledger…")}</p>}
         {snapshot && <div className="mt-3 space-y-4 text-sm">
-          <p className="lottery-subtle">{t("本期截止", "Round cutoff")} · {formatDate(snapshot.round)} {t("北京时间", "Beijing time")}</p>
+          <p className="lottery-subtle">{t("本期截止", "Round cutoff")} · {formatDate(snapshot.round)}</p>
           {chainMatchesLedger === false && <p role="alert">{t("抽奖明细和已锁定的链上记录不一致。", "The published ledger differs from the locked on-chain record.")}</p>}
           {chainMatchesLedger === true && <p className="lottery-subtle">{t("明细承诺与链上已锁定记录一致。", "The ledger commitment matches the locked on-chain record.")}</p>}
           {address && !snapshotError && chainMatchesLedger !== false && <p>
@@ -334,15 +338,15 @@ function LotteryPage() {
           <div>
             <dt className="font-semibold">{t("怎么抽", "How the winner is drawn")}</dt>
             <dd className="lottery-subtle mt-1">{t(
-              "符合条件的实收协议交易费组成全站奖池，每周抽一位。各代币的协议费按当期美元报价折算，中奖概率等于你的手续费占比。周一 08:00 补漏截止后锁定权重，再用可验证的随机数开奖。",
-              "Eligible protocol trading fees form one sitewide pool with one winner per week. Fees are valued in USD for the draw. Your chance is your share of eligible fees. After corrections close at 08:00 on Monday, weights are locked and the winner is drawn with verifiable randomness.",
+              "符合条件的实收协议交易费组成全站奖池，每周抽一位。各代币的协议费按当期美元报价折算，中奖概率等于你的手续费占比。周日下午补漏结束后锁定权重，再用可验证的随机数开奖。",
+              "Eligible protocol trading fees form one sitewide pool with one winner per week. Fees are valued in USD for the draw. Your chance is your share of eligible fees. After corrections close on Sunday afternoon Pacific Time, weights are locked and the winner is drawn with verifiable randomness.",
             )}</dd>
           </div>
           <div>
             <dt className="font-semibold">{t("怎么领取", "How to claim")}</dt>
             <dd className="lottery-subtle mt-1">{t(
-              "中奖钱包可领取奖池里的原币，领取截至下一周一 08:00（北京时间）。逾期未领的奖金归下一位中奖者，旧交易权重不滚入下一轮。",
-              "The winning wallet can claim the tokens in the pool until the following Monday at 08:00 (Beijing time). Unclaimed tokens go to the next winner. Prior-round weights do not carry over.",
+              "中奖钱包可领取奖池里的原币，领取期在下一周日补漏截止时结束（美国太平洋时间）。逾期未领的奖金归下一位中奖者，旧交易权重不滚入下一轮。",
+              "The winning wallet can claim the tokens in the pool until corrections close the following Sunday, Pacific Time. Unclaimed tokens go to the next winner. Prior-round weights do not carry over.",
             )}</dd>
           </div>
         </dl>
