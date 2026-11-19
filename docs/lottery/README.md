@@ -28,4 +28,4 @@
 
 - 合约在 `contracts/topic-market/src/lottery/`。运行 `forge test --offline --match-contract ProtocolFeeLotteryTest`，测试包含两条真实历史 drand 签名。Robinhood Chain 主网只读模拟验证了正确签名和错误轮次。验签库来自 Randamu `bls-solidity` 的固定版本 `11af179a8287d978659aae07adb66aa60f64b8a6`。该上游实现标为实验性且未经审计。生产启用前需复核验签库和完整开奖的 gas。
 - Keeper 的运行方式和环境变量见 `infra/lottery-keeper`。只需要一个能支付链上操作 gas 的 Keeper 钱包。
-- 前端可从 OCP 菜单打开 `/lottery.html` 查看规则。设置 `VITE_LOTTERY_CONTRACT` 后显示链上状态和领奖功能。设置 `VITE_LOTTERY_API_URL` 读取公开名单、权重明细和漏单提交接口。前端环境变量是公开值。
+- 前端可从主网市场操作栏打开 `/lottery.html` 查看规则。设置 `VITE_LOTTERY_CONTRACT` 后显示链上状态和领奖功能。设置 `VITE_LOTTERY_API_URL` 读取公开名单、权重明细和漏单提交接口。前端环境变量是公开值。

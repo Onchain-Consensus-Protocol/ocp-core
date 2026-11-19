@@ -251,7 +251,6 @@ function LotteryPage() {
         {(lotteryContractAddress || snapshotUrl) && !address && <button type="button" className="lottery-action" onClick={connectWallet}>
           {t("连接钱包", "Connect wallet")}
         </button>}
-        {address && <code className="lottery-subtle break-all text-xs">{address}</code>}
       </div>
       {!lotteryContractAddress && <section className="lottery-card mb-5 p-5 sm:p-6" aria-labelledby="lottery-preview">
         <h2 id="lottery-preview" className="text-xl font-semibold">{t("抽奖尚未开放", "The lottery has not opened yet")}</h2>

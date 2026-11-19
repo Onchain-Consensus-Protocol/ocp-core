@@ -11,7 +11,7 @@ import {approveThenExecute,ApprovalFlowError,requireSuccessfulReceipt,withPendin
 import {readCoreHistory,type CoreHistory} from '../testnet/coreHistory';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {BrowserProvider, JsonRpcProvider, Contract, Interface, ZeroAddress, ZeroHash, formatUnits, isAddress, parseUnits} from 'ethers';
-import {ArrowLeft, RefreshCw, Share2, Search, Plus} from 'lucide-react';
+import {ArrowLeft, RefreshCw, Share2, Search, Plus, Ticket} from 'lucide-react';
 import {TestnetSimulation} from './TestnetSimulation';
 import {EarlyTerminationNotice} from './EarlyTerminationNotice';
 import {Button} from './Button';
@@ -520,7 +520,18 @@ export function TestnetMarketApp({lang = 'zh',degen=false}: {lang?: Language;deg
   const holdersPanel=market&&stock?(<OnchainHolders key={`${market.address}:${tab}`} market={market} history={history} coreHistory={coreRecord?.market===selected?coreRecord.value:undefined} kind={tab==='CORE'?'CORE':[0,4].includes(market.phase)?'GENESIS':'FORMAL'} lang={lang} symbol={stock.symbol} decimals={stock.decimals}/>):null;
 
   return <div className="max-w-7xl mx-auto text-text" data-testid="testnet-market-app">
-    <div className="flex flex-wrap justify-between items-center gap-3 mb-5"><span className="text-xs font-bold text-accent">{t('Robinhood 主网','Robinhood Mainnet')}</span><div className="flex items-center gap-3 text-sm"><a className="text-xs text-accent whitespace-nowrap" aria-disabled={busy} onClick={e=>{if(busy)e.preventDefault();}} href={marketViewHref(!degen,window.location.search,lang)}>{degen?t('完整模式','Full mode'):'Degen'}</a><button className={small} disabled={busy} onClick={()=>void connect()}>{wallet?short(wallet.address):t('连接钱包','Connect wallet')}</button><button className={small} disabled={busy||!configured} aria-label={t('刷新','Refresh')} onClick={()=>{setHistoryRetry(value=>value+1);void refresh(true).catch(e=>setNotice(errorText(e,zh)));}}><RefreshCw size={15}/></button></div></div>
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <span className="text-xs font-bold text-accent">{t('Robinhood 主网','Robinhood Mainnet')}</span>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <a className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-accent hover:underline" href={`/lottery.html?lang=${lang}`}>
+          <Ticket size={14} aria-hidden="true" />
+          {t('协议费抽奖','Fee lottery')}
+        </a>
+        <a className="text-xs text-accent whitespace-nowrap" aria-disabled={busy} onClick={e=>{if(busy)e.preventDefault();}} href={marketViewHref(!degen,window.location.search,lang)}>{degen?t('完整模式','Full mode'):'Degen'}</a>
+        <button className={small} disabled={busy} onClick={()=>void connect()}>{wallet?short(wallet.address):t('连接钱包','Connect wallet')}</button>
+        <button className={small} disabled={busy||!configured} aria-label={t('刷新','Refresh')} onClick={()=>{setHistoryRetry(value=>value+1);void refresh(true).catch(e=>setNotice(errorText(e,zh)));}}><RefreshCw size={15}/></button>
+      </div>
+    </div>
     {!configured&&<p className={box}>{t('主网合约尚未配置','Mainnet contracts are not configured')}</p>}
     {!viewLive&&(directory||market)&&<p role="status" className="text-xs text-text-muted mb-3">{t('正在核对最新链上状态，缓存仅供浏览。','Verifying live state; cached data is for display only.')}</p>}
     {pollError&&<p role="status" className="text-sm text-orange-500 mb-4">{t('链上状态自动更新失败，请点击刷新确认最新申请状态。','Automatic state refresh failed. Refresh to check the latest request status.')}</p>}
