@@ -249,8 +249,12 @@ function LotteryPage() {
         </button>}
         {address && <code className="lottery-subtle break-all text-xs">{address}</code>}
       </div>
-      {!snapshotUrl && !lotteryContractAddress && <section className="lottery-card p-5">
-        <h2 className="font-semibold">{t("抽奖尚未上线", "Lottery not live yet")}</h2>
+      {!lotteryContractAddress && <section className="lottery-card mb-5 p-5 sm:p-6" aria-labelledby="lottery-preview">
+        <h2 id="lottery-preview" className="text-xl font-semibold">{t("抽奖尚未开放", "The lottery has not opened yet")}</h2>
+        <p className="lottery-subtle mt-2 text-sm">
+          {t("本页先公开规则。首期时间、参与明细和领奖入口将在开放后公布。",
+            "The rules are available below. The first draw date, eligibility ledger and prize claims will appear when the lottery opens.")}
+        </p>
       </section>}
       {lotteryContractAddress && <section className="lottery-card mb-5 p-5 sm:p-6" aria-labelledby="lottery-prize">
         <h2 id="lottery-prize" className="text-xl font-semibold">{t("链上奖池", "On-chain prize")}</h2>
@@ -317,6 +321,32 @@ function LotteryPage() {
           {!reviewOpen && <p className="lottery-subtle">{t("本轮补漏窗口已关闭。", "The correction window for this round is closed.")}</p>}
         </div>}
       </section>}
+      <section className={`lottery-card p-5 sm:p-6 ${snapshotUrl ? "mt-5" : ""}`} aria-labelledby="lottery-rules">
+        <h2 id="lottery-rules" className="text-xl font-semibold">{t("抽奖规则", "Lottery rules")}</h2>
+        <dl className="mt-4 space-y-4 text-sm leading-relaxed">
+          <div>
+            <dt className="font-semibold">{t("哪些交易参加", "Which trades qualify")}</dt>
+            <dd className="lottery-subtle mt-1">{t(
+              "统计本周已完成结果结算、或未毕业并开放退款的市场。该市场从开盘到结束的合格买卖统一计入一轮。Core 质押不计入。",
+              "A market qualifies in the week it settles or opens refunds after failing to graduate. Eligible buys and sells from the market’s full lifetime count in that round. Core staking does not count.",
+            )}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold">{t("怎么抽", "How the winner is drawn")}</dt>
+            <dd className="lottery-subtle mt-1">{t(
+              "符合条件的实收协议交易费组成全站奖池，每周抽一位。各代币的协议费按当期美元报价折算，中奖概率等于你的手续费占比。周一 08:00 补漏截止后锁定权重，再用可验证的随机数开奖。",
+              "Eligible protocol trading fees form one sitewide pool with one winner per week. Fees are valued in USD for the draw. Your chance is your share of eligible fees. After corrections close at 08:00 on Monday, weights are locked and the winner is drawn with verifiable randomness.",
+            )}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold">{t("怎么领取", "How to claim")}</dt>
+            <dd className="lottery-subtle mt-1">{t(
+              "中奖钱包可领取奖池里的原币，领取截至下一周一 08:00（北京时间）。逾期未领的奖金归下一位中奖者，旧交易权重不滚入下一轮。",
+              "The winning wallet can claim the tokens in the pool until the following Monday at 08:00 (Beijing time). Unclaimed tokens go to the next winner. Prior-round weights do not carry over.",
+            )}</dd>
+          </div>
+        </dl>
+      </section>
     </main>
   </div>;
 }

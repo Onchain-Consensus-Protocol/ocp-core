@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 
 import { ThemeToggle } from "./ThemeToggle";
-import { lotteryContractAddress } from "../shared/lotteryConfig";
 
 import type { Language } from "../types";
 
@@ -107,16 +106,14 @@ export function OCPMenu({ lang, suffix }: { lang: Language; suffix?: string }) {
             <Landmark className="w-4 h-4 shrink-0" />
             {lang === "zh" ? "主网市场" : "Market"}
           </a>
-          {lotteryContractAddress && (
-            <a
-              href={`/lottery.html?lang=${lang}`}
-              role="menuitem"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
-            >
-              <Ticket className="w-4 h-4 shrink-0" />
-              {lang === "zh" ? "协议费抽奖" : "Fee lottery"}
-            </a>
-          )}
+          <a
+            href={`${MARKET_ORIGIN}/lottery.html?lang=${lang}`}
+            role="menuitem"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-display font-bold text-text-muted hover:text-accent hover:bg-accent/5 transition-colors"
+          >
+            <Ticket className="w-4 h-4 shrink-0" />
+            {lang === "zh" ? "协议费抽奖" : "Fee lottery"}
+          </a>
           <details className="group/future">
             <summary
               role="menuitem"
