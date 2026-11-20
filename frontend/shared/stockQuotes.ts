@@ -1,6 +1,7 @@
 // Canonical Robinhood Chain assets, checked against api.robinhood.com/rhj/assets.
 // Reference display only: never feed these quotes into simulation balances or settlement.
 export const STOCK_QUOTE_TOKENS:Record<string,string>={
+ ANT:'0xbbb6c29bcc3a1028a2b54310df73f4f7a3bcb373',
  TSLA:'0x322f0929c4625ed5bad873c95208d54e1c003b2d',
  NVDA:'0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec',
  AAPL:'0xaf3d76f1834a1d425780943c99ea8a608f8a93f9',

@@ -2,7 +2,7 @@ import {describe, it, expect} from 'vitest';
 import {stockCategories, referenceSymbol, filterStockMarkets} from './marketDirectory';
 describe('testnet stock directory', () => {
   it('retains reference categories without inventing registered markets', () => {
-    expect(stockCategories([])).toEqual(['TSLA','NVDA','AAPL','SPCX','GOOGL']);
+    expect(stockCategories([])).toEqual(['TSLA','NVDA','AAPL','SPCX','GOOGL','ANT']);
     expect(filterStockMarkets([], [], 'TSLA', '')).toEqual([]);
     expect(referenceSymbol('SPCX')).toBe('SPACEX');
     expect(referenceSymbol('UNKNOWN')).toBeUndefined();
