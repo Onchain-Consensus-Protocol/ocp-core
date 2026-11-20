@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { robinhoodRpcUrl } from "../server/chain/robinhoodRpc.js";
+import { ROBINHOOD_PUBLIC_RPC } from "../shared/robinhoodNetwork.js";
 
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
 const HASH = /^0x[0-9a-f]{64}$/i;
@@ -83,6 +84,29 @@ function safeReply(response: unknown, call: RpcCall) {
     : errorReply(call.id, -32000, "Upstream RPC unavailable");
 }
 
+async function fetchRpc(url: string, payload: RpcCall | RpcCall[], deadline: AbortSignal): Promise<unknown> {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.any([deadline, AbortSignal.timeout(5000)]),
+      redirect: "error",
+    });
+    return response.ok ? await response.json() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function usable(response: unknown, id: RpcId): boolean {
+  if (!object(response) || response.id !== id) return false;
+  if ("result" in response) return true;
+  if (!object(response.error)) return false;
+  const code = response.error.code;
+  return code !== -32005 && code !== 429;
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
@@ -124,22 +148,27 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
   try {
-    const upstreamCalls = calls.map(({ id, method, params }) => ({
+    const upstreamCalls: RpcCall[] = calls.map(({ id, method, params }) => ({
       jsonrpc: "2.0", id, method,
       // 仅允许常规读调用。限制模拟 gas，禁用调用方状态覆盖和交易发送。
       params: method === "eth_call" ? [{ ...(params[0] as JsonObject), gas: "0x4c4b40" }, params[1]] : params ?? [],
     }));
-    const upstream = await fetch(robinhoodRpcUrl(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(batched ? upstreamCalls : upstreamCalls[0]),
-      signal: AbortSignal.timeout(8000),
-      redirect: "error",
-    });
-    if (!upstream.ok) throw new Error("RPC unavailable");
-    const payload: unknown = await upstream.json();
+    const primary = robinhoodRpcUrl();
+    const deadline = AbortSignal.timeout(12_000);
+    const payload = await fetchRpc(primary, batched ? upstreamCalls : upstreamCalls[0], deadline);
     const responses = Array.isArray(payload) ? payload : [payload];
     const byId = new Map(responses.filter(object).map(value => [value.id, value]));
+    // 部分 RPC 会在批量响应里漏掉 id。只重试缺失的读请求，保留其余成功结果。
+    const missing = upstreamCalls.filter(call => !usable(byId.get(call.id), call.id));
+    for (let start = 0; start < missing.length && !deadline.aborted; start += 8) {
+      await Promise.all(missing.slice(start, start + 8).map(async call => {
+        let value = batched ? await fetchRpc(primary, call, deadline) : byId.get(call.id);
+        if (!usable(value, call.id) && primary !== ROBINHOOD_PUBLIC_RPC) {
+          value = await fetchRpc(ROBINHOOD_PUBLIC_RPC, call, deadline);
+        }
+        if (object(value) && usable(value, call.id)) byId.set(call.id, value);
+      }));
+    }
     const output = calls.map(call => safeReply(byId.get(call.id), call));
     reply(200, batched ? output : output[0]);
   } catch {

@@ -49,6 +49,21 @@ describe("Robinhood read RPC", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("retries only a missing batch reply on the private node then uses the public fallback", async () => {
+    vi.stubEnv("ROBINHOOD_RPC_URL", "https://rpc.example/key");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json([{ id: 1, result: "0x1237" }, { code: -32000 }]))
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(Response.json({ id: 2, result: "0x12" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const output = await call([request("eth_chainId"), request("eth_blockNumber", [], 2)]);
+    expect(output.body.map((entry: { result: string }) => entry.result)).toEqual(["0x1237", "0x12"]);
+    expect(fetchMock.mock.calls.slice(1).map(([url, init]) => [url, JSON.parse(init.body).id])).toEqual([
+      ["https://rpc.example/key", 2],
+      ["https://rpc.mainnet.chain.robinhood.com", 2],
+    ]);
+  });
+
   it("keeps upstream error details private", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
       id: 1, error: { code: -32602, message: "https://rpc.example/key", data: { url: "https://rpc.example/key" } },

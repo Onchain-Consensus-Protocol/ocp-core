@@ -9,7 +9,7 @@ import type {HistoryStore,HistoryKey,SharedHistoryResponse,IndexedHistoryRow} fr
 import {robinhoodRpcRequest} from './robinhoodRpc.js';
 let store:ChainHistoryStore|undefined,provider:JsonRpcProvider|undefined;
 const scheduled=new Map<string,Promise<unknown>>();
-function chainProvider(){return provider??=new JsonRpcProvider(robinhoodRpcRequest(),undefined,{cacheTimeout:-1,batchMaxCount:40});}
+function chainProvider(){return provider??=new JsonRpcProvider(robinhoodRpcRequest(),undefined,{cacheTimeout:-1,batchMaxCount:1});}
 export interface ChainHistoryHttpDependencies {
  store?:HistoryStore;factory?:string;now?:()=>number;
  sync?:(market:string)=>Promise<unknown>;

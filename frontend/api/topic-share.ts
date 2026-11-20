@@ -34,7 +34,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   try {
     // 分享数据仅从固定主网工厂读取，防止请求参数选择任意链或合约数据源。
     if (!provider) {
-      provider = new JsonRpcProvider(robinhoodRpcRequest(), 4663, {staticNetwork: true});
+      provider = new JsonRpcProvider(robinhoodRpcRequest(), 4663, {staticNetwork: true, batchMaxCount: 1});
     }
     const factory = new Contract(CURRENT_MAINNET_FACTORY, factoryAbi, provider);
     if (!await factory.isMarket(market)) {
