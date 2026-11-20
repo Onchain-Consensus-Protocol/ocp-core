@@ -1,15 +1,15 @@
 import type {IncomingMessage,ServerResponse} from 'node:http';
-import {JsonRpcProvider,FetchRequest,getAddress,ZeroAddress} from 'ethers';
+import {JsonRpcProvider,getAddress,ZeroAddress} from 'ethers';
 import {waitUntil} from '@vercel/functions';
 import {CURRENT_MAINNET_FACTORY} from '../../shared/mainnetDeployment.js';
 import {replayCheckpoint} from '../../testnet/priceHistory.js';
 import {ChainHistoryStore} from './store.js';
 import {syncIndexedMarket} from './indexer.js';
 import type {HistoryStore,HistoryKey,SharedHistoryResponse,IndexedHistoryRow} from './types.js';
-const RPC='https://rpc.mainnet.chain.robinhood.com';
+import {robinhoodRpcRequest} from './robinhoodRpc.js';
 let store:ChainHistoryStore|undefined,provider:JsonRpcProvider|undefined;
 const scheduled=new Map<string,Promise<unknown>>();
-function chainProvider(){if(!provider){const request=new FetchRequest(RPC);request.timeout=8000;provider=new JsonRpcProvider(request,undefined,{cacheTimeout:-1,batchMaxCount:40});}return provider;}
+function chainProvider(){return provider??=new JsonRpcProvider(robinhoodRpcRequest(),undefined,{cacheTimeout:-1,batchMaxCount:40});}
 export interface ChainHistoryHttpDependencies {
  store?:HistoryStore;factory?:string;now?:()=>number;
  sync?:(market:string)=>Promise<unknown>;

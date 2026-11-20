@@ -15,7 +15,7 @@ const TARGET_NETWORK_PARAMS = {
     symbol: config.nativeCurrencySymbol,
     decimals: 18,
   },
-  rpcUrls: [config.rpcUrl],
+  rpcUrls: [config.walletRpcUrl],
   ...(config.explorer ? { blockExplorerUrls: [config.explorer] } : {}),
 };
 

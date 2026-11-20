@@ -1,11 +1,12 @@
 import React from 'react';
 import {ImageResponse} from '@vercel/og';
-import {Contract, FetchRequest, JsonRpcProvider, getAddress} from 'ethers';
+import {Contract, JsonRpcProvider, getAddress} from 'ethers';
 import type {IncomingMessage, ServerResponse} from 'node:http';
 import factoryAbi from '../testnet/abi/TopicMarketStockFactory.json' with {type: 'json'};
 import {TopicCard, type TopicCardData} from '../server/share/topicCard.js';
 import {loadMarketBrand} from '../server/share/marketBrand.js';
 import {CURRENT_MAINNET_FACTORY} from '../shared/mainnetDeployment.js';
+import {robinhoodRpcRequest} from '../server/chain/robinhoodRpc.js';
 
 const origin = 'https://market.ocp-protocol.org';
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char =>
@@ -33,9 +34,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   try {
     // 分享数据仅从固定主网工厂读取，防止请求参数选择任意链或合约数据源。
     if (!provider) {
-      const rpc = new FetchRequest('https://rpc.mainnet.chain.robinhood.com');
-      rpc.timeout = 8000;
-      provider = new JsonRpcProvider(rpc, 4663, {staticNetwork: true});
+      provider = new JsonRpcProvider(robinhoodRpcRequest(), 4663, {staticNetwork: true});
     }
     const factory = new Contract(CURRENT_MAINNET_FACTORY, factoryAbi, provider);
     if (!await factory.isMarket(market)) {

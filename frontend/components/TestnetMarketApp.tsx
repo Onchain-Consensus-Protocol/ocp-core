@@ -228,7 +228,7 @@ export function TestnetMarketApp({lang = 'zh',degen=false}: {lang?: Language;deg
           await ethereum.request({method: 'wallet_addEthereumChain', params: [{
             chainId: '0x1237', chainName: 'Robinhood Chain',
             nativeCurrency: {name: 'Ether', symbol: 'ETH', decimals: 18},
-            rpcUrls: [config.rpcUrl || 'https://rpc.mainnet.chain.robinhood.com'],
+            rpcUrls: [config.walletRpcUrl],
             blockExplorerUrls: ['https://robinhoodchain.blockscout.com'],
           }]});
           await ethereum.request({method: 'wallet_switchEthereumChain', params: [{chainId: '0x1237'}]});

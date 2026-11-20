@@ -1,5 +1,6 @@
 import {CURRENT_MAINNET_FACTORY} from "./shared/mainnetDeployment";
 import {isMainnetMarketPage} from "./shared/marketPageMode";
+import {ROBINHOOD_PUBLIC_RPC} from "./shared/robinhoodNetwork";
 const mainnetMode=typeof window !== "undefined" && (
   isMainnetMarketPage(window.location.pathname, window.location.hostname) || window.location.pathname === "/lottery.html"
 );
@@ -10,7 +11,8 @@ export const config = {
   depositTokenAddress: "",
   marketFactoryAddress: mainnetFactory,
   chainId: mainnetMode ? 4663 : 0,
-  rpcUrl: mainnetMode ? "https://rpc.mainnet.chain.robinhood.com" : "",
+  rpcUrl: mainnetMode ? (import.meta.env.DEV ? ROBINHOOD_PUBLIC_RPC : new URL("/api/robinhood-rpc", window.location.origin).href) : "",
+  walletRpcUrl: mainnetMode ? ROBINHOOD_PUBLIC_RPC : "",
   explorer: mainnetMode ? "https://robinhoodchain.blockscout.com" : "",
   marketEnabled: mainnetMode && /^0x[0-9a-fA-F]{40}$/.test(mainnetFactory) && !/^0x0{40}$/.test(mainnetFactory),
   isLocalDev: false,
