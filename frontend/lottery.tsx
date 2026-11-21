@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Contract, JsonRpcProvider, ZeroAddress, formatUnits, isAddress } from "ethers";
 import { OCPMenu } from "./components/OCPMenu";
 import { LanguageToggle } from "./components/LanguageToggle";
+import { LotteryAdmin } from "./components/LotteryAdmin";
 import { config } from "./config";
 import { lotteryApiUrl, lotteryContractAddress } from "./shared/lotteryConfig";
 import { useWallet } from "./useWallet";
@@ -18,7 +19,8 @@ const lotteryAbi = [
   "function assets(uint256 index) view returns (address)",
   "function claim(address[] tokens)",
 ];
-const tokenAbi = ["function symbol() view returns (string)", "function decimals() view returns (uint8)"];
+const tokenAbi = ["function symbol() view returns (string)", "function decimals() view returns (uint8)",
+  "function balanceOf(address account) view returns (uint256)"];
 const txHashPattern = /^0x[0-9a-fA-F]{64}$/;
 const isUint = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9]{1,78}$/.test(value);
@@ -47,6 +49,7 @@ type ChainRound = {
   pendingWeight: bigint;
   drandRound: bigint;
   assets: PrizeAsset[];
+  poolAssets: PrizeAsset[];
   chainTime: number;
 };
 
@@ -68,22 +71,20 @@ async function getChainRound(address: string): Promise<ChainRound> {
   if (!block) throw new Error("Robinhood Chain returned no latest block");
   const at = { blockTag: block.number };
   const [active, pending] = await Promise.all([contract.activePrize(at), contract.pendingRound(at)]);
-  const assets: PrizeAsset[] = [];
-  if (active.winner !== ZeroAddress) {
-    const count = Number(await contract.assetCount(at));
-    const addresses = await Promise.all(Array.from({ length: count }, (_, index) => contract.assets(index, at)));
-    const amounts = await Promise.all(addresses.map(token => contract.prize(token, at)));
-    await Promise.all(addresses.map(async (token, index) => {
-      if (amounts[index] === 0n) return;
-      const erc20 = new Contract(token, tokenAbi, rpc);
-      const [symbol, decimals] = await Promise.allSettled([erc20.symbol(at), erc20.decimals(at)]);
-      assets[index] = {
-        token, amount: amounts[index],
-        decimals: decimals.status === "fulfilled" ? Number(decimals.value) : null,
-        symbol: symbol.status === "fulfilled" ? symbol.value : null,
-      };
-    }));
-  }
+  const count = Number(await contract.assetCount(at));
+  const addresses = await Promise.all(Array.from({ length: count }, (_, index) => contract.assets(index, at)));
+  const balances = await Promise.all(addresses.map(async token => {
+    const erc20 = new Contract(token, tokenAbi, rpc);
+    const [balance, prize] = await Promise.all([
+      erc20.balanceOf(address, at),
+      active.winner !== ZeroAddress ? contract.prize(token, at) : 0n,
+    ]);
+    if (balance === 0n && prize === 0n) return null;
+    const [symbol, decimals] = await Promise.allSettled([erc20.symbol(at), erc20.decimals(at)]);
+    return { token, balance, prize, decimals: decimals.status === "fulfilled" ? Number(decimals.value) : null,
+      symbol: symbol.status === "fulfilled" ? String(symbol.value) : null };
+  }));
+  const amounts = balances.filter(entry => entry !== null);
   return {
     winner: active.winner,
     cutoff: Number(active.cutoff),
@@ -92,7 +93,8 @@ async function getChainRound(address: string): Promise<ChainRound> {
     pendingRoot: pending.root,
     pendingWeight: pending.totalWeight,
     drandRound: pending.drandRound,
-    assets: assets.filter(Boolean),
+    assets: amounts.filter(entry => entry.prize > 0n).map(entry => ({ ...entry, amount: entry.prize })),
+    poolAssets: amounts.filter(entry => entry.balance > 0n).map(entry => ({ ...entry, amount: entry.balance })),
     chainTime: block.timestamp,
   };
 }
@@ -263,8 +265,8 @@ function LotteryPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{t("每周协议费抽奖", "Weekly fee lottery")}</h1>
           <p className="lottery-subtle mt-2 text-sm">{t(
-            "美国太平洋时间：周日 04:00 截止，16:00 补漏结束（PST）。夏令时为周日 05:00 和 17:00（PDT）。",
-            "US Pacific Time: eligibility closes Sunday at 4 AM and corrections close at 4 PM (PST). During daylight time, the cutoffs are Sunday at 5 AM and 5 PM (PDT).",
+            "美国太平洋时间，周日 08:00 截止统计，20:00 停止补漏，21:00 正常开奖。",
+            "Sundays in US Pacific time: eligibility closes at 8 AM, corrections close at 8 PM, and the draw is scheduled for 9 PM.",
           )}</p>
         </div>
         {(lotteryContractAddress || snapshotUrl) && !address && <button type="button" className="lottery-action" onClick={connectWallet}>
@@ -282,6 +284,12 @@ function LotteryPage() {
         <h2 id="lottery-prize" className="text-xl font-semibold">{t("链上奖池", "On-chain prize")}</h2>
         {chainError && <p role="alert" className="mt-3 text-sm">{t("暂时无法读取链上奖池。", "The on-chain prize is temporarily unavailable.")}</p>}
         {!chainError && !chain && <p role="status" className="lottery-subtle mt-3 text-sm">{t("正在读取链上奖池…", "Loading on-chain prize…")}</p>}
+        {chain && <div className="mt-3 text-sm">
+          <p className="font-semibold">{t("合约余额", "Pool balance")}</p>
+          {chain.poolAssets.length ? <ul className="lottery-amount mt-1 space-y-1">{chain.poolAssets.map(asset => <li key={asset.token}>
+            {asset.decimals === null ? `${asset.amount} ${t("最小单位", "base units")}` : formatUnits(asset.amount, asset.decimals)} {asset.symbol || asset.token}
+          </li>)}</ul> : <p className="lottery-subtle">{t("奖池暂无代币余额。", "The pool has no token balances yet.")}</p>}
+        </div>}
         {chain && chain.pendingCutoff !== 0 && <p className="lottery-subtle mt-3 text-sm">
           {t("等待开奖", "Draw pending")} · {formatDate(chain.pendingCutoff)} · drand #{chain.drandRound.toString()}
         </p>}
@@ -315,6 +323,8 @@ function LotteryPage() {
           <p role="status" className="text-sm">{claimMessage}</p>
         </div>}
       </section>}
+      {lotteryContractAddress && <LotteryAdmin lotteryAddress={lotteryContractAddress} signer={signer}
+        walletAddress={address} lang={lang} onChange={() => setRefresh(value => value + 1)} />}
       {snapshotUrl && <section className="lottery-card p-5 sm:p-6" aria-labelledby="lottery-weights">
         <h2 id="lottery-weights" className="text-xl font-semibold">{t("资格与权重", "Eligibility and weights")}</h2>
         {snapshotError && <p role="alert" className="mt-3 text-sm">{t("暂时无法读取抽奖明细。", "The lottery ledger is temporarily unavailable.")}</p>}
@@ -356,8 +366,8 @@ function LotteryPage() {
           <div>
             <dt className="font-semibold">{t("怎么抽", "How the winner is drawn")}</dt>
             <dd className="lottery-subtle mt-1">{t(
-              "符合条件的实收协议交易费组成全站奖池，每周抽一位。各代币的协议费按当期美元报价折算，中奖概率等于你的手续费占比。周日下午补漏结束后锁定权重，再用可验证的随机数开奖。",
-              "Eligible protocol trading fees form one sitewide pool with one winner per week. Fees are valued in USD for the draw. Your chance is your share of eligible fees. After corrections close on Sunday afternoon Pacific Time, weights are locked and the winner is drawn with verifiable randomness.",
+              "符合条件的实收协议交易费组成全站奖池，每周抽一位。各代币的协议费按当期美元报价折算，中奖概率等于你的手续费占比。补漏结束后锁定权重，若名单锁晚了，就用随后发布的随机数补开当周。",
+              "Eligible protocol trading fees form one sitewide pool with one winner per week. Fees are valued in USD for the draw. Your chance is your share of eligible fees. Weights are locked after corrections close. If locking runs late, the same week’s draw uses a later randomness round.",
             )}</dd>
           </div>
           <div>
