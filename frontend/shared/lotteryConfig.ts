@@ -9,8 +9,13 @@ export const lotteryContractAddress = address && /^0x[0-9a-fA-F]{40}$/.test(addr
 const api = import.meta.env.VITE_LOTTERY_API_URL?.trim();
 export function lotteryApiUrl(path: string) {
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
-  const base = api || (local ? "http://127.0.0.1:8787/" : "");
-  return base ? resolveLotteryApiUrl(base, path, window.location.origin) : null;
+  if (api || local) return resolveLotteryApiUrl(api || "http://127.0.0.1:8787/", path, window.location.origin);
+  const requested = new URL(path, window.location.origin);
+  const endpoint = new URL("/api/lottery-keeper", window.location.origin);
+  endpoint.searchParams.set("endpoint", requested.pathname.slice(1));
+  const round = requested.searchParams.get("round");
+  if (round !== null) endpoint.searchParams.set("round", round);
+  return endpoint.href;
 }
 
 export function resolveLotteryApiUrl(api: string, path: string, origin: string) {

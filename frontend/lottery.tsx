@@ -114,6 +114,7 @@ function LotteryPage() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [chain, setChain] = useState<ChainRound | null>(null);
   const [snapshotError, setSnapshotError] = useState(false);
+  const [snapshotUnpublished, setSnapshotUnpublished] = useState(false);
   const [chainError, setChainError] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [refresh, setRefresh] = useState(0);
@@ -147,11 +148,20 @@ function LotteryPage() {
       void (async () => {
         try {
           const response = await fetch(snapshotUrl, { signal: request.signal, cache: "no-store" });
+          if (response.status === 404) {
+            if (!request.signal.aborted) {
+              setSnapshot(null);
+              setSnapshotError(false);
+              setSnapshotUnpublished(true);
+            }
+            return;
+          }
           if (!response.ok) throw new Error("Snapshot request failed");
           const data = validateSnapshot(await response.json());
           if (!request.signal.aborted) {
             setSnapshot(data);
             setSnapshotError(false);
+            setSnapshotUnpublished(false);
           }
         } catch {
           if (!request.signal.aborted) setSnapshotError(true);
@@ -328,7 +338,9 @@ function LotteryPage() {
       {snapshotUrl && <section className="lottery-card p-5 sm:p-6" aria-labelledby="lottery-weights">
         <h2 id="lottery-weights" className="text-xl font-semibold">{t("资格与权重", "Eligibility and weights")}</h2>
         {snapshotError && <p role="alert" className="mt-3 text-sm">{t("暂时无法读取抽奖明细。", "The lottery ledger is temporarily unavailable.")}</p>}
-        {!snapshotError && !snapshot && <p role="status" className="lottery-subtle mt-3 text-sm">{t("正在读取明细…", "Loading lottery ledger…")}</p>}
+        {!snapshotError && !snapshot && <p role="status" className="lottery-subtle mt-3 text-sm">{snapshotUnpublished
+          ? t("抽奖名单尚未公布。", "The lottery ledger has not been published yet.")
+          : t("正在读取明细…", "Loading lottery ledger…")}</p>}
         {snapshot && <div className="mt-3 space-y-4 text-sm">
           <p className="lottery-subtle">{t("本期截止", "Round cutoff")} · {formatDate(snapshot.round)}</p>
           {chainMatchesLedger === false && <p role="alert">{t("抽奖明细和已锁定的链上记录不一致。", "The published ledger differs from the locked on-chain record.")}</p>}
