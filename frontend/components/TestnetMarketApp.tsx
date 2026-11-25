@@ -539,9 +539,6 @@ export function TestnetMarketApp({lang = 'zh',degen=false}: {lang?: Language;deg
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <span className="text-xs font-bold text-accent">{t('Robinhood 主网','Robinhood Mainnet')}</span>
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <button type="button" className="text-xs text-accent whitespace-nowrap hover:underline" disabled={busy} aria-pressed={cryptoSection&&!selected&&!creating} onClick={()=>{setCreating(false);chooseCategory(cryptoSection&&!selected&&!creating?'all':'crypto');}}>
-          {t('加密货币','Crypto')}
-        </button>
         <a className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-accent hover:underline" href={`/lottery.html?lang=${lang}`}>
           <Ticket size={14} aria-hidden="true" />
           {t('协议费抽奖','Fee lottery')}
@@ -567,7 +564,27 @@ export function TestnetMarketApp({lang = 'zh',degen=false}: {lang?: Language;deg
       {coreHistoryError&&<p role="status" className="text-xs text-text-muted mt-3">{coreHistoryError}</p>}
       {coreRecord?.market===selected&&<p className="text-[10px] text-text-muted mt-2">{t('质押记录截至区块','Stake history through block')} {coreRecord.value.latestBlock}</p>}
     </>:<>
-      {selectedCategory==='all'?<section className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-slate-50 p-6 sm:p-10 mb-6"><div className="text-xs tracking-widest font-bold text-accent mb-3">OCP MARKET</div><div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6"><div><h1 className="text-2xl leading-snug sm:text-5xl sm:leading-tight font-bold tracking-tight">{cryptoSection?t('加密货币市场','Crypto markets'):t('围绕你关注的股票发起话题，参与交易。','Ticker. Topic. Trade.')}</h1><p className="text-sm text-text-muted mt-4">{cryptoSection?t('使用各自的代币开题、交易和结算。','Create, trade and settle markets in their own tokens.'):'Every stock has a story. Trade & Pump it.'}</p></div><button className={small+' bg-accent text-white inline-flex items-center gap-2'} disabled={busy} onClick={openCreation}><Plus size={16}/>{t('发起话题','Create topic')}</button></div></section>:<div className="flex items-center justify-between gap-4 mb-5"><h1 className="text-2xl font-bold">{selectedCategory}</h1><button className={small+' bg-accent text-white'} onClick={openCreation}>{t('发起话题','Create topic')}</button></div>}
+      <section className="mb-6 rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-slate-50 p-6 sm:p-10">
+        <div className="mb-3 text-xs font-bold tracking-widest text-accent">OCP MARKET</div>
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold leading-snug tracking-tight sm:text-5xl sm:leading-tight">Ticker. Topic. Trade.</h1>
+            <p className="mt-4 text-sm text-text-muted">Every ticker has a story. Trade &amp; Pump it.</p>
+          </div>
+          <button type="button" className={small+' inline-flex items-center gap-2 bg-accent text-white'}
+            disabled={busy||creationAssets.length===0} onClick={openCreation}>
+            <Plus size={16}/>{t('发起话题','Create topic')}
+          </button>
+        </div>
+      </section>
+      <div className="mb-5 inline-flex rounded-xl border border-border bg-white p-1" role="group" aria-label={t('市场类型','Market type')}>
+        {([{category:'all',label:t('股票','Stocks')},{category:'crypto',label:t('加密货币','Crypto')}]).map(option=>{
+          const active = cryptoSection === (option.category==='crypto');
+          return <button key={option.category} type="button" aria-pressed={active} disabled={busy}
+            className={'rounded-lg px-4 py-2 text-sm '+(active?'bg-orange-50 font-bold text-accent':'text-text-muted hover:text-text')}
+            onClick={()=>{if(!active)chooseCategory(option.category);}}>{option.label}</button>;
+        })}
+      </div>
       {!directory||(!viewLive&&directory.markets.length===0)?<p className="p-10 text-center text-text-muted">{t('正在读取链上市场…','Loading on-chain markets…')}</p>:<div className="grid lg:grid-cols-[176px_minmax(0,1fr)] gap-4"><aside aria-label={cryptoSection?t('加密货币话题','Crypto topics'):t('股票话题','Stock topics')} className="rounded-xl border border-border bg-white p-2 self-start flex gap-1 overflow-x-auto lg:block lg:space-y-1">{['all',...categories].map(symbol=><button key={symbol} type="button" aria-pressed={selectedCategory===symbol} disabled={busy} className={'shrink-0 lg:w-full flex flex-col rounded-lg px-3 py-2.5 text-sm text-left '+(selectedCategory===symbol?'bg-orange-50 text-orange-600 font-bold':'text-text-muted hover:text-text')} onClick={()=>chooseCategory(cryptoSection?(symbol==='all'?'crypto':'crypto:'+symbol):symbol)}><span className="flex w-full justify-between gap-4"><span>{symbol==='all'?t('全部话题','All topics'):symbol}</span><span className="text-[11px] text-text-muted">{categoryCount(symbol)}</span></span>{!cryptoSection&&symbol!=='all'&&referenceSymbol(symbol)&&<span className="w-full"><StockPriceReference symbol={referenceSymbol(symbol)!} lang={lang} compact context="mainnet"/></span>}</button>)}</aside><section className="min-w-0">{!cryptoSection&&category!=='all'&&referenceSymbol(category)&&<StockPriceReference key={category} symbol={referenceSymbol(category)!} lang={lang} context="mainnet"/>}<h2 className="text-xl font-bold mb-4">{selectedCategory==='all'?t('全部市场','All markets'):t(`${selectedCategory} 的全部话题`,`${selectedCategory} topics`)}</h2><div className="flex flex-wrap gap-3 mb-5"><label className="flex flex-1 min-w-[180px] items-center gap-2 border border-border bg-white rounded-xl px-3"><Search size={16}/><input aria-label="Search markets" className="py-3 bg-transparent text-sm w-full outline-none" value={query} onChange={e=>setQuery(e.target.value)} placeholder={t('搜索话题或标的…','Search questions or tickers…')}/></label><select className="border border-border rounded-xl p-2 bg-white" aria-label="Market phase" value={phaseFilter} onChange={e=>setPhaseFilter(e.target.value)}><option value="all">{t('全部阶段','All phases')}</option>{[0,1,2,3,4].map(i=><option value={i} key={i}>{phaseName(i)}</option>)}</select></div><div className="grid sm:grid-cols-2 gap-4">{visibleMarkets.map(item=>{const asset=directory.stocks.find(a=>a.address.toLowerCase()===item.stock.toLowerCase());return <TestnetMarketCard readHistory={reader.readBackgroundPriceHistory} readCachedHistory={reader.readCachedPriceHistory} key={item.address} market={item} symbol={asset?.symbol??short(item.stock)} phaseLabel={phaseName(item.phase)} lang={lang} now={now} disabled={busy} onClick={()=>chooseMarket(item.address)}/>})}</div>{!visibleMarkets.length&&<p className="border border-dashed border-border rounded-2xl p-10 text-center text-sm text-text-muted">{t('当前分类没有匹配的市场。','No matching markets.')}</p>}</section></div>}
     </>)}
   </div>;
