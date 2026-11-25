@@ -1,3 +1,4 @@
+import { cryptoAssets } from '../shared/cryptoAssets';
 import {loadViewSnapshot,saveViewSnapshot} from '../testnet/viewCache';
 import {DegenMarketView} from './DegenMarketView';
 import {ActivityRecords} from './ActivityRecords';
@@ -100,7 +101,9 @@ export function TestnetMarketApp({lang = 'zh',degen=false}: {lang?: Language;deg
   const pending = useRef(false);
   const stock = directory?.stocks.find(asset => asset.address.toLowerCase() === market?.stock.toLowerCase());
   const enabledStocks = directory?.stocks.filter(asset => asset.enabled) ?? [];
-  const creationStock = enabledStocks.find(asset => asset.address === stockAddress);
+  const cryptoAddresses = new Set<string>(cryptoAssets.map(asset=>asset.address.toLowerCase()));
+  const creationAssets = category==='crypto' ? enabledStocks.filter(asset=>cryptoAddresses.has(asset.address.toLowerCase())) : enabledStocks;
+  const creationStock = creationAssets.find(asset => asset.address === stockAddress);
   const categories = stockCategories(directory?.stocks ?? []);
   const visibleMarkets = filterStockMarkets(directory?.markets ?? [], directory?.stocks ?? [], category, query).filter(m=>phaseFilter==='all'||String(m.phase)===phaseFilter);
   const categoryCount = (symbol: string) => filterStockMarkets(directory?.markets ?? [], directory?.stocks ?? [], symbol, '').length;
@@ -523,6 +526,9 @@ export function TestnetMarketApp({lang = 'zh',degen=false}: {lang?: Language;deg
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <span className="text-xs font-bold text-accent">{t('Robinhood 主网','Robinhood Mainnet')}</span>
       <div className="flex flex-wrap items-center gap-3 text-sm">
+        <button type="button" className="text-xs text-accent whitespace-nowrap hover:underline" disabled={busy} aria-pressed={category==='crypto'&&!selected&&!creating} onClick={()=>{setCreating(false);chooseCategory(category==='crypto'&&!selected&&!creating?'all':'crypto');}}>
+          {t('加密货币','Crypto')}
+        </button>
         <a className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-accent hover:underline" href={`/lottery.html?lang=${lang}`}>
           <Ticket size={14} aria-hidden="true" />
           {t('协议费抽奖','Fee lottery')}
@@ -536,7 +542,23 @@ export function TestnetMarketApp({lang = 'zh',degen=false}: {lang?: Language;deg
     {!viewLive&&(directory||market)&&<p role="status" className="text-xs text-text-muted mb-3">{t('正在核对最新链上状态，缓存仅供浏览。','Verifying live state; cached data is for display only.')}</p>}
     {pollError&&<p role="status" className="text-sm text-orange-500 mb-4">{t('链上状态自动更新失败，请点击刷新确认最新申请状态。','Automatic state refresh failed. Refresh to check the latest request status.')}</p>}
     {notice&&<div role="status" className="rounded-xl border border-border p-3 text-sm mb-4 break-words">{notice}{txHash&&<a className="ml-2 text-accent underline" href={config.explorer+'/tx/'+txHash} target="_blank" rel="noreferrer">{t('查看交易','View transaction')}</a>}</div>}
-    {configured&&(creating?<form className={box+' max-w-xl mx-auto space-y-4 bg-white'} onSubmit={e=>{e.preventDefault();if(validCreation)void transact(c=>c.createMarket({...topic,stock:stockAddress,coreEnd:BigInt(finalTimestamp)}),created);}}><div className="flex justify-between items-center"><h2 className="text-xl font-bold">{t('发起话题','Create topic')}</h2><button className={small} type="button" disabled={busy} onClick={()=>setCreating(false)}>{t('取消','Cancel')}</button></div><label className="block text-sm">{t('股票','Stock')}<select className={field} value={stockAddress} onChange={e=>setStockAddress(e.target.value)} disabled={busy}>{enabledStocks.map(a=><option key={a.address} value={a.address}>{a.symbol}</option>)}</select></label>{(['topic','yesRule','noRule','invalidRule'] as const).map((key,i)=><label className="block text-sm" key={key}>{[t('话题内容','Market question'),'YES','NO','INVALID'][i]}<textarea required rows={2} className={field} value={topic[key]} disabled={busy} onChange={e=>setTopic({...topic,[key]:e.target.value})}/></label>)}<FinalDeadlineInput lang={lang} value={deadline} onChange={setDeadline} now={now}/><p className="text-xs text-text-muted">{t('Genesis提前2小时截止，Formal提前1小时截止。创建需支付主网 gas。','Genesis closes 2 hours before the final cutoff; Formal 1 hour before it. Creation requires mainnet gas only.')}</p><Button type="submit" className="w-full" disabled={!viewLive||!wallet||busy||!validCreation}>{t('在钱包中确认创建','Confirm creation in wallet')}</Button></form>:selected?<>
+    {category==='crypto'&&!selected&&!creating?<section className={box+' space-y-4'} aria-label={t('加密货币','Crypto')}>
+      <h1 className="text-2xl font-bold">{t('加密货币','Crypto')}</h1>
+      <p className="text-sm text-text-muted">{t('各市场使用对应代币交易和结算。','Each market trades and settles in its own token.')}</p>
+      <ul className="divide-y divide-border">
+        {cryptoAssets.map(asset=>{
+          const registered = viewLive && enabledStocks.find(candidate=>candidate.address.toLowerCase()===asset.address.toLowerCase());
+          return <li key={asset.address} className="flex flex-wrap items-center justify-between gap-2 py-3">
+            <a className="font-semibold hover:underline" href={config.explorer+'/token/'+asset.address} target="_blank" rel="noreferrer">{asset.symbol}</a>
+            {registered ? <Button size="sm" disabled={busy} onClick={()=>{setStockAddress(registered.address);setCreating(true);}}>{t('发起话题','Create topic')}</Button>
+              : <span className="text-xs text-text-muted">{viewLive?t('待开放','Pending listing'):t('正在核对链上状态','Checking on-chain status')}</span>}
+          </li>;
+        })}
+      </ul>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {directory?.markets.filter(item=>cryptoAddresses.has(item.stock.toLowerCase())).map(item=><TestnetMarketCard readHistory={reader.readBackgroundPriceHistory} readCachedHistory={reader.readCachedPriceHistory} key={item.address} market={item} symbol={cryptoAssets.find(asset=>asset.address.toLowerCase()===item.stock.toLowerCase())!.symbol} phaseLabel={phaseName(item.phase)} lang={lang} now={now} disabled={busy} onClick={()=>chooseMarket(item.address)}/>)}
+      </div>
+    </section>:configured&&(creating?<form className={box+' max-w-xl mx-auto space-y-4 bg-white'} onSubmit={e=>{e.preventDefault();if(validCreation)void transact(c=>c.createMarket({...topic,stock:stockAddress,coreEnd:BigInt(finalTimestamp)}),created);}}><div className="flex justify-between items-center"><h2 className="text-xl font-bold">{t('发起话题','Create topic')}</h2><button className={small} type="button" disabled={busy} onClick={()=>setCreating(false)}>{t('取消','Cancel')}</button></div><label className="block text-sm">{category==='crypto'?t('抵押代币','Collateral token'):t('股票','Stock')}<select className={field} value={stockAddress} onChange={e=>setStockAddress(e.target.value)} disabled={busy}>{creationAssets.map(a=><option key={a.address} value={a.address}>{a.symbol}</option>)}</select></label>{(['topic','yesRule','noRule','invalidRule'] as const).map((key,i)=><label className="block text-sm" key={key}>{[t('话题内容','Market question'),'YES','NO','INVALID'][i]}<textarea required rows={2} className={field} value={topic[key]} disabled={busy} onChange={e=>setTopic({...topic,[key]:e.target.value})}/></label>)}<FinalDeadlineInput lang={lang} value={deadline} onChange={setDeadline} now={now}/><p className="text-xs text-text-muted">{t('Genesis提前2小时截止，Formal提前1小时截止。创建需支付主网 gas。','Genesis closes 2 hours before the final cutoff; Formal 1 hour before it. Creation requires mainnet gas only.')}</p><Button type="submit" className="w-full" disabled={!viewLive||!wallet||busy||!validCreation}>{t('在钱包中确认创建','Confirm creation in wallet')}</Button></form>:selected?<>
       <div className="flex justify-between items-center gap-3 mb-4"><button className={small+' inline-flex gap-2 items-center'} disabled={busy} onClick={()=>chooseMarket('')}><ArrowLeft size={15}/>{category==='all'?t('全部市场','All markets'):t(`返回 ${category} 话题`,`${category} topics`)}</button><button className={small+' inline-flex gap-2 items-center'} onClick={()=>void navigator.clipboard.writeText(window.location.href).then(()=>setNotice(t('话题链接已复制','Topic link copied')))}><Share2 size={15}/>{t('分享话题','Share topic')}</button></div>
       {market&&((market.phase===0&&now>=Number(market.genesisCutoff))||([1,2].includes(market.phase)&&(now>=Number(market.coreCutoff)||market.vaultResolved)&&!(market.early&&market.early.requestId>0n&&!market.vaultResolved)))&&<MarketSettlementNotice failed={market.phase===0} lang={lang} connected={!!wallet} busy={busy||!viewLive} onConnect={()=>void connect()} onProcess={()=>void transact(c=>market.phase===0?c.closeExpired(market.address):c.finalizeMarket(market.address))}/>}
       {market?.early&&market.early.requestId>0n&&!market.vaultResolved&&<EarlyTerminationNotice request={market.early} now={now} lang={lang} connected={!!wallet} busy={busy||!viewLive} onConnect={()=>void connect()} onProcess={()=>void transact(c=>c.processEarlyTermination(market.address))}/>}
