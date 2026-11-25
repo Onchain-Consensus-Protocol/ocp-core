@@ -109,7 +109,7 @@ export function TestnetMarketApp({lang = 'zh',degen=false}: {lang?: Language;deg
   const sectionMarkets = (directory?.markets ?? []).filter(item=>sectionAddresses.has(item.stock.toLowerCase()));
   const creationAssets = enabledStocks.filter(asset=>sectionAddresses.has(asset.address.toLowerCase()));
   const creationStock = creationAssets.find(asset => asset.address === stockAddress);
-  const categories = stockCategories(sectionStocks);
+  const categories = cryptoSection ? cryptoAssets.map(asset=>asset.symbol) : stockCategories(sectionStocks);
   const selectedCategory = cryptoSection ? cryptoSymbol : category;
   const visibleMarkets = filterStockMarkets(sectionMarkets, sectionStocks, selectedCategory, query)
     .filter(m=>phaseFilter==='all'||String(m.phase)===phaseFilter);
