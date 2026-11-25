@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {Interface,ZeroAddress,getAddress,type Provider} from 'ethers';
+import {Interface,ZeroAddress,getAddress,solidityPacked,type Provider} from 'ethers';
 import {exchangePriceImpactBps,quoteExchange,readExchangeAssets,MAINNET_V3_QUOTER} from './exchangeQuote';
 
 const EXCHANGE='0x1111111111111111111111111111111111111111';
@@ -9,11 +9,13 @@ const ROUTER='0x4444444444444444444444444444444444444444';
 const FACTORY='0x5555555555555555555555555555555555555555';
 const POOL='0x6666666666666666666666666666666666666666';
 const OTHER='0x7777777777777777777777777777777777777777';
+const BRIDGE='0x8888888888888888888888888888888888888888';
+const BRIDGE_POOL='0x9999999999999999999999999999999999999999';
 const Q96=1n<<96n;
 const BLOCK_HASH=`0x${'aa'.repeat(32)}`;
 const ABI=new Interface([
   'function stock() view returns(address)','function stable() view returns(address)',
-  'function dexRouter() view returns(address)','function fee() view returns(uint24)',
+  'function dexRouter() view returns(address)','function fee() view returns(uint24)','function bridge() view returns(address)','function stableFee() view returns(uint24)',
   'function factory() view returns(address)','function factoryV3() view returns(address)',
   'function getPool(address,address,uint24) view returns(address)',
   'function feeAmountTickSpacing(uint24) view returns(int24)',
@@ -21,13 +23,15 @@ const ABI=new Interface([
   'function tickSpacing() view returns(int24)','function liquidity() view returns(uint128)',
   'function slot0() view returns(uint160,int24,uint16,uint16,uint16,uint8,bool)',
   'function balanceOf(address) view returns(uint256)','function decimals() view returns(uint8)','function symbol() view returns(string)',
+  'function quoteExactInput(bytes,uint256) returns(uint256,uint160[],uint32[],uint256)',
+  'function quoteExactOutput(bytes,uint256) returns(uint256,uint160[],uint32[],uint256)',
   'function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint24 fee,uint160 sqrtPriceLimitX96)) returns(uint256,uint160,uint32,uint256)',
   'function quoteExactOutputSingle((address tokenIn,address tokenOut,uint256 amount,uint24 fee,uint160 sqrtPriceLimitX96)) returns(uint256,uint160,uint32,uint256)',
 ]);
 interface Options {
   outputBalance?:bigint;chain?:bigint;wrongQuoter?:boolean;wrongPoolFactory?:boolean;reverseMismatch?:boolean;
   missingPool?:boolean;wrongTokens?:boolean;wrongSpacing?:boolean;locked?:boolean;
-  zeroQuote?:boolean;priceLimit?:boolean;reorgAfterQuote?:boolean;router02?:boolean;
+  zeroQuote?:boolean;priceLimit?:boolean;reorgAfterQuote?:boolean;router02?:boolean;bridge?:boolean;
 }
 function fixture(options:Options={}){
   const calls:{to:string;name:string;args:unknown[];blockTag:unknown}[]=[];
@@ -43,26 +47,36 @@ function fixture(options:Options={}){
       calls.push({to,name,args,blockTag:tx.blockTag});
       let values:unknown[];
       if(to===getAddress(EXCHANGE)){
+        if(name==='bridge'&&!options.bridge)return '0x';
+        if(name==='bridge')return ABI.encodeFunctionResult(parsed.fragment,[BRIDGE]);
+        if(name==='stableFee')return ABI.encodeFunctionResult(parsed.fragment,[100]);
         values=name==='stock'?[STOCK]:name==='stable'?[STABLE]:name==='dexRouter'?[ROUTER]:[3000];
       }else if(to===getAddress(ROUTER)){
         if(options.router02&&name==='factory')throw new Error('unknown factory selector');
         values=[FACTORY];
       }else if(to===getAddress(FACTORY)){
         values=name==='getPool'?[options.missingPool?ZeroAddress:
-          options.reverseMismatch&&getAddress(String(args[0]))===getAddress(STABLE)?OTHER:POOL]:[60];
+          options.reverseMismatch&&getAddress(String(args[0]))===getAddress(STABLE)?OTHER:Number(args[2])===100?BRIDGE_POOL:POOL]:[Number(args[0])===100?1:60];
       }else if(to===getAddress(POOL)){
         if(name==='factory')values=[options.wrongPoolFactory?OTHER:FACTORY];
         else if(name==='token0')values=[options.wrongTokens?OTHER:STOCK];
-        else if(name==='token1')values=[STABLE];
+        else if(name==='token1')values=[options.bridge?BRIDGE:STABLE];
         else if(name==='fee')values=[3000];
         else if(name==='tickSpacing')values=[options.wrongSpacing?10:60];
         else if(name==='liquidity')values=[1000000000000000000n];
         else values=[Q96,0,0,1,1,0,!options.locked];
+      }else if(to===getAddress(BRIDGE_POOL)){
+        const responses:Record<string,unknown[]>={factory:[FACTORY],token0:[STABLE],token1:[BRIDGE],fee:[100],tickSpacing:[1],liquidity:[1000000000000000000n],slot0:[Q96,0,0,1,1,0,true]};
+        values=responses[name];
       }else if(to===getAddress(STOCK)||to===getAddress(STABLE)){
         values=name==='balanceOf'?[options.outputBalance??((1n<<255n)-1n)]:name==='decimals'?[to===getAddress(STOCK)?18:6]:[to===getAddress(STOCK)?'TSLA':'USDG'];
       }else if(to===getAddress(MAINNET_V3_QUOTER)){
         if(name==='factory')values=[options.wrongQuoter?OTHER:FACTORY];
-        else {
+        else if(name==='quoteExactInput'||name==='quoteExactOutput'){
+          quoted=true;
+          const amount=BigInt(parsed.args[1]);
+          values=[name==='quoteExactInput'?3n*amount:(amount+2n)/3n,[Q96,Q96],[0,0],120000];
+        }else {
           quoted=true;
           const params=parsed.args[0];
           // Deliberately arbitrary raw-unit fixture values, not a frontend price formula.
@@ -148,3 +162,16 @@ describe('read-only QuoterV2 exact input/output',()=>{
 it('rejects exact output exceeding the real token balance before asking the quoter',async()=>{const {provider,calls}=fixture({outputBalance:99n});await expect(quoteExchange(provider,EXCHANGE,STABLE,STOCK,100n,'output')).rejects.toThrow('EXCHANGE_OUTPUT_BALANCE');expect(calls.some(c=>c.name==='quoteExactOutputSingle')).toBe(false);});
 
 it('measures exchange impact without treating the pool fee as price impact',()=>{expect(exchangePriceImpactBps(STOCK,STABLE,1000000n,997000n,1n<<96n,3000)).toBe(0);expect(exchangePriceImpactBps(STOCK,STABLE,1000000n,498500n,1n<<96n,3000)).toBe(5000);expect(exchangePriceImpactBps(STABLE,STOCK,1000000n,498500n,1n<<96n,3000)).toBe(5000);});
+
+it('quotes exact input and reverse exact output using the registered two-pool path',async()=>{
+  const {provider,calls}=fixture({bridge:true});
+  const input=await quoteExchange(provider,EXCHANGE,STABLE,STOCK,100n,'input');
+  const output=await quoteExchange(provider,EXCHANGE,STABLE,STOCK,300n,'output');
+  expect(input.amountOut).toBe(300n);
+  expect(output.amountIn).toBe(100n);
+  const types=['address','uint24','address','uint24','address'];
+  expect(calls.find(call=>call.name==='quoteExactInput')?.args[0])
+    .toBe(solidityPacked(types,[STABLE,100,BRIDGE,3000,STOCK]));
+  expect(calls.find(call=>call.name==='quoteExactOutput')?.args[0])
+    .toBe(solidityPacked(types,[STOCK,3000,BRIDGE,100,STABLE]));
+});

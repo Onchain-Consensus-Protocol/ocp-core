@@ -1,4 +1,4 @@
-import {Contract, ZeroAddress, getAddress, type Provider} from 'ethers';
+import {Contract, ZeroAddress, getAddress, solidityPacked, type Provider} from 'ethers';
 
 /** Existing QuoterV2, independently verified on chain 4663; its factory is checked on every quote. */
 export const MAINNET_V3_QUOTER='0x33e885eD0Ec9bF04EcfB19341582aADCb4c8A9E7';
@@ -10,6 +10,7 @@ const MAX_SQRT_RATIO=1461446703485210103287273052203988822378723970342n;
 const EXCHANGE_ABI=[
   'function stock() view returns(address)','function stable() view returns(address)',
   'function dexRouter() view returns(address)','function fee() view returns(uint24)',
+  'function bridge() view returns(address)','function stableFee() view returns(uint24)',
 ];
 const ROUTER_ABI=['function factory() view returns(address)','function factoryV3() view returns(address)'];
 const FACTORY_ABI=[
@@ -25,6 +26,8 @@ const POOL_ABI=[
 const TOKEN_ABI=['function decimals() view returns(uint8)','function symbol() view returns(string)','function balanceOf(address) view returns(uint256)'];
 const QUOTER_ABI=[
   'function factory() view returns(address)',
+  'function quoteExactInput(bytes path,uint256 amountIn) returns(uint256,uint160[],uint32[],uint256)',
+  'function quoteExactOutput(bytes path,uint256 amountOut) returns(uint256,uint160[],uint32[],uint256)',
   'function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint24 fee,uint160 sqrtPriceLimitX96) params) returns(uint256 amountOut,uint160 sqrtPriceX96After,uint32 initializedTicksCrossed,uint256 gasEstimate)',
   'function quoteExactOutputSingle((address tokenIn,address tokenOut,uint256 amount,uint24 fee,uint160 sqrtPriceLimitX96) params) returns(uint256 amountIn,uint160 sqrtPriceX96After,uint32 initializedTicksCrossed,uint256 gasEstimate)',
 ];
@@ -33,6 +36,7 @@ export interface ExchangeAssets {
   exchange:string;stock:string;stable:string;stockDecimals:number;stableDecimals:number;
   stockSymbol:string;stableSymbol:string;dexRouter:string;factory:string;pool:string;fee:number;
   tickSpacing:number;liquidity:bigint;sqrtPriceX96:bigint;tick:number;quoter:string;
+  bridge?:{token:string;fee:number;pool:string;sqrtPriceX96:bigint};
   blockNumber:number;blockHash:string;
 }
 export interface ExchangeQuote {
@@ -86,36 +90,57 @@ export async function readExchangeAssets(provider:Provider,exchangeAddress:strin
   await code(provider,factory,blockTag);
   const registry=new Contract(factory,FACTORY_ABI,provider);
   const quoteContract=new Contract(quoter,QUOTER_ABI,provider);
-  const [poolRaw,reverseRaw,quoterFactoryRaw,spacingRaw]=await Promise.all([
-    registry.getPool(stock,stable,fee,overrides),registry.getPool(stable,stock,fee,overrides),
-    quoteContract.factory(overrides),registry.feeAmountTickSpacing(fee,overrides),
-  ]);
-  if(address(quoterFactoryRaw)!==factory)throw new Error('EXCHANGE_QUOTER_FACTORY');
-  const pool=address(poolRaw);
-  if(address(reverseRaw)!==pool)throw new Error('EXCHANGE_POOL_REVERSE');
-  await code(provider,pool,blockTag);
-  const poolContract=new Contract(pool,POOL_ABI,provider);
+  // 旧适配器只有单池报价。只有明确暴露 bridge 的适配器使用双池路径。
+  let bridgeToken=ZeroAddress;
+  try {bridgeToken=await adapter.bridge(overrides);}
+  catch(error){if(!['CALL_EXCEPTION','BAD_DATA'].includes((error as {code?:string})?.code??''))throw error;}
+  const hasBridge=bridgeToken!==ZeroAddress;
+  if(hasBridge){
+    bridgeToken=address(bridgeToken);
+    if(bridgeToken===stock||bridgeToken===stable)throw new Error('EXCHANGE_PAIR');
+    await code(provider,bridgeToken,blockTag);
+  }
+  async function readPool(a:string,b:string,poolFee:number) {
+    if(!Number.isInteger(poolFee)||poolFee<=0||poolFee>=1_000_000)throw new Error('EXCHANGE_PAIR');
+    const [poolRaw,reverseRaw,spacingRaw]=await Promise.all([
+      registry.getPool(a,b,poolFee,overrides),registry.getPool(b,a,poolFee,overrides),
+      registry.feeAmountTickSpacing(poolFee,overrides),
+    ]);
+    const pool=address(poolRaw);
+    if(address(reverseRaw)!==pool)throw new Error('EXCHANGE_POOL_REVERSE');
+    await code(provider,pool,blockTag);
+    const contract=new Contract(pool,POOL_ABI,provider);
+    const [poolFactory,t0,t1,actualFee,poolSpacing,liquidity,slot0]=await Promise.all([
+      contract.factory(overrides),contract.token0(overrides),contract.token1(overrides),
+      contract.fee(overrides),contract.tickSpacing(overrides),contract.liquidity(overrides),contract.slot0(overrides),
+    ]);
+    if(address(poolFactory)!==factory||Number(actualFee)!==poolFee)throw new Error('EXCHANGE_POOL_IDENTITY');
+    const token0=address(t0),token1=address(t1);
+    if(!((token0===a&&token1===b)||(token0===b&&token1===a)))throw new Error('EXCHANGE_POOL_TOKENS');
+    const tickSpacing=Number(poolSpacing),sqrtPriceX96=BigInt(slot0[0]);
+    if(tickSpacing<=0||tickSpacing!==Number(spacingRaw))throw new Error('EXCHANGE_POOL_SPACING');
+    if(sqrtPriceX96<=MIN_SQRT_RATIO||sqrtPriceX96>=MAX_SQRT_RATIO||!slot0[6])throw new Error('EXCHANGE_POOL_NOT_READY');
+    return {pool,tickSpacing,sqrtPriceX96,tick:Number(slot0[1]),liquidity:BigInt(liquidity)};
+  }
   const stockContract=new Contract(stock,TOKEN_ABI,provider),stableContract=new Contract(stable,TOKEN_ABI,provider);
-  const [poolFactory,t0,t1,poolFee,poolSpacing,liquidity,slot0,stockDecimalsRaw,stableDecimalsRaw,stockSymbol,stableSymbol]=await Promise.all([
-    poolContract.factory(overrides),poolContract.token0(overrides),poolContract.token1(overrides),
-    poolContract.fee(overrides),poolContract.tickSpacing(overrides),poolContract.liquidity(overrides),
-    poolContract.slot0(overrides),stockContract.decimals(overrides),stableContract.decimals(overrides),
+  const [quoterFactoryRaw,primary,bridge,stockDecimalsRaw,stableDecimalsRaw,stockSymbol,stableSymbol]=await Promise.all([
+    quoteContract.factory(overrides),readPool(stock,hasBridge?bridgeToken:stable,fee),
+    hasBridge ? (async()=>{
+      const stableFee=Number(await adapter.stableFee(overrides));
+      const pool=await readPool(bridgeToken,stable,stableFee);
+      return {token:bridgeToken,fee:stableFee,pool:pool.pool,sqrtPriceX96:pool.sqrtPriceX96};
+    })() : undefined,
+    stockContract.decimals(overrides),stableContract.decimals(overrides),
     stockContract.symbol(overrides).catch(()=>stock),stableContract.symbol(overrides).catch(()=>stable),
   ]);
-  const token0=address(t0),token1=address(t1);
-  if(address(poolFactory)!==factory || BigInt(poolFee)!==BigInt(fee))throw new Error('EXCHANGE_POOL_IDENTITY');
-  if(!((token0===stock && token1===stable)||(token0===stable && token1===stock)))throw new Error('EXCHANGE_POOL_TOKENS');
-  const tickSpacing=Number(poolSpacing);
-  if(tickSpacing<=0 || tickSpacing!==Number(spacingRaw))throw new Error('EXCHANGE_POOL_SPACING');
-  const sqrtPriceX96=BigInt(slot0[0]);
-  if(sqrtPriceX96<=MIN_SQRT_RATIO || sqrtPriceX96>=MAX_SQRT_RATIO || !slot0[6])throw new Error('EXCHANGE_POOL_NOT_READY');
+  if(address(quoterFactoryRaw)!==factory)throw new Error('EXCHANGE_QUOTER_FACTORY');
   const stockDecimals=Number(stockDecimalsRaw),stableDecimals=Number(stableDecimalsRaw);
   if(!Number.isInteger(stockDecimals)||stockDecimals<0||stockDecimals>255
     ||!Number.isInteger(stableDecimals)||stableDecimals<0||stableDecimals>255)throw new Error('EXCHANGE_TOKEN_DECIMALS');
   const current=await provider.getBlock(blockTag);
   if(current?.hash!==head.hash)throw new Error('EXCHANGE_BLOCK_REORG');
-  return {exchange,stock,stable,stockDecimals,stableDecimals,stockSymbol,stableSymbol,dexRouter,factory,pool,fee,
-    tickSpacing,liquidity:BigInt(liquidity),sqrtPriceX96,tick:Number(slot0[1]),quoter,blockNumber:blockTag,blockHash:head.hash};
+  return {exchange,stock,stable,stockDecimals,stableDecimals,stockSymbol,stableSymbol,dexRouter,factory,fee,
+    ...primary,bridge,quoter,blockNumber:blockTag,blockHash:head.hash};
 }
 
 /** QuoterV2 eth_call: exact V3 fees, ticks and integer rounding; does not request signatures or broadcast. */
@@ -129,24 +154,48 @@ export async function quoteExchange(
   if(!((tokenIn===assets.stock&&tokenOut===assets.stable)
     ||(tokenIn===assets.stable&&tokenOut===assets.stock)))throw new Error('EXCHANGE_UNSUPPORTED_ASSET');
   if(exact==='output'){
-    const available=await new Contract(tokenOut,TOKEN_ABI,provider).balanceOf(assets.pool,{blockTag:assets.blockNumber});
+    const available=await new Contract(tokenOut,TOKEN_ABI,provider).balanceOf(tokenOut===assets.stable && assets.bridge ? assets.bridge.pool : assets.pool,{blockTag:assets.blockNumber});
     if(amount>BigInt(available))throw new Error('EXCHANGE_OUTPUT_BALANCE');
   }
   const quoter=new Contract(assets.quoter,QUOTER_ABI,provider);
+  const bridge=assets.bridge;
   let result;
-  try{result=exact==='input'
-    ?await quoter.quoteExactInputSingle.staticCall([tokenIn,tokenOut,amount,assets.fee,0n],{blockTag:assets.blockNumber})
-    :await quoter.quoteExactOutputSingle.staticCall([tokenIn,tokenOut,amount,assets.fee,0n],{blockTag:assets.blockNumber});
+  try {
+    if(bridge){
+      // QuoterV2 的 exactOutput 路径从输出币反向编码。
+      const first=exact==='input'?tokenIn:tokenOut, last=exact==='input'?tokenOut:tokenIn;
+      const [firstFee,lastFee]=first===assets.stock?[assets.fee,bridge.fee]:[bridge.fee,assets.fee];
+      const path=solidityPacked(['address','uint24','address','uint24','address'],[first,firstFee,bridge.token,lastFee,last]);
+      result=await (exact==='input'?quoter.quoteExactInput:quoter.quoteExactOutput).staticCall(path,amount,{blockTag:assets.blockNumber});
+    }else{
+      result=exact==='input'
+        ?await quoter.quoteExactInputSingle.staticCall([tokenIn,tokenOut,amount,assets.fee,0n],{blockTag:assets.blockNumber})
+        :await quoter.quoteExactOutputSingle.staticCall([tokenIn,tokenOut,amount,assets.fee,0n],{blockTag:assets.blockNumber});
+    }
   }catch(error){if((error as {code?:string})?.code==='CALL_EXCEPTION')throw new Error('EXCHANGE_QUOTE_REVERTED');throw error;}
-  const quoted=BigInt(result[0]),sqrtPriceAfter=BigInt(result[1]);
+  const quoted=BigInt(result[0]);
   if(quoted<=0n)throw new Error('EXCHANGE_NO_LIQUIDITY');
-  // A quote reaching the implicit pool price limit may consume only part of exact-input funds.
-  // The deployed adapter requires all input to be spent, so never present that partial swap as executable.
-  if(sqrtPriceAfter<=MIN_SQRT_RATIO+1n || sqrtPriceAfter>=MAX_SQRT_RATIO-1n)throw new Error('EXCHANGE_PRICE_LIMIT');
+  const prices=bridge?Array.from(result[1] as bigint[]):[BigInt(result[1])];
+  if(prices.length!==(bridge?2:1)||prices.some(price=>price<=MIN_SQRT_RATIO+1n||price>=MAX_SQRT_RATIO-1n))
+    throw new Error('EXCHANGE_PRICE_LIMIT');
+  const amountIn=exact==='input'?amount:quoted, amountOut=exact==='input'?quoted:amount;
+  let priceImpactBps;
+  if(bridge){
+    const ratio=(from:string,to:string,sqrt:bigint,fee:number)=>{
+      const square=sqrt*sqrt,q192=1n<<192n;
+      return BigInt(from)<BigInt(to)?[square*BigInt(1_000_000-fee),q192*1_000_000n]:[q192*BigInt(1_000_000-fee),square*1_000_000n];
+    };
+    const fromStock=tokenIn===assets.stock;
+    const [firstN,firstD]=ratio(tokenIn,bridge.token,fromStock?assets.sqrtPriceX96:bridge.sqrtPriceX96,fromStock?assets.fee:bridge.fee);
+    const [lastN,lastD]=ratio(bridge.token,tokenOut,fromStock?bridge.sqrtPriceX96:assets.sqrtPriceX96,fromStock?bridge.fee:assets.fee);
+    const expected=amountIn*firstN*lastN, actual=amountOut*firstD*lastD;
+    priceImpactBps=actual>=expected?0:Number((expected-actual)*10000n/expected);
+  }else{
+    priceImpactBps=exchangePriceImpactBps(tokenIn,tokenOut,amountIn,amountOut,assets.sqrtPriceX96,assets.fee);
+  }
   const block=await provider.getBlock(assets.blockNumber);
   if(block?.hash!==assets.blockHash)throw new Error('EXCHANGE_BLOCK_REORG');
-  return {amountIn:exact==='input'?amount:quoted,amountOut:exact==='input'?quoted:amount,
-    priceImpactBps:exchangePriceImpactBps(tokenIn,tokenOut,exact==='input'?amount:quoted,exact==='input'?quoted:amount,assets.sqrtPriceX96,assets.fee),
+  return {amountIn,amountOut,priceImpactBps,
     blockNumber:assets.blockNumber,blockHash:assets.blockHash,pool:assets.pool,factory:assets.factory,
     exchange:assets.exchange,fee:assets.fee};
 }
